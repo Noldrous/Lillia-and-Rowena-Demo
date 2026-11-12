@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-canvas: #ffffff;
+    --bg-elevated: #f8fafc;
+    --bg-glass: rgba(255, 255, 255, 0.94);
+    --text-ink: #0d1015;
+    --text-slate: #475569;
+    --text-muted: #64748b;
+    --accent-sky: #0095ff;
+    --accent-sky-hover: #0077cc;
+    --accent-sky-soft: #e0f2fe;
+    --border-hairline: #e2e8f0;
+  }
+
+  html {
+    background-color: var(--bg-canvas);
+    color: var(--text-ink);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg-canvas);
+    color: var(--text-ink);
+    overflow-x: hidden;
+  }
+
+  .font-serif-display {
+    font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+    letter-spacing: -0.02em;
+  }
+
+  .font-mono-tech {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.blueprint-hairline-grid {
+  background-size: 48px 48px;
+  background-image:
+    linear-gradient(to right, rgba(0, 149, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 149, 255, 0.05) 1px, transparent 1px);
+}

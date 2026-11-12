@@ -1,0 +1,30 @@
+{
+  "name": "lillia-and-rowena/atelier-furniture",
+  "description": "Lillia and Rowena Furniture — PSR-4 Architectural Showroom, Admin Messenger Redirect, Color-Tiered Pricing, Exclusive Product Vouchers & Order Management System",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.1",
+    "ext-pdo": "*",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "App/",
+      "Library\\": "Library/",
+      "LilliaRowena\\Atelier\\": "src/PhpAtelier/"
+    },
+    "files": [
+      "Library/helpers.php"
+    ]
+  },
+  "scripts": {
+    "serve": "php -S 0.0.0.0:8000 index.php",
+    "test": "php test_user.php",
+    "dump-autoload": "composer dump-autoload -o"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}
