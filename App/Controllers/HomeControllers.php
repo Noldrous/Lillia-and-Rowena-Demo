@@ -14,7 +14,7 @@ use Library\Exceptions\ValidationException;
 /**
  * Part 4: HomeControllers
  * Handles Login, Logout, Welcome/Showroom view rendering, and JSON API actions
- * for Lillia & Rowena Furniture Atelier.
+ * for Lillia and Rowena Furniture.
  */
 class HomeControllers
 {

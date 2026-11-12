@@ -1,9 +1,9 @@
 /**
  * Lillia and Rowena Furniture — Pure Vanilla JavaScript Store & Business Logic Module
- * Works with JSON (/data/atelier_store.json) and PSR-4 PHP / Node API endpoints (/api/*).
+ * Works with JSON (/data/store.json) and PSR-4 PHP / Node API endpoints (/api/*).
  */
 
-export const ADMIN_MESSENGER_PLACEHOLDER_URL = 'https://m.me/lilliarowenafurniture.admin';
+export const ADMIN_MESSENGER_PLACEHOLDER_URL = 'https://www.messenger.com/t/100000505712325';
 
 export const ORDER_STATUS_STEPS = [
   'Inquiry Received',
@@ -179,7 +179,7 @@ export function validateLoginCredentials(email, accessCode, requestedRole) {
       valid: false,
       role: requestedRole,
       displayName: '',
-      errorMessage: 'Please enter a valid client or atelier email address.',
+      errorMessage: 'Please enter a valid client or admin email address.',
     };
   }
 
@@ -188,7 +188,7 @@ export function validateLoginCredentials(email, accessCode, requestedRole) {
       valid: false,
       role: requestedRole,
       displayName: '',
-      errorMessage: 'Please enter a valid 4+ character atelier access code or order key.',
+      errorMessage: 'Please enter a valid 4+ character access code or order key.',
     };
   }
 
@@ -200,7 +200,7 @@ export function validateLoginCredentials(email, accessCode, requestedRole) {
   return {
     valid: true,
     role: requestedRole,
-    displayName: requestedRole === 'admin' ? `${formattedName} (Atelier Admin)` : formattedName,
+    displayName: requestedRole === 'admin' ? `${formattedName} (Admin)` : formattedName,
     errorMessage: null,
   };
 }

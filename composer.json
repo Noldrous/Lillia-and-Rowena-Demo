@@ -1,5 +1,5 @@
 {
-  "name": "lillia-and-rowena/atelier-furniture",
+  "name": "lillia-and-rowena/furniture",
   "description": "Lillia and Rowena Furniture — PSR-4 Architectural Showroom, Admin Messenger Redirect, Color-Tiered Pricing, Exclusive Product Vouchers & Order Management System",
   "type": "project",
   "license": "proprietary",
@@ -11,8 +11,7 @@
   "autoload": {
     "psr-4": {
       "App\\": "App/",
-      "Library\\": "Library/",
-      "LilliaRowena\\Atelier\\": "src/PhpAtelier/"
+      "Library\\": "Library/"
     },
     "files": [
       "Library/helpers.php"

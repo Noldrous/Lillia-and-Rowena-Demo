@@ -10,8 +10,8 @@ use PDOException;
 use PDOStatement;
 
 /**
- * Part 2: Database wrapper for the MySQL 8.0.16+ InnoDB schema (database/bookhub.sql)
- * with automatic JSON datastore fallback (data/atelier_store.json) when PDO MySQL is offline.
+ * Part 2: Database wrapper for the MySQL 8.0.16+ InnoDB schema (database/furniture.sql)
+ * with automatic JSON datastore fallback (data/store.json) when PDO MySQL is offline.
  */
 class Database
 {
@@ -24,11 +24,11 @@ class Database
      */
     public function __construct(array $config = [])
     {
-        $this->jsonPath = $config['json_path'] ?? (dirname(__DIR__) . '/data/atelier_store.json');
+        $this->jsonPath = $config['json_path'] ?? (dirname(__DIR__) . '/data/store.json');
 
         $host = $config['host'] ?? (getenv('DB_HOST') ?: '');
         $port = $config['port'] ?? (getenv('DB_PORT') ?: '3306');
-        $dbname = $config['dbname'] ?? (getenv('DB_NAME') ?: 'lillia_rowena_atelier');
+        $dbname = $config['dbname'] ?? (getenv('DB_NAME') ?: 'lillia_rowena_furniture');
         $username = $config['user'] ?? (getenv('DB_USER') ?: 'root');
         $password = $config['pass'] ?? (getenv('DB_PASS') ?: '');
 
@@ -132,7 +132,7 @@ class Database
     }
 
     /**
-     * Read the full JSON datastore (`data/atelier_store.json`).
+     * Read the full JSON datastore (`data/store.json`).
      *
      * @return array<string, mixed>
      * @throws DatabaseException
@@ -154,7 +154,7 @@ class Database
     }
 
     /**
-     * Write updated state back to `data/atelier_store.json`.
+     * Write updated state back to `data/store.json`.
      *
      * @param array<string, mixed> $data
      * @throws DatabaseException

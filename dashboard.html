@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lillia and Rowena Furniture — Account Dashboard</title>
+    <meta name="description" content="Lillia and Rowena Furniture — Customer Account Dashboard and Admin Management Console." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/assets/css/style.css" />
+  </head>
+  <body class="bg-[#F4F9FF] text-[#0F172A] antialiased selection:bg-[#0095FF] selection:text-white min-h-screen flex flex-col">
+    <!-- Dedicated Logged-In Header (No Client/Admin Switcher — Strictly Shows Logged-In User's Account) -->
+    <header class="sticky top-0 z-40 bg-[#0B0F17] text-white border-b border-slate-800 shadow-sm">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <a href="/index.html" class="flex items-center gap-3 group">
+            <div class="w-9 h-9 rounded-lg bg-[#0095FF] text-white flex items-center justify-center font-serif-display text-sm font-bold">
+              LR
+            </div>
+            <div>
+              <span class="font-serif-display text-lg font-bold tracking-tight text-white block leading-none">
+                Lillia and Rowena Furniture
+              </span>
+              <span id="portal-header-subtitle" class="font-mono-tech text-[10px] uppercase tracking-widest text-[#BCE3FF] block mt-1">
+                My Account Dashboard
+              </span>
+            </div>
+          </a>
+        </div>
+
+        <!-- Logged-In User Pill + Back to Showroom & Log Out -->
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="portal-user-badge" class="text-xs font-semibold text-slate-200">Signed In</span>
+          </div>
+          <a
+            href="/index.html"
+            class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+          >
+            ← Back to Showroom
+          </a>
+          <button
+            type="button"
+            id="portal-logout-btn"
+            class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Log Out
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Workspace -->
+    <main class="flex-1 py-8 sm:py-12">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8">
+        <!-- =================================================================
+             1. USER-FRIENDLY CUSTOMER DASHBOARD (Shown ONLY when a Customer logs in)
+             ================================================================= -->
+        <section id="client-portal-view" class="hidden space-y-8">
+          <!-- Friendly Customer Welcome Banner Card -->
+          <div class="rounded-3xl bg-[#0B0F17] text-white p-6 sm:p-9 border border-slate-800 shadow-lg relative overflow-hidden">
+            <div
+              class="absolute inset-0 opacity-25 pointer-events-none"
+              style="background-image: radial-gradient(circle at 85% 20%, rgba(0, 149, 255, 0.4), transparent 55%);"
+            ></div>
+            <div class="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div class="space-y-2">
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0095FF]/20 border border-[#0095FF]/40 text-[#BCE3FF] text-xs font-semibold">
+                  Customer Account
+                </span>
+                <h1 class="font-serif-display text-3xl sm:text-4xl font-bold text-white">
+                  Welcome back, <span id="client-welcome-name">Rowena Vance</span>!
+                </h1>
+                <p class="text-sm text-slate-300 max-w-xl">
+                  Signed in as <span id="client-welcome-email" class="font-mono-tech text-[#BCE3FF]">rowena.vance@vancearchitects.com</span>. Here you can check your furniture delivery status, copy your exclusive Messenger voucher codes, or request a custom piece.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3 shrink-0">
+                <a
+                  href="/index.html#catalog-section"
+                  class="px-5 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+                >
+                  Browse Showroom Catalog →
+                </a>
+                <a
+                  href="https://www.messenger.com/t/100000505712325"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-5 py-3 rounded-xl bg-[#BCE3FF] hover:bg-white text-[#0D1015] text-xs sm:text-sm font-semibold transition-colors"
+                >
+                  Want to Request a Custom Design? ↗
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3 Friendly At-a-Glance Summary Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="bg-white rounded-2xl border border-[#BCE3FF] p-5 flex items-center gap-4 shadow-2xs">
+              <div class="w-12 h-12 rounded-2xl bg-[#EBF6FF] text-[#0095FF] flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-[#64748B]">Active Furniture Orders</p>
+                <p id="user-stat-orders" class="font-serif-display text-2xl font-bold text-[#0D1015]">2 Orders in Progress</p>
+                <p class="text-[11px] text-[#0077CC] font-medium">White-glove delivery included</p>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-[#BCE3FF] p-5 flex items-center gap-4 shadow-2xs">
+              <div class="w-12 h-12 rounded-2xl bg-[#EBF6FF] text-[#0095FF] flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-[#64748B]">My Messenger Vouchers</p>
+                <p id="user-stat-vouchers" class="font-serif-display text-2xl font-bold text-[#0095FF]">2 Ready to Use</p>
+                <p class="text-[11px] text-[#475569]">Single-product savings from Owner</p>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-[#BCE3FF] p-5 flex items-center justify-between gap-4 shadow-2xs">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-[#EBF6FF] text-[#0095FF] flex items-center justify-center shrink-0">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-[#64748B]">My Shopping Cart</p>
+                  <p id="user-stat-cart" class="font-serif-display text-2xl font-bold text-[#0D1015]">0 Items</p>
+                  <p class="text-[11px] text-[#475569]">Add items from the showroom</p>
+                </div>
+              </div>
+              <a href="/index.html#catalog-section" class="px-3.5 py-2 rounded-xl bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0077CC] text-xs font-semibold shrink-0">
+                Shop →
+              </a>
+            </div>
+          </div>
+
+          <!-- User-Friendly 2-Column Main Content (Orders Left, Vouchers & Custom Design Right) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <!-- Left Column (8 cols): Visual Order Cards with Simple Progress Tracker -->
+            <div class="lg:col-span-8 space-y-5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="font-serif-display text-2xl font-bold text-[#0D1015]">My Furniture Orders</h2>
+                  <p class="text-xs text-[#475569] mt-0.5">Live updates from our workshop to your home</p>
+                </div>
+                <a
+                  href="https://www.messenger.com/t/100000505712325"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs font-semibold text-[#0095FF] hover:underline"
+                >
+                  Have a question about an order? Message Us ↗
+                </a>
+              </div>
+
+              <div id="client-orders-friendly-list" class="space-y-5"></div>
+            </div>
+
+            <!-- Right Column (4 cols): Voucher Wallet + Custom Design Helper -->
+            <aside class="lg:col-span-4 space-y-6">
+              <!-- Voucher Wallet Card -->
+              <div class="bg-white rounded-3xl border border-[#BCE3FF] p-6 space-y-4 shadow-2xs">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h2 class="font-serif-display text-xl font-bold text-[#0D1015]">My Voucher Wallet</h2>
+                    <p class="text-xs text-[#475569] mt-0.5">Exclusive single-product codes from Messenger</p>
+                  </div>
+                  <span class="px-2.5 py-1 rounded-full bg-[#EBF6FF] text-[#0077CC] font-mono-tech text-[11px] font-bold">
+                    Personal
+                  </span>
+                </div>
+
+                <div id="client-vouchers-friendly-list" class="space-y-3.5"></div>
+
+                <div class="p-3.5 rounded-2xl bg-[#F0F8FF] border border-[#BCE3FF] text-xs text-[#475569] space-y-2">
+                  <p class="font-semibold text-[#0D1015]">Want a discount on another piece?</p>
+                  <p>Negotiate directly with the owner on Messenger. If accepted, a new voucher code for that item will appear here.</p>
+                  <a
+                    href="https://www.messenger.com/t/100000505712325"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-block font-semibold text-[#0095FF] hover:underline pt-1"
+                  >
+                    Make an Offer on Messenger ↗
+                  </a>
+                </div>
+              </div>
+
+              <!-- Request a Custom Design Card -->
+              <div class="rounded-3xl bg-[#0D1015] text-white p-6 space-y-4 border border-slate-800 shadow-md">
+                <span class="inline-block px-2.5 py-1 rounded-md bg-[#0095FF]/20 text-[#BCE3FF] font-mono-tech text-[10px] uppercase tracking-wider font-semibold">
+                  Bespoke Service
+                </span>
+                <h3 class="font-serif-display text-xl font-bold text-white">
+                  Want to Request a Custom Furniture Design?
+                </h3>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                  Send us a sketch, reference photo, and your room dimensions on Messenger. Our team will craft it to your exact specifications and add it to the catalog for you.
+                </p>
+                <a
+                  href="https://www.messenger.com/t/100000505712325"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block w-full py-3 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold text-center transition-colors"
+                >
+                  Chat on Messenger to Request a Design ↗
+                </a>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <!-- =================================================================
+             2. ADMIN MANAGEMENT CONSOLE (Shown ONLY when Admin logs in)
+             ================================================================= -->
+        <section id="admin-portal-view" class="hidden space-y-10">
+          <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-[#BCE3FF]">
+            <div class="space-y-2">
+              <p class="font-mono-tech text-xs uppercase tracking-[0.16em] text-[#0095FF] font-semibold">
+                Lillia and Rowena Furniture · Left-Sidebar Admin Management Console
+              </p>
+              <h1 class="font-serif-display text-3xl sm:text-4xl font-bold text-[#0D1015]">
+                Business Owner &amp; Admin Management Console
+              </h1>
+              <p class="text-sm text-[#475569] max-w-2xl">
+                Add custom furniture designs requested by clients on Messenger, edit product color prices and storewide discounts, and issue single-user, single-product Vouchers.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                id="admin-open-add-product-btn"
+                class="px-5 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+              >
+                + Add Product / Custom Messenger Design
+              </button>
+            </div>
+          </div>
+
+          <div id="admin-status-banner" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm font-medium"></div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <!-- Left Sidebar -->
+            <aside class="lg:col-span-3 bg-white rounded-3xl border border-[#BCE3FF] p-6 space-y-6 shadow-2xs">
+              <div>
+                <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
+                  Management Modules
+                </p>
+                <p class="text-xs text-[#64748B] mt-1">
+                  Select a record table on the left
+                </p>
+              </div>
+
+              <nav class="space-y-2.5">
+                <button
+                  type="button"
+                  data-admin-tab="catalog"
+                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#0095FF] text-white border-[#0095FF] shadow-sm"
+                >
+                  <p class="text-xs font-bold">Products, Colors &amp; Discounts</p>
+                  <p class="text-[11px] opacity-85 mt-0.5">Add custom designs &amp; color prices</p>
+                </button>
+                <button
+                  type="button"
+                  data-admin-tab="vouchers"
+                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#F8FBFF] text-[#0D1015] border-[#E2E8F0] hover:border-[#0095FF]"
+                >
+                  <p class="text-xs font-bold">Single-Product Vouchers</p>
+                  <p class="text-[11px] text-[#64748B] mt-0.5">Issue Messenger offer codes</p>
+                </button>
+                <button
+                  type="button"
+                  data-admin-tab="orders"
+                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#F8FBFF] text-[#0D1015] border-[#E2E8F0] hover:border-[#0095FF]"
+                >
+                  <p class="text-xs font-bold">Client Orders (`Customer_Order`)</p>
+                  <p class="text-[11px] text-[#64748B] mt-0.5">Update production status</p>
+                </button>
+              </nav>
+            </aside>
+
+            <!-- Right Content Workspace -->
+            <div class="lg:col-span-9 space-y-8">
+              <!-- Tab 1: Products, Colors & Discounts -->
+              <div id="admin-tab-catalog" class="admin-tab-panel space-y-8">
+                <form id="admin-product-form" class="bg-white rounded-3xl border border-[#BCE3FF] p-8 space-y-6 shadow-2xs hidden">
+                  <div class="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
+                    <div>
+                      <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
+                        Product &amp; Custom Messenger Design Editor
+                      </p>
+                      <h3 id="admin-product-form-title" class="font-serif-display text-2xl font-bold text-[#0D1015] mt-0.5">
+                        Add Product or Client's Custom Design
+                      </h3>
+                    </div>
+                    <button type="button" id="admin-close-product-form" class="text-xs font-semibold text-[#64748B] hover:text-[#0D1015] cursor-pointer">
+                      Cancel ✕
+                    </button>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Product Name</label>
+                      <input id="prod-name" type="text" required placeholder="e.g. Custom 280cm Walnut Dining Table" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">SKU Code</label>
+                      <input id="prod-sku" type="text" required placeholder="e.g. LR-CUST-109" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm uppercase" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Room Category</label>
+                      <select id="prod-category" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-sm">
+                        <option value="living">Living &amp; Lounge</option>
+                        <option value="dining">Dining &amp; Tables</option>
+                        <option value="bedroom">Bedroom Sanctuary</option>
+                        <option value="office">Study &amp; Credenzas</option>
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Base Price (USD)</label>
+                        <input id="prod-price" type="number" min="50" required value="2850" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
+                      </div>
+                      <div>
+                        <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Storewide Discount %</label>
+                        <input id="prod-discount" type="number" min="0" max="80" value="0" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Dimensions</label>
+                      <input id="prod-dimensions" type="text" value="240cm L × 100cm W × 75cm H" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Color Variants (`Name | Hex | +Delta`)</label>
+                      <input id="prod-colors" type="text" value="Natural Walnut|#5C3A21|0, Smoked Oak|#3D312A|180, Ebonized Ash|#1C1917|260" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end gap-3 pt-2">
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold cursor-pointer">
+                      Save Product to Catalog
+                    </button>
+                  </div>
+                </form>
+
+                <div id="admin-catalog-list" class="space-y-5"></div>
+              </div>
+
+              <!-- Tab 2: Single-Product Messenger Vouchers -->
+              <div id="admin-tab-vouchers" class="admin-tab-panel hidden space-y-8">
+                <form id="admin-voucher-form" class="bg-white rounded-3xl border border-[#BCE3FF] p-8 space-y-6 shadow-2xs">
+                  <div>
+                    <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
+                      Issue Single-User, Single-Product Voucher (`Voucher` Table)
+                    </p>
+                    <h3 class="font-serif-display text-2xl font-bold text-[#0D1015] mt-1">
+                      Generate Messenger Offer Voucher
+                    </h3>
+                    <p class="text-xs text-[#475569] mt-1">
+                      After agreeing on a reduced price in Messenger (<a href="https://www.messenger.com/t/100000505712325" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] underline">https://www.messenger.com/t/100000505712325</a>), issue a voucher locked to that specific customer and product.
+                    </p>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Customer Email (`Customer.Email`)</label>
+                      <input id="vch-email" type="email" required value="rowena.vance@vancearchitects.com" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Target Product (`Product.ProductID`)</label>
+                      <select id="vch-product" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-xs font-semibold"></select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Voucher Code (`Voucher.Code`)</label>
+                      <input id="vch-code" type="text" required placeholder="e.g. VCH-ROWENA-500" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs uppercase" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Fixed Discount Amount ($ USD)</label>
+                      <input id="vch-discount" type="number" min="25" required value="300" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
+                    </div>
+                  </div>
+
+                  <button type="submit" class="px-6 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold cursor-pointer">
+                    Issue Single-Product Voucher
+                  </button>
+                </form>
+
+                <div id="admin-vouchers-list" class="space-y-4"></div>
+              </div>
+
+              <!-- Tab 3: Client Orders -->
+              <div id="admin-tab-orders" class="admin-tab-panel hidden space-y-6"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="/assets/js/app.js"></script>
+  </body>
+</html>

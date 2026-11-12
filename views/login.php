@@ -12,26 +12,26 @@ $activeRole = ($role ?? 'Customer') === 'Admin' ? 'Admin' : 'Customer';
 $defaultEmail = !empty($email)
     ? $email
     : ($activeRole === 'Admin' ? 'admin@lilliarowena.com' : 'clara.vance@architects.io');
-$defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'AtelierClient2025!';
+$defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
 ?>
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lillia &amp; Rowena Furniture — Atelier Authentication Portal</title>
+    <title>Lillia and Rowena Furniture — Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/login.css" />
   </head>
-  <body class="atelier-login-body">
+  <body class="lr-login-body">
     <main class="login-shell">
       <div style="margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between;">
         <a href="home.php" style="text-decoration: none; font-size: 0.875rem; font-weight: 700; color: #475569;">
           ← Back to Showroom Collection
         </a>
-        <span class="atelier-mono" style="font-size: 0.75rem; color: #0095FF; font-weight: 600;">
+        <span class="lr-mono" style="font-size: 0.75rem; color: #0095FF; font-weight: 600;">
           MYSQL 8.0.16+ INNODB · PSR-4 COMPOSER
         </span>
       </div>
@@ -39,33 +39,32 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'AtelierClient2025
       <div class="login-grid">
         <!-- Left Architectural Showcase Column -->
         <aside class="login-showcase">
-          <img src="assets/img/library.jpg" alt="Lillia &amp; Rowena Furniture Atelier" class="login-showcase-img" />
+          <img src="assets/img/showroom.jpg" alt="Lillia and Rowena Furniture" class="login-showcase-img" />
           <div class="login-showcase-overlay"></div>
 
           <div style="position: relative; z-index: 2;">
             <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2.25rem;">
-              <div class="atelier-serif" style="width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700;">
+              <div class="lr-serif" style="width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700;">
                 LR
               </div>
               <div>
-                <div class="atelier-serif" style="font-size: 1.125rem; font-weight: 700; color: #FFF;">Lillia &amp; Rowena</div>
-                <div class="atelier-mono" style="font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: #7DD3FC;">Furniture Atelier</div>
+                <div class="lr-serif" style="font-size: 1.125rem; font-weight: 700; color: #FFF;">Lillia and Rowena Furniture</div>
               </div>
             </div>
 
-            <p class="atelier-mono" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.14em; color: #38BDF8; margin: 0 0 0.75rem;">
-              AUTHENTICATED ATELIER PORTAL
+            <p class="lr-mono" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.14em; color: #38BDF8; margin: 0 0 0.75rem;">
+              CLIENT &amp; ADMIN PORTAL
             </p>
-            <h1 class="atelier-serif" style="font-size: 2.15rem; line-height: 1.15; margin: 0 0 1rem; color: #FFF;">
+            <h1 class="lr-serif" style="font-size: 2.15rem; line-height: 1.15; margin: 0 0 1rem; color: #FFF;">
               Direct Access to Commission Ledgers &amp; Studio Records.
             </h1>
             <p style="font-size: 0.925rem; line-height: 1.65; color: #CBD5E1; margin: 0;">
-              Customers track custom timber sizing, color finish variants, and single-product Messenger Vouchers. Studio administrators manage products, storewide discounts, and custom furniture designs.
+              Customers track custom timber sizing, color finish variants, and single-product Messenger Vouchers. Administrators manage products, storewide discounts, and custom furniture designs.
             </p>
           </div>
 
           <div style="position: relative; z-index: 2; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 1.25rem; margin-top: 2rem;">
-            <div class="atelier-mono" style="font-size: 0.72rem; color: #BAE6FD;">
+            <div class="lr-mono" style="font-size: 0.72rem; color: #BAE6FD;">
               TABLES: Admin · Customer · Product · Voucher · Customer_Order · Order_Item
             </div>
           </div>
@@ -74,7 +73,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'AtelierClient2025
         <!-- Right Authentication Form Column -->
         <section class="login-form-panel">
           <div style="max-width: 440px; width: 100%; margin: 0 auto;">
-            <h2 class="atelier-serif" style="font-size: 1.85rem; margin: 0 0 0.4rem; color: #0F172A;">
+            <h2 class="lr-serif" style="font-size: 1.85rem; margin: 0 0 0.4rem; color: #0F172A;">
               Sign In to Your Account
             </h2>
             <p style="font-size: 0.9rem; color: #475569; margin: 0 0 1.5rem;">
@@ -102,10 +101,10 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'AtelierClient2025
             <!-- Demo Credentials Helper -->
             <div style="background: rgba(224, 242, 254, 0.75); border: 1px solid #BAE6FD; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
               <div>
-                <div class="atelier-mono" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #0284C7;">
+                <div class="lr-mono" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #0284C7;">
                   Quick Demo Credentials
                 </div>
-                <div id="demo-email-preview" class="atelier-mono" style="font-size: 0.78rem; color: #0F172A; margin-top: 0.15rem;">
+                <div id="demo-email-preview" class="lr-mono" style="font-size: 0.78rem; color: #0F172A; margin-top: 0.15rem;">
                   <?= e($defaultEmail) ?>
                 </div>
               </div>
@@ -128,7 +127,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'AtelierClient2025
             </div>
 
             <!-- Login Form -->
-            <form id="atelier-login-form" method="post" action="index.php" novalidate>
+            <form id="lr-login-form" method="post" action="index.php" novalidate>
               <input type="hidden" id="login-role" name="role" value="<?= e($activeRole) ?>" />
 
               <div class="form-group">

@@ -1,10 +1,10 @@
 /**
- * Part 5: Lillia & Rowena Furniture Atelier — Client-Side Login Controller
+ * Part 5: Lillia and Rowena Furniture — Client-Side Login Controller
  * File: assets/js/login.js
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('atelier-login-form');
+  const form = document.getElementById('lr-login-form');
   const emailInput = document.getElementById('login-email');
   const passwordInput = document.getElementById('login-password');
   const roleInput = document.getElementById('login-role');
@@ -16,12 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const DEMO_CREDENTIALS = {
     Customer: {
-      email: 'clara.vance@architects.io',
-      password: 'AtelierClient2025!',
+      email: 'rowena.vance@vancearchitects.com',
+      name: 'Rowena Vance',
+      password: 'ClientPass2025!',
       buttonLabel: 'Sign In to Client Portal →',
     },
     Admin: {
       email: 'admin@lilliarowena.com',
+      name: 'Lillia Mercier (Owner)',
       password: 'MasterJoinery#01',
       buttonLabel: 'Sign In to Admin Console →',
     },
@@ -75,6 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
       hideError();
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
+      const role = roleInput ? roleInput.value : 'Customer';
 
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         event.preventDefault();
@@ -87,7 +90,33 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         if (passwordInput) passwordInput.classList.add('has-error');
         showError('Password must be at least 6 characters.');
+        return;
       }
+
+      // If running on index.php, allow standard PHP POST form submission
+      if (window.location.pathname.endsWith('.php')) {
+        return;
+      }
+
+      // Otherwise save authenticated session and redirect to the separate /dashboard.html page
+      event.preventDefault();
+      const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
+      const userObj = {
+        email,
+        role: targetRoleParam,
+        name:
+          role === 'Admin'
+            ? 'Lillia Mercier (Business Owner)'
+            : email === 'rowena.vance@vancearchitects.com'
+            ? 'Rowena Vance'
+            : email.split('@')[0],
+      };
+      try {
+        localStorage.setItem('lr_session_user', JSON.stringify(userObj));
+      } catch (_e) {
+        // Ignore storage errors
+      }
+      window.location.href = `/dashboard.html?role=${targetRoleParam}`;
     });
   }
 });

@@ -10,16 +10,16 @@ use Library\Exceptions\DatabaseException;
 use Library\Exceptions\ValidationException;
 
 /**
- * Part 3: User Model
+ * Part 3: User Model — Lillia and Rowena Furniture
  * Maps to the MySQL `Customer` (CustomerID, FullName, Email, PasswordHash, PhoneNumber, Address)
- * and `Admin` (AdminID, Email, PasswordHash) tables defined in database/bookhub.sql.
+ * and `Admin` (AdminID, Email, PasswordHash) tables defined in database/furniture.sql.
  */
 class User
 {
     private Database $db;
 
     /**
-     * Default seeded accounts matching Customer and Admin tables in database/bookhub.sql
+     * Default seeded accounts matching Customer and Admin tables in database/furniture.sql
      *
      * @var array<int, array<string, mixed>>
      */
@@ -29,7 +29,7 @@ class User
             'role'         => 'Customer',
             'fullName'     => 'Clara Vance',
             'email'        => 'clara.vance@architects.io',
-            'passwordPlain'=> 'AtelierClient2025!',
+            'passwordPlain'=> 'ClientPass2025!',
             'phoneNumber'  => '+1 (212) 555-0148',
             'address'      => '412 Mercer St, Penthouse B, New York, NY 10013',
         ],
@@ -38,7 +38,7 @@ class User
             'role'         => 'Customer',
             'fullName'     => 'Julian Thorne',
             'email'        => 'j.thorne@studio-thorne.com',
-            'passwordPlain'=> 'AtelierClient2025!',
+            'passwordPlain'=> 'ClientPass2025!',
             'phoneNumber'  => '+1 (415) 555-0193',
             'address'      => '88 Pacific Ave, San Francisco, CA 94111',
         ],
@@ -49,7 +49,7 @@ class User
             'email'        => 'admin@lilliarowena.com',
             'passwordPlain'=> 'MasterJoinery#01',
             'phoneNumber'  => '+1 (212) 555-0100',
-            'address'      => 'Lillia & Rowena Flagship Atelier, New York',
+            'address'      => 'Lillia and Rowena Furniture Showroom, New York',
         ],
     ];
 

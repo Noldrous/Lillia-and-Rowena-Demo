@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Application Bootstrap
+ * Application Bootstrap — Lillia and Rowena Furniture
  * Initializes Composer PSR-4 autoloading, session management, and shared Database instance.
  */
 
@@ -18,10 +18,10 @@ use Library\Database;
 $dbConfig = [
     'host'      => getenv('DB_HOST') ?: '',
     'port'      => getenv('DB_PORT') ?: '3306',
-    'dbname'    => getenv('DB_NAME') ?: 'lillia_rowena_atelier',
+    'dbname'    => getenv('DB_NAME') ?: 'lillia_rowena_furniture',
     'user'      => getenv('DB_USER') ?: 'root',
     'pass'      => getenv('DB_PASS') ?: '',
-    'json_path' => __DIR__ . '/data/atelier_store.json',
+    'json_path' => __DIR__ . '/data/store.json',
 ];
 
 $database = Database::getInstance($dbConfig);

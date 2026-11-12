@@ -1,7 +1,7 @@
 {
   "messengerConfig": {
-    "adminMessengerUrl": "https://m.me/lilliarowenafurniture.admin",
-    "businessOwnerName": "Lillia & Rowena Furniture Atelier"
+    "adminMessengerUrl": "https://www.messenger.com/t/100000505712325",
+    "businessOwnerName": "Lillia and Rowena Furniture"
   },
   "categories": [
     {
@@ -334,7 +334,7 @@
       "issuedByAdmin": "Lillia Vance (Owner)",
       "createdAt": "2026-11-10",
       "expiryDate": "2026-12-31",
-      "messengerPlaceholderLink": "https://m.me/lilliarowenafurniture.admin?voucher=VCH-ROWENA-SOFA400&client=rowena.vance%40vancearchitects.com&sku=LR-LV-014"
+      "messengerPlaceholderLink": "https://www.messenger.com/t/100000505712325?voucher=VCH-ROWENA-SOFA400&client=rowena.vance%40vancearchitects.com&sku=LR-LV-014"
     },
     {
       "id": "vch-102",
@@ -349,7 +349,7 @@
       "issuedByAdmin": "Lillia Vance (Owner)",
       "createdAt": "2026-11-11",
       "expiryDate": "2026-12-31",
-      "messengerPlaceholderLink": "https://m.me/lilliarowenafurniture.admin?voucher=VCH-ROWENA-WALNUT350&client=rowena.vance%40vancearchitects.com&sku=LR-DN-108"
+      "messengerPlaceholderLink": "https://www.messenger.com/t/100000505712325?voucher=VCH-ROWENA-WALNUT350&client=rowena.vance%40vancearchitects.com&sku=LR-DN-108"
     },
     {
       "id": "vch-103",
@@ -364,7 +364,7 @@
       "issuedByAdmin": "Lillia Vance (Owner)",
       "createdAt": "2026-11-09",
       "expiryDate": "2026-12-15",
-      "messengerPlaceholderLink": "https://m.me/lilliarowenafurniture.admin?voucher=VCH-JULIAN-BED250&client=j.mercier%40mercierstudio.co&sku=LR-BD-204"
+      "messengerPlaceholderLink": "https://www.messenger.com/t/100000505712325?voucher=VCH-JULIAN-BED250&client=j.mercier%40mercierstudio.co&sku=LR-BD-204"
     }
   ],
   "orders": [

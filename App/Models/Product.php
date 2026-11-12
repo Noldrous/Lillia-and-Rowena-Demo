@@ -9,7 +9,7 @@ use Library\Exceptions\ValidationException;
 
 /**
  * Product & Voucher Domain Model mapped to `Product`, `Category`, `Voucher`, `Order_Item`,
- * and `Customization` tables in `database/bookhub.sql`.
+ * and `Customization` tables in `database/furniture.sql`.
  */
 class Product
 {
@@ -34,7 +34,7 @@ class Product
 
     /**
      * Validate a single-customer, single-product Voucher matching the MySQL stored procedure
-     * `check_voucher_use(p_voucher_id, p_order_id, p_check_status)` in `database/bookhub.sql`.
+     * `check_voucher_use(p_voucher_id, p_order_id, p_check_status)` in `database/furniture.sql`.
      *
      * @return array<string, mixed>
      * @throws ValidationException

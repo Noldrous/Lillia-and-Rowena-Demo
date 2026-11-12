@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Composer\Autoload;
 
 /**
- * PSR-4 Compliant Class Autoloader for Lillia & Rowena Furniture Atelier.
- * Maps namespace prefixes (e.g., LilliaRowena\Atelier\) to base directories (src/PhpAtelier/).
+ * PSR-4 Compliant Class Autoloader for Lillia and Rowena Furniture.
+ * Maps namespace prefixes (App\, Library\) to base directories (App/, Library/).
  */
 final class Psr4Autoloader
 {

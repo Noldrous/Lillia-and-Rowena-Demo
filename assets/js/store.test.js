@@ -12,7 +12,7 @@ import {
   validateVoucherForOrder,
 } from './store.js';
 
-const storeJsonPath = path.resolve(process.cwd(), 'data/atelier_store.json');
+const storeJsonPath = path.resolve(process.cwd(), 'data/store.json');
 const storeData = JSON.parse(fs.readFileSync(storeJsonPath, 'utf8'));
 const INITIAL_FURNITURE_ITEMS = storeData.products;
 const INITIAL_VOUCHERS = storeData.vouchers;
@@ -45,7 +45,7 @@ describe('Pure JavaScript & JSON Store Logic Tests', () => {
       proposedPrice: 4100,
       clientEmail: 'rowena.vance@vancearchitects.com',
     });
-    assert.ok(url.startsWith('https://m.me/lilliarowenafurniture.admin?ref='));
+    assert.ok(url.startsWith('https://www.messenger.com/t/100000505712325?ref='));
     assert.ok(url.includes('lr-lv-014'));
     assert.ok(url.includes('offer-4100'));
     assert.ok(url.includes('client=rowena.vance%40vancearchitects.com'));
