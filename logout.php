@@ -7,7 +7,7 @@ declare(strict_types=1);
  * Destroys the session and redirects to index.php.
  */
 
-require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/config/bootstrap.php';
 
 use App\Controllers\HomeControllers;
 

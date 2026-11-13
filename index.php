@@ -7,7 +7,7 @@ declare(strict_types=1);
  * Delegates to App\Controllers\HomeControllers::login().
  */
 
-require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/config/bootstrap.php';
 
 use App\Controllers\HomeControllers;
 
