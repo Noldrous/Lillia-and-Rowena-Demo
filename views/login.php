@@ -11,7 +11,7 @@
 $activeRole = ($role ?? 'Customer') === 'Admin' ? 'Admin' : 'Customer';
 $defaultEmail = !empty($email)
     ? $email
-    : ($activeRole === 'Admin' ? 'admin@lilliarowena.com' : 'clara.vance@architects.io');
+    : ($activeRole === 'Admin' ? 'admin@lilliarowena.com' : 'rowena.vance@vancearchitects.com');
 $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
 ?>
 <!doctype html>

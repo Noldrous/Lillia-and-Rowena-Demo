@@ -23,7 +23,7 @@ const HERO_TAB_CONTENT = {
     monthly: 'Or $49/mo for 24 mos*',
     ctaText: 'Explore Living & Lounge',
     filterTarget: 'living',
-    image: '/assets/images/hero_living_room_atelier.jpg',
+    image: 'assets/images/hero_living_room_atelier.jpg',
     cardSubtitle: 'Featured Room Package · Lillia Monolith Dining & Rowena Bouclé Salon · 3–6 Weeks Lead Time',
     cardTitle: 'Living & Lounge Showroom Collection',
   },
@@ -37,7 +37,7 @@ const HERO_TAB_CONTENT = {
     monthly: 'Or $70/mo for 24 mos*',
     ctaText: 'Browse Living & Lounge Below',
     filterTarget: 'living',
-    image: '/assets/images/category_living_lounge.jpg',
+    image: 'assets/images/category_living_lounge.jpg',
     cardSubtitle: 'CAT-01 / LIVING · Kiln-Dried White Oak, Heavyweight Wool Bouclé & Honed Travertine',
     cardTitle: 'Living & Lounge Architectural Suite',
   },
@@ -51,7 +51,7 @@ const HERO_TAB_CONTENT = {
     monthly: 'Or $54/mo for 24 mos*',
     ctaText: 'Browse Dining & Tables Below',
     filterTarget: 'dining',
-    image: '/assets/images/category_dining_tables.jpg',
+    image: 'assets/images/category_dining_tables.jpg',
     cardSubtitle: 'CAT-02 / DINING · FAS American Black Walnut & Quarter-Sawn White Oak · 4–8 Weeks Lead Time',
     cardTitle: 'Dining & Tables Showroom Collection',
   },
@@ -65,7 +65,7 @@ const HERO_TAB_CONTENT = {
     monthly: 'Or $49/mo for 24 mos*',
     ctaText: 'Browse Bedroom Sanctuary Below',
     filterTarget: 'bedroom',
-    image: '/assets/images/category_bedroom_sanctuary.jpg',
+    image: 'assets/images/category_bedroom_sanctuary.jpg',
     cardSubtitle: 'CAT-03 / BEDROOM · Belgian Unbleached Flax Linen & Solid European Ash · 3–5 Weeks Lead Time',
     cardTitle: 'Bedroom Sanctuary Collection',
   },
@@ -79,7 +79,7 @@ const HERO_TAB_CONTENT = {
     monthly: 'Or $89/mo for 24 mos*',
     ctaText: 'Browse Study & Credenzas Below',
     filterTarget: 'office',
-    image: '/assets/images/category_office_storage.jpg',
+    image: 'assets/images/category_office_storage.jpg',
     cardSubtitle: 'CAT-04 / STUDY · Fluted Black Walnut & Bridle Leather · 2–6 Weeks Lead Time',
     cardTitle: 'Study & Credenzas Collection',
   },
@@ -169,11 +169,11 @@ function loadCartFromStorage() {
 
 async function loadData() {
   try {
-    const res = await fetch('/api/catalog');
+    const res = await fetch('api/catalog');
     if (!res.ok) throw new Error('Fallback to static JSON');
     return await res.json();
   } catch (_e) {
-    const res = await fetch('/data/store.json');
+    const res = await fetch('data/store.json');
     return await res.json();
   }
 }
@@ -190,7 +190,7 @@ function initShowroomPage() {
 
   if (state.sessionUser) {
     const isAdmin = state.sessionUser.role === 'admin';
-    const dashUrl = `/dashboard.html?role=${isAdmin ? 'admin' : 'client'}`;
+    const dashUrl = `dashboard.html?role=${isAdmin ? 'admin' : 'client'}`;
     const dashLabel = isAdmin ? 'Admin Dashboard' : 'My Dashboard';
 
     if (navAuthActions) {
@@ -215,7 +215,7 @@ function initShowroomPage() {
         logoutBtn.addEventListener('click', () => {
           localStorage.removeItem('lr_session_user');
           localStorage.removeItem('lr_cart_items');
-          window.location.href = '/index.html';
+          window.location.href = 'index.html';
         });
       }
     }
@@ -226,10 +226,10 @@ function initShowroomPage() {
       cartCheckoutLink.textContent = isAdmin ? 'Open Admin Dashboard →' : 'Go to My Dashboard →';
     }
   } else {
-    if (heroTrackLink) heroTrackLink.href = '/login.html';
+    if (heroTrackLink) heroTrackLink.href = 'login.html';
     if (cartUserEmailEl) cartUserEmailEl.textContent = 'Sign in to verify your email';
     if (cartCheckoutLink) {
-      cartCheckoutLink.href = '/login.html';
+      cartCheckoutLink.href = 'login.html';
       cartCheckoutLink.textContent = 'Sign In to Checkout →';
     }
   }
@@ -717,9 +717,9 @@ function initDashboardPage() {
     state.sessionUser = activeUser;
   }
 
-  // If still not logged in, redirect to /login.html
+  // If still not logged in, redirect to index.php (on PHP) or login.html
   if (!activeUser) {
-    window.location.href = '/login.html';
+    window.location.href = window.location.pathname.endsWith('.php') ? 'index.php' : 'login.html';
     return;
   }
 
@@ -748,7 +748,7 @@ function initDashboardPage() {
     logoutBtn.addEventListener('click', () => {
       localStorage.removeItem('lr_session_user');
       localStorage.removeItem('lr_cart_items');
-      window.location.href = '/login.html';
+      window.location.href = window.location.pathname.endsWith('.php') ? 'logout.php' : 'login.html';
     });
   }
 
@@ -828,7 +828,7 @@ function initDashboardPage() {
 
       state.catalog.unshift(newProduct);
       try {
-        await fetch('/api/products', {
+        await fetch('api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newProduct),
@@ -871,7 +871,7 @@ function initDashboardPage() {
 
       state.vouchers.unshift(newVoucher);
       try {
-        await fetch('/api/vouchers', {
+        await fetch('api/vouchers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newVoucher),

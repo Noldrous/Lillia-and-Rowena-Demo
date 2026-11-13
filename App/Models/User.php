@@ -27,6 +27,15 @@ class User
         [
             'id'           => 1,
             'role'         => 'Customer',
+            'fullName'     => 'Rowena Vance',
+            'email'        => 'rowena.vance@vancearchitects.com',
+            'passwordPlain'=> 'ClientPass2025!',
+            'phoneNumber'  => '+1 (212) 555-0148',
+            'address'      => '412 Mercer St, Penthouse B, New York, NY 10013',
+        ],
+        [
+            'id'           => 2,
+            'role'         => 'Customer',
             'fullName'     => 'Clara Vance',
             'email'        => 'clara.vance@architects.io',
             'passwordPlain'=> 'ClientPass2025!',

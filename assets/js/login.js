@@ -93,13 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // If running on index.php, allow standard PHP POST form submission
-      if (window.location.pathname.endsWith('.php')) {
-        return;
-      }
-
-      // Otherwise save authenticated session and redirect to the separate /dashboard.html page
-      event.preventDefault();
       const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
       const userObj = {
         email,
@@ -116,7 +109,17 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (_e) {
         // Ignore storage errors
       }
-      window.location.href = `/dashboard.html?role=${targetRoleParam}`;
+
+      // If running via PHP (index.php or http://localhost/<folder>/ where action="index.php"),
+      // allow standard PHP POST form submission to index.php -> home.php
+      const formAction = (form.getAttribute('action') || '').toLowerCase();
+      if (window.location.pathname.endsWith('.php') || formAction.includes('index.php')) {
+        return;
+      }
+
+      // Otherwise redirect to the separate dashboard.html page
+      event.preventDefault();
+      window.location.href = `dashboard.html?role=${targetRoleParam}`;
     });
   }
 });

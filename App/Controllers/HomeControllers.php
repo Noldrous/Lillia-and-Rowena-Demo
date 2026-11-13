@@ -13,8 +13,7 @@ use Library\Exceptions\ValidationException;
 
 /**
  * Part 4: HomeControllers
- * Handles Login, Logout, Welcome/Showroom view rendering, and JSON API actions
- * for Lillia and Rowena Furniture.
+ * Handles Login, Logout, and Dashboard rendering in XAMPP / PHP.
  */
 class HomeControllers
 {
@@ -49,16 +48,17 @@ class HomeControllers
             try {
                 $authenticatedUser = $this->userModel->authenticate($email, $password, $role);
                 $_SESSION['user'] = $authenticatedUser;
+                $targetRole = strcasecmp((string) ($authenticatedUser['role'] ?? ''), 'Admin') === 0 ? 'admin' : 'client';
 
                 if ($isAjax) {
                     jsonResponse([
                         'ok'       => true,
                         'user'     => $authenticatedUser,
-                        'redirect' => 'home.php',
+                        'redirect' => 'home.php?role=' . $targetRole,
                     ]);
                 }
 
-                redirect('home.php');
+                redirect('home.php?role=' . $targetRole);
             } catch (ValidationException $e) {
                 $error = $e->getMessage();
                 $fieldErrors = $e->getErrors();
@@ -93,7 +93,7 @@ class HomeControllers
     }
 
     /**
-     * Render the Welcome / Flagship Showroom & Order Management page (`home.php` -> `views/home.php`).
+     * Render the Logged-In Dashboard page (`home.php` -> `views/home.php`).
      */
     public function home(): void
     {

@@ -14,7 +14,7 @@
       "leadTimeRange": "3–6 Weeks",
       "pieceCount": 3,
       "startingPrice": 1680,
-      "image": "/assets/images/category_living_lounge.jpg"
+      "image": "assets/images/category_living_lounge.jpg"
     },
     {
       "id": "dining",
@@ -26,7 +26,7 @@
       "leadTimeRange": "4–8 Weeks",
       "pieceCount": 2,
       "startingPrice": 1290,
-      "image": "/assets/images/category_dining_tables.jpg"
+      "image": "assets/images/category_dining_tables.jpg"
     },
     {
       "id": "bedroom",
@@ -38,7 +38,7 @@
       "leadTimeRange": "3–5 Weeks",
       "pieceCount": 2,
       "startingPrice": 1180,
-      "image": "/assets/images/category_bedroom_sanctuary.jpg"
+      "image": "assets/images/category_bedroom_sanctuary.jpg"
     },
     {
       "id": "office",
@@ -50,7 +50,7 @@
       "leadTimeRange": "2–6 Weeks",
       "pieceCount": 2,
       "startingPrice": 2150,
-      "image": "/assets/images/category_office_storage.jpg"
+      "image": "assets/images/category_office_storage.jpg"
     }
   ],
   "products": [
@@ -81,7 +81,7 @@
       ],
       "description": "A sweeping crescent silhouette engineered for conversational salon layouts. Built over a solid kiln-dried white oak plinth with multi-density natural latex and down-wrapped cushions.",
       "craftsmanshipNote": "Hand-tufted internal spring suspension with mortise-and-tenon oak base rail.",
-      "image": "/assets/images/category_living_lounge.jpg",
+      "image": "assets/images/category_living_lounge.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -112,7 +112,7 @@
       ],
       "description": "Our flagship dining table featuring a 45mm thick book-matched walnut slab top with a subtle live-inspired chamfered edge and sculptural trestle stretchers.",
       "craftsmanshipNote": "Reinforced with concealed solid brass butterfly keys and zero-VOC cold-pressed tung oil.",
-      "image": "/assets/images/category_dining_tables.jpg",
+      "image": "assets/images/category_dining_tables.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -141,7 +141,7 @@
       ],
       "description": "Architectural low-profile platform bed with removable tailored Belgian linen upholstery and solid ash European slat support requiring no box spring.",
       "craftsmanshipNote": "Acoustic wool headboard padding with precision mitered solid timber corner joinery.",
-      "image": "/assets/images/category_bedroom_sanctuary.jpg",
+      "image": "assets/images/category_bedroom_sanctuary.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -170,7 +170,7 @@
       ],
       "description": "Rhythmic half-round solid walnut reeds across four seamless cabinet doors conceal adjustable shelving, velvet-lined flatware trays, and media ventilation.",
       "craftsmanshipNote": "CNC-indexed and hand-sanded solid walnut fluting with Blum soft-close architectural hinges.",
-      "image": "/assets/images/category_office_storage.jpg",
+      "image": "assets/images/category_office_storage.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -199,7 +199,7 @@
       ],
       "description": "Steam-bent armrests flow seamlessly into tapered rear legs via precision finger-jointed transitions. Equally suited as a reading chair or architectural pair.",
       "craftsmanshipNote": "Hand-shaved spokeshave arm profiles with full-grain vegetable-tanned saddle straps.",
-      "image": "/assets/images/hero_living_room_atelier.jpg",
+      "image": "assets/images/hero_living_room_atelier.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -228,7 +228,7 @@
       ],
       "description": "Cut from monolithic blocks of porous Roman travertine with a softly bullnosed organic top resting on two offset architectural column cylinders.",
       "craftsmanshipNote": "Breathable penetrating stone sealer applied in-atelier for stain resistance.",
-      "image": "/assets/images/category_living_lounge.jpg",
+      "image": "assets/images/category_living_lounge.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -257,7 +257,7 @@
       ],
       "description": "Hand-woven over four hours using 130 meters of wax-coated Danish paper cord per seat. Designed to tuck flush beneath the Lillia Monolith Dining Table.",
       "craftsmanshipNote": "Continuous steam-bent backrest rail with wedged mortise joinery.",
-      "image": "/assets/images/category_dining_tables.jpg",
+      "image": "assets/images/category_dining_tables.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -286,7 +286,7 @@
       ],
       "description": "Wall-mounted or plinth-supported floating bedside cases with mitered waterfall grain wrap, aromatic Spanish cedar drawer bottoms, and concealed rear cord pass-throughs.",
       "craftsmanshipNote": "Hand-cut half-blind dovetail drawer boxes with solid brass knurled pulls.",
-      "image": "/assets/images/category_bedroom_sanctuary.jpg",
+      "image": "assets/images/category_bedroom_sanctuary.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     },
@@ -315,7 +315,7 @@
       ],
       "description": "A serene architectural worktable with dual flush-front stationery drawers, vegetable-tanned leather interior liners, and a hidden rear power trough.",
       "craftsmanshipNote": "Inlaid full-grain Italian desktop blotter and solid timber leg stretchers.",
-      "image": "/assets/images/category_office_storage.jpg",
+      "image": "assets/images/category_office_storage.jpg",
       "isCustomClientDesign": false,
       "customClientEmail": null
     }
