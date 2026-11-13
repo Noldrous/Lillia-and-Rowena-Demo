@@ -93,11 +93,37 @@ class HomeControllers
     }
 
     /**
-     * Render the Logged-In Dashboard page (`home.php` -> `views/home.php`).
+     * Render the Logged-In Dashboard page (`home.php` -> `views/home.php`)
+     * and process server-side checkout / voucher verification POST requests.
      */
     public function home(): void
     {
         $user = currentUser();
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '') === 'checkout') {
+            $customerEmail = trim((string) ($_POST['customerEmail'] ?? ($user['email'] ?? '')));
+            $voucherCode = isset($_POST['voucherCode']) ? trim((string) $_POST['voucherCode']) : null;
+            $rawItems = $_POST['cartItems'] ?? '[]';
+            $cartItems = is_string($rawItems) ? (json_decode($rawItems, true) ?: []) : (is_array($rawItems) ? $rawItems : []);
+
+            try {
+                $pricing = $this->productModel->calculateCartOrderWithVoucher(
+                    $cartItems,
+                    $voucherCode,
+                    $customerEmail
+                );
+                jsonResponse([
+                    'ok'      => true,
+                    'pricing' => $pricing,
+                ]);
+            } catch (ValidationException $e) {
+                jsonResponse([
+                    'ok'    => false,
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
+        }
+
         $store = $this->db->readStore();
         $products = $this->productModel->getAll();
         require dirname(__DIR__, 2) . '/views/home.php';

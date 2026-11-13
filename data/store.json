@@ -3,6 +3,60 @@
     "adminMessengerUrl": "https://www.messenger.com/t/100000505712325",
     "businessOwnerName": "Lillia and Rowena Furniture"
   },
+  "messengerConversations": [
+    {
+      "id": "msg-thread-101",
+      "customerName": "Rowena Vance",
+      "customerEmail": "rowena.vance@vancearchitects.com",
+      "topic": "Custom 300cm Monolith Walnut Conference & Dining Slab",
+      "categoryId": "dining",
+      "suggestedName": "Rowena Custom 300cm Walnut Monolith Table",
+      "suggestedSku": "LR-CUST-300",
+      "suggestedPrice": 5200,
+      "suggestedDimensions": "300cm L × 115cm W × 75cm H",
+      "customizationNotes": "Extended 300cm book-matched walnut slab with concealed brass floor-box cable grommets requested via Messenger.",
+      "updatedAt": "2026-11-12"
+    },
+    {
+      "id": "msg-thread-102",
+      "customerName": "Julian Mercier",
+      "customerEmail": "j.mercier@mercierstudio.co",
+      "topic": "Bespoke Deep-Seat Bouclé L-Sectional Sofa",
+      "categoryId": "living",
+      "suggestedName": "Mercier Bespoke Bouclé Corner Sectional",
+      "suggestedSku": "LR-CUST-204",
+      "suggestedPrice": 5650,
+      "suggestedDimensions": "310cm W × 165cm D × 74cm H",
+      "customizationNotes": "Left-return chaise configuration in heavyweight Alabaster Belgian bouclé over a smoked oak plinth.",
+      "updatedAt": "2026-11-11"
+    },
+    {
+      "id": "msg-thread-103",
+      "customerName": "Elena Rostova",
+      "customerEmail": "elena@rostovainteriors.com",
+      "topic": "Floating Fluted Ash Acoustic Media Credenza",
+      "categoryId": "office",
+      "suggestedName": "Rostova Floating Fluted Ash Credenza",
+      "suggestedSku": "LR-CUST-410",
+      "suggestedPrice": 3490,
+      "suggestedDimensions": "240cm W × 45cm D × 52cm H",
+      "customizationNotes": "Wall-hung French cleat mounting with acoustic linen center doors and concealed soundbar compartment.",
+      "updatedAt": "2026-11-10"
+    },
+    {
+      "id": "msg-thread-104",
+      "customerName": "Marcus Sterling",
+      "customerEmail": "m.sterling@sterlingcapital.io",
+      "topic": "California King Belgian Linen Tall-Headboard Platform Bed",
+      "categoryId": "bedroom",
+      "suggestedName": "Sterling Cal-King Tailored Linen Bed",
+      "suggestedSku": "LR-CUST-512",
+      "suggestedPrice": 4280,
+      "suggestedDimensions": "228cm L × 200cm W × 105cm H",
+      "customizationNotes": "Extra-tall 105cm acoustic wool headboard with integrated warm-bronze reading sconce cutouts.",
+      "updatedAt": "2026-11-09"
+    }
+  ],
   "categories": [
     {
       "id": "living",
@@ -535,6 +589,82 @@
       "orderNumber": "ORD-2026-8815",
       "note": "Custom felt-lined timber crate sealed with shock-telemetry sensor attached.",
       "qcPassed": true
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "sup-101",
+      "name": "Appalachian FAS Timber Co.",
+      "contactPerson": "Henrik Lindqvist",
+      "phone": "+1 (503) 555-0192",
+      "address": "410 Sawmill Parkway, Portland, OR 97209",
+      "productIds": ["furn-dn-01", "furn-of-01", "furn-lv-02", "furn-of-02"]
+    },
+    {
+      "id": "sup-102",
+      "name": "Antwerp Flax & Bouclé Mills",
+      "contactPerson": "Claire Vermeer",
+      "phone": "+32 3 555 0148",
+      "address": "Kloosterstraat 88, 2000 Antwerpen, Belgium",
+      "productIds": ["furn-lv-01", "furn-bd-01", "furn-dn-02"]
+    },
+    {
+      "id": "sup-103",
+      "name": "Tivoli Stone & Architectural Foundry",
+      "contactPerson": "Marco Bellini",
+      "phone": "+39 06 555 0210",
+      "address": "Via Tiburtina 142, 00019 Tivoli RM, Italy",
+      "productIds": ["furn-lv-03", "furn-bd-02"]
+    }
+  ],
+  "inventoryTransactions": [
+    {
+      "id": "inv-tx-101",
+      "productId": "furn-dn-01",
+      "productName": "Lillia Monolith Solid Walnut Dining Table",
+      "productSku": "LR-DN-108",
+      "transactionType": "Stock In",
+      "quantity": 3,
+      "previousStock": 2,
+      "newStock": 5,
+      "supplierId": "sup-101",
+      "supplierName": "Appalachian FAS Timber Co.",
+      "purchaseCost": 2100,
+      "reason": "Supplier Delivery",
+      "dateTime": "2026-11-11 09:30",
+      "adminName": "Lillia Mercier (Business Owner)"
+    },
+    {
+      "id": "inv-tx-102",
+      "productId": "furn-lv-01",
+      "productName": "Rowena Curved Bouclé Lounge Sofa",
+      "productSku": "LR-LV-014",
+      "transactionType": "Stock In",
+      "quantity": 2,
+      "previousStock": 2,
+      "newStock": 4,
+      "supplierId": "sup-102",
+      "supplierName": "Antwerp Flax & Bouclé Mills",
+      "purchaseCost": 2450,
+      "reason": "Supplier Delivery",
+      "dateTime": "2026-11-10 14:15",
+      "adminName": "Lillia Mercier (Business Owner)"
+    },
+    {
+      "id": "inv-tx-103",
+      "productId": "furn-lv-03",
+      "productName": "Verona Honed Travertine Plinth Table",
+      "productSku": "LR-LV-042",
+      "transactionType": "Stock Out",
+      "quantity": 1,
+      "previousStock": 4,
+      "newStock": 3,
+      "supplierId": null,
+      "supplierName": null,
+      "purchaseCost": null,
+      "reason": "Damaged (Corner chip during crating inspection)",
+      "dateTime": "2026-11-09 16:40",
+      "adminName": "Lillia Mercier (Business Owner)"
     }
   ]
 }

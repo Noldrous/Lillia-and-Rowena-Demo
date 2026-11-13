@@ -51,11 +51,48 @@ CREATE TABLE Employee (
 -- ---------- Catalog ----------
 
 CREATE TABLE Product (
-    ProductID    INT AUTO_INCREMENT PRIMARY KEY,
-    CategoryID   INT NOT NULL,
-    ProductName  VARCHAR(150) NOT NULL,
-    BasePrice    DECIMAL(10,2) NOT NULL CHECK (BasePrice >= 0),
+    ProductID      INT AUTO_INCREMENT PRIMARY KEY,
+    CategoryID     INT NOT NULL,
+    ProductName    VARCHAR(150) NOT NULL,
+    BasePrice      DECIMAL(10,2) NOT NULL CHECK (BasePrice >= 0),
+    StockQuantity  INT NOT NULL DEFAULT 0 CHECK (StockQuantity >= 0),
+    MinStockLevel  INT NOT NULL DEFAULT 2 CHECK (MinStockLevel >= 0),
     FOREIGN KEY (CategoryID) REFERENCES Category(CategoryID)
+) ENGINE=InnoDB;
+
+CREATE TABLE Supplier_Product (
+    SupplierID         INT NOT NULL,
+    ProductID          INT NOT NULL,
+    DefaultSupplyCost  DECIMAL(10,2) DEFAULT NULL CHECK (DefaultSupplyCost IS NULL OR DefaultSupplyCost >= 0),
+    PRIMARY KEY (SupplierID, ProductID),
+    FOREIGN KEY (SupplierID) REFERENCES Supplier(SupplierID) ON DELETE CASCADE,
+    FOREIGN KEY (ProductID)  REFERENCES Product(ProductID) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE Inventory_Record (
+    InventoryID     INT AUTO_INCREMENT PRIMARY KEY,
+    ProductID       INT NOT NULL UNIQUE,
+    AvailableStock  INT NOT NULL DEFAULT 0 CHECK (AvailableStock >= 0),
+    MinStockLevel   INT NOT NULL DEFAULT 2 CHECK (MinStockLevel >= 0),
+    UpdatedAt       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (ProductID) REFERENCES Product(ProductID) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE Stock_Movement (
+    MovementID        INT AUTO_INCREMENT PRIMARY KEY,
+    ProductID         INT NOT NULL,
+    SupplierID        INT DEFAULT NULL,
+    AdminID           INT NOT NULL,
+    MovementType      VARCHAR(20) NOT NULL CHECK (MovementType IN ('Stock In','Stock Out')),
+    Quantity          INT NOT NULL CHECK (Quantity > 0),
+    PreviousStock     INT NOT NULL CHECK (PreviousStock >= 0),
+    NewStock          INT NOT NULL CHECK (NewStock >= 0),
+    UnitPurchaseCost  DECIMAL(10,2) DEFAULT NULL CHECK (UnitPurchaseCost IS NULL OR UnitPurchaseCost >= 0),
+    Reason            VARCHAR(150) DEFAULT NULL,
+    MovementDate      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ProductID)  REFERENCES Product(ProductID) ON DELETE CASCADE,
+    FOREIGN KEY (SupplierID) REFERENCES Supplier(SupplierID) ON DELETE SET NULL,
+    FOREIGN KEY (AdminID)    REFERENCES Admin(AdminID)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Material (
@@ -232,6 +269,67 @@ FOR EACH ROW
 BEGIN
     -- status/expiry are only re-checked when the voucher itself changes
     CALL check_voucher_use(NEW.VoucherID, NEW.OrderID, NOT (NEW.VoucherID <=> OLD.VoucherID));
+END$$
+
+CREATE PROCEDURE sp_record_stock_movement(
+    IN p_product_id    INT,
+    IN p_supplier_id   INT,
+    IN p_admin_id      INT,
+    IN p_movement_type VARCHAR(20),
+    IN p_quantity      INT,
+    IN p_unit_cost     DECIMAL(10,2),
+    IN p_reason        VARCHAR(150)
+)
+BEGIN
+    DECLARE v_prev_stock INT;
+    DECLARE v_new_stock  INT;
+
+    IF p_quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Stock movement quantity must be greater than zero';
+    END IF;
+
+    START TRANSACTION;
+
+    SELECT StockQuantity INTO v_prev_stock
+      FROM Product
+     WHERE ProductID = p_product_id
+       FOR UPDATE;
+
+    IF v_prev_stock IS NULL THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product not found for stock movement';
+    END IF;
+
+    IF p_movement_type = 'Stock In' THEN
+        SET v_new_stock = v_prev_stock + p_quantity;
+    ELSEIF p_movement_type = 'Stock Out' THEN
+        IF v_prev_stock < p_quantity THEN
+            ROLLBACK;
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock: cannot deduct more than available quantity';
+        END IF;
+        SET v_new_stock = v_prev_stock - p_quantity;
+    ELSE
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid movement type (must be Stock In or Stock Out)';
+    END IF;
+
+    UPDATE Product
+       SET StockQuantity = v_new_stock
+     WHERE ProductID = p_product_id;
+
+    INSERT INTO Inventory_Record (ProductID, AvailableStock)
+    VALUES (p_product_id, v_new_stock)
+    ON DUPLICATE KEY UPDATE AvailableStock = v_new_stock;
+
+    INSERT INTO Stock_Movement (
+        ProductID, SupplierID, AdminID, MovementType,
+        Quantity, PreviousStock, NewStock, UnitPurchaseCost, Reason
+    ) VALUES (
+        p_product_id, p_supplier_id, p_admin_id, p_movement_type,
+        p_quantity, v_prev_stock, v_new_stock, p_unit_cost, p_reason
+    );
+
+    COMMIT;
 END$$
 
 DELIMITER ;

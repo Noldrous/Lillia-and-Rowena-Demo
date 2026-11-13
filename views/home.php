@@ -29,8 +29,8 @@ $sessionPayload = [
     </script>
   </head>
   <body class="bg-[#F4F9FF] text-[#0F172A] antialiased selection:bg-[#0095FF] selection:text-white min-h-screen flex flex-col">
-    <!-- Dedicated Logged-In Header (Strictly Shows Logged-In User's Account) -->
-    <header class="sticky top-0 z-40 bg-[#0B0F17] text-white border-b border-slate-800 shadow-sm">
+    <!-- Dedicated Logged-In Header (Shown ONLY for Customer Account Dashboard) -->
+    <header id="portal-top-header" class="sticky top-0 z-40 bg-[#0B0F17] text-white border-b border-slate-800 shadow-sm">
       <div class="max-w-[1440px] mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
         <div class="flex items-center gap-4">
           <a href="index.html" class="flex items-center gap-3 group">
@@ -71,8 +71,8 @@ $sessionPayload = [
     </header>
 
     <!-- Main Dashboard Workspace -->
-    <main class="flex-1 py-8 sm:py-10">
-      <div class="max-w-[1440px] mx-auto px-4 sm:px-8">
+    <main id="portal-main-workspace" class="flex-1">
+      <div id="client-portal-wrapper" class="max-w-[1440px] mx-auto px-4 sm:px-8 py-8 sm:py-10">
         <!-- =================================================================
              1. USER DASHBOARD WITH LEFT SIDEBAR NAVIGATION (Shown ONLY when a Customer logs in)
                 Left Sidebar Buttons: Home · Orders · Address/Contact · Transactions · Cart · Vouchers
@@ -623,185 +623,542 @@ $sessionPayload = [
             </div>
           </div>
         </section>
+      </div>
 
-        <!-- 2. ADMIN MANAGEMENT CONSOLE (Shown ONLY when Admin logs in) -->
-        <section id="admin-portal-view" class="hidden space-y-10">
-          <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-[#BCE3FF]">
-            <div class="space-y-2">
-              <p class="font-mono-tech text-xs uppercase tracking-[0.16em] text-[#0095FF] font-semibold">
-                Lillia and Rowena Furniture · Left-Sidebar Admin Management Console
-              </p>
-              <h1 class="font-serif-display text-3xl sm:text-4xl font-bold text-[#0D1015]">
-                Business Owner &amp; Admin Management Console
-              </h1>
-              <p class="text-sm text-[#475569] max-w-2xl">
-                Add custom furniture designs requested by clients on Messenger, edit product color prices and storewide discounts, and issue single-user, single-product Vouchers.
-              </p>
+      <!-- 2. ADMIN MANAGEMENT CONSOLE (Shown ONLY when Admin logs in) -->
+      <section id="admin-portal-view" class="hidden admin-cms-shell">
+        <!-- Mobile Top Bar (< 1024px) -->
+        <div id="admin-mobile-bar" class="admin-mobile-bar">
+          <div class="flex items-center gap-3">
+            <div class="admin-brand-mark">
+              LR
+            </div>
+            <span class="font-serif-display text-sm font-bold text-white truncate">
+              Lillia &amp; Rowena Admin
+            </span>
+          </div>
+          <button
+            type="button"
+            id="admin-mobile-menu-btn"
+            aria-label="Toggle Admin Navigation Sidebar"
+            aria-expanded="false"
+            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
+            <span>Menu</span>
+          </button>
+        </div>
+
+        <!-- Mobile Sidebar Backdrop -->
+        <div id="admin-sidebar-backdrop" class="admin-sidebar-backdrop" aria-hidden="true"></div>
+
+        <!-- ONE UNIFIED FIXED VERTICAL LEFT SIDEBAR -->
+        <aside id="admin-sidebar" class="admin-sidebar" aria-label="Admin Dashboard Navigation">
+          <div class="p-4 sm:p-5 space-y-6">
+            <div class="flex items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="admin-brand-mark">
+                  LR
+                </div>
+                <div class="min-w-0">
+                  <p class="font-serif-display text-sm font-bold text-white truncate leading-tight">
+                    Lillia &amp; Rowena
+                  </p>
+                  <p class="text-xs text-slate-400 truncate mt-0.5">
+                    Admin Dashboard
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="admin-sidebar-close-btn"
+                aria-label="Close Admin Navigation Sidebar"
+                class="admin-sidebar-close-btn"
+              >
+                ✕
+              </button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <nav aria-label="Admin Sidebar Links" class="admin-nav-list">
+              <button
+                type="button"
+                data-admin-tab="overview"
+                aria-current="page"
+                class="admin-tab-btn admin-nav-item is-active"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                  <span>Overview</span>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                data-admin-tab="catalog"
+                class="admin-tab-btn admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                  <span>Products</span>
+                </span>
+                <span id="admin-nav-count-products" class="admin-nav-count">8</span>
+              </button>
+
               <button
                 type="button"
                 id="admin-open-add-product-btn"
-                class="px-5 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+                data-admin-tab="add-product"
+                class="admin-tab-btn admin-nav-item"
               >
-                + Add Product / Custom Messenger Design
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                  <span>Add Product</span>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                data-admin-tab="suppliers"
+                class="admin-tab-btn admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span>Suppliers</span>
+                </span>
+                <span id="admin-nav-count-suppliers" class="admin-nav-count">3</span>
+              </button>
+
+              <button
+                type="button"
+                data-admin-tab="inventory"
+                class="admin-tab-btn admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                  <span>Inventory</span>
+                </span>
+                <span id="admin-nav-count-inventory" class="admin-nav-count">24</span>
+              </button>
+
+              <button
+                type="button"
+                data-admin-tab="vouchers"
+                class="admin-tab-btn admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                  <span>Vouchers</span>
+                </span>
+                <span id="admin-nav-count-vouchers" class="admin-nav-count">3</span>
+              </button>
+
+              <button
+                type="button"
+                data-admin-tab="orders"
+                class="admin-tab-btn admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 14h6"/><path d="M9 18h6"/><path d="M9 10h6"/></svg>
+                  <span>Orders</span>
+                </span>
+                <span id="admin-nav-count-orders" class="admin-nav-count">3</span>
+              </button>
+
+              <a
+                href="https://www.messenger.com/t/100000505712325"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                  <span>Messenger</span>
+                </span>
+              </a>
+
+              <a
+                href="index.html"
+                class="admin-nav-item"
+              >
+                <span class="admin-nav-item-label">
+                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  <span>View Store</span>
+                </span>
+              </a>
+            </nav>
+          </div>
+
+          <div class="p-4 sm:p-5 border-t border-slate-800 space-y-3">
+            <div class="px-1">
+              <p id="admin-sidebar-user-name" class="text-xs font-semibold text-white truncate">
+                Lillia Mercier
+              </p>
+              <p id="admin-sidebar-user-email" class="text-xs text-slate-400 truncate mt-0.5">
+                admin@lilliarowena.com
+              </p>
+            </div>
+            <a
+              href="logout.php"
+              id="admin-logout-btn"
+              class="admin-logout-button"
+            >
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+              <span>Log Out</span>
+            </a>
+          </div>
+        </aside>
+
+        <!-- RIGHT SIDE: CLEAN, FOCUSED PAGE CONTENT -->
+        <div id="admin-main-content" class="admin-main-content">
+          <div class="admin-content-inner space-y-6">
+            <div class="pb-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div class="space-y-1">
+                <p id="admin-page-eyebrow" class="text-xs font-semibold text-[#0284C7]">
+                  Store Summary
+                </p>
+                <h1 id="admin-page-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-slate-900">
+                  Dashboard Overview
+                </h1>
+                <p id="admin-page-description" class="text-sm text-slate-600 max-w-2xl">
+                  Track your store performance, inventory breakdown, and recent customer orders in one place.
+                </p>
+              </div>
+            </div>
+
+            <div id="admin-status-banner" role="status" class="hidden px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-medium flex items-center justify-between gap-3"></div>
+
+            <!-- PAGE 1: OVERVIEW -->
+            <div id="admin-overview-section" class="space-y-6">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="admin-kpi-card">
+                  <p class="text-xs font-semibold text-slate-500">Total Products</p>
+                  <p id="admin-stat-catalog" class="font-mono-tech text-2xl font-bold text-slate-900 mt-1">8 Pieces</p>
+                  <p id="admin-stat-catalog-sub" class="text-xs text-slate-500 mt-1">Across 4 room categories</p>
+                </div>
+                <div class="admin-kpi-card">
+                  <p class="text-xs font-semibold text-slate-500">Active Vouchers</p>
+                  <p id="admin-stat-vouchers" class="font-mono-tech text-2xl font-bold text-[#0284C7] mt-1">3 Active</p>
+                  <p class="text-xs text-slate-500 mt-1">Personal discount codes</p>
+                </div>
+                <div class="admin-kpi-card">
+                  <p class="text-xs font-semibold text-slate-500">Customer Orders</p>
+                  <p id="admin-stat-orders" class="font-mono-tech text-2xl font-bold text-slate-900 mt-1">3 Orders</p>
+                  <p class="text-xs text-slate-500 mt-1">Currently in progress</p>
+                </div>
+                <div class="admin-kpi-card">
+                  <p class="text-xs font-semibold text-slate-500">Total Revenue</p>
+                  <p id="admin-stat-revenue" class="font-mono-tech text-2xl font-bold text-emerald-700 mt-1">$16,911</p>
+                  <p class="text-xs text-slate-500 mt-1">From active orders</p>
+                </div>
+              </div>
+
+              <div class="admin-charts-grid">
+                <div class="admin-card p-6 space-y-4">
+                  <div>
+                    <h2 class="text-base font-bold text-slate-900">Products by Category</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Number of items and average price per room</p>
+                  </div>
+                  <div id="admin-chart-categories" class="space-y-3"></div>
+                </div>
+
+                <div class="admin-card p-6 space-y-4">
+                  <div>
+                    <h2 class="text-base font-bold text-slate-900">Orders by Stage</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Current fulfillment progress across customer orders</p>
+                  </div>
+                  <div id="admin-chart-orders" class="space-y-3"></div>
+                </div>
+              </div>
+
+              <div id="admin-overview-recent-orders" class="admin-card overflow-hidden"></div>
+            </div>
+
+            <!-- PAGE 2 & 3: PRODUCTS & ADD PRODUCT -->
+            <div id="admin-tab-catalog" class="admin-tab-panel hidden space-y-6">
+              <form id="admin-product-form" novalidate class="admin-card p-6 sm:p-8 space-y-6 hidden">
+                <input type="hidden" id="prod-edit-id" value="" />
+                <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
+                  <div>
+                    <h2 id="admin-product-form-title" class="text-lg font-bold text-slate-900">
+                      Add Product
+                    </h2>
+                    <p id="admin-product-form-subtitle" class="text-xs text-slate-500 mt-0.5">
+                      Choose a product type below. Both Normal Products and Customized Products appear in the public Shop for all customers.
+                    </p>
+                  </div>
+                  <button type="button" id="admin-close-product-form" class="admin-btn admin-btn-sm admin-btn-secondary">
+                    Cancel
+                  </button>
+                </div>
+
+                <div id="admin-product-form-error" role="alert" class="hidden px-4 py-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold"></div>
+
+                <!-- 1. Product Type Selection -->
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                    <div>
+                      <label for="prod-type" class="admin-label">Product Type</label>
+                      <select id="prod-type" class="admin-select font-semibold">
+                        <option value="standard">Normal Product</option>
+                        <option value="customized">Customized Product (Messenger)</option>
+                      </select>
+                      <p class="admin-hint">Select whether this is a regular admin product or a Messenger customization.</p>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 space-y-1">
+                      <p id="prod-type-badge" class="font-bold text-slate-900">
+                        Origin: Admin · Public Shop Visibility: All Customers
+                      </p>
+                      <p id="prod-type-helper">
+                        Regular product manually added by the admin. Appears in the public Shop/Product Catalog for all customers to view and purchase.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Conditional Messenger Customization Section (Shown when Customized Product is selected) -->
+                  <div id="prod-messenger-section" class="hidden pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label for="prod-messenger-thread" class="admin-label">Related Messenger Conversation (Optional)</label>
+                      <select id="prod-messenger-thread" class="admin-select">
+                        <option value="">None — General Messenger Customization</option>
+                      </select>
+                      <p class="admin-hint">Optionally link a customer's Messenger conversation for reference or quick autofill.</p>
+                    </div>
+                    <div>
+                      <label for="prod-custom-notes" class="admin-label">Customer Request / Customization Details</label>
+                      <input
+                        id="prod-custom-notes"
+                        type="text"
+                        placeholder="e.g. Extended 300cm walnut slab with brass cable grommets requested via Messenger"
+                        class="admin-input"
+                      />
+                      <p class="admin-hint">Custom specifications requested through Messenger (visible in public product details).</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 2. Product Details Form -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label for="prod-name" class="admin-label">Product Name</label>
+                    <input id="prod-name" type="text" required placeholder="e.g. Solid Walnut Dining Table" class="admin-input" />
+                    <p class="admin-hint">Clear, descriptive title shown to all customers in the Shop.</p>
+                  </div>
+                  <div>
+                    <label for="prod-sku" class="admin-label">SKU Code</label>
+                    <input id="prod-sku" type="text" required placeholder="e.g. LR-DN-120" class="admin-input font-mono-tech uppercase" />
+                    <p class="admin-hint">Unique catalog reference code.</p>
+                  </div>
+                  <div>
+                    <label for="prod-category" class="admin-label">Category</label>
+                    <select id="prod-category" class="admin-select">
+                      <option value="living">Living &amp; Lounge</option>
+                      <option value="dining">Dining &amp; Tables</option>
+                      <option value="bedroom">Bedroom Sanctuary</option>
+                      <option value="office">Study &amp; Credenzas</option>
+                    </select>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="prod-price" class="admin-label">Base Price ($)</label>
+                      <input id="prod-price" type="number" min="50" required value="2850" class="admin-input font-mono-tech" />
+                    </div>
+                    <div>
+                      <label for="prod-discount" class="admin-label">Discount (%)</label>
+                      <input id="prod-discount" type="number" min="0" max="80" value="0" class="admin-input font-mono-tech" />
+                    </div>
+                  </div>
+                  <div>
+                    <label for="prod-dimensions" class="admin-label">Dimensions</label>
+                    <input id="prod-dimensions" type="text" value="240cm L × 100cm W × 75cm H" placeholder="e.g. 240cm L × 100cm W × 75cm H" class="admin-input" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="prod-stock" class="admin-label">Available Stock</label>
+                      <input id="prod-stock" type="number" min="0" required value="4" class="admin-input font-mono-tech" />
+                    </div>
+                    <div>
+                      <label for="prod-min-stock" class="admin-label">Min Stock Alert</label>
+                      <input id="prod-min-stock" type="number" min="0" required value="2" class="admin-input font-mono-tech" />
+                    </div>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label for="prod-colors" class="admin-label">Finish Options</label>
+                    <input id="prod-colors" type="text" value="Natural Walnut|#5C3A21|0, Smoked Oak|#3D312A|180, Ebonized Ash|#1C1917|260" class="admin-input font-mono-tech text-xs" />
+                    <p class="admin-hint">Format: Finish Name | Hex Color | Price Difference</p>
+                  </div>
+
+                  <!-- 3. Product Image Upload & Live Preview (Required for Add & Editable on Update) -->
+                  <div class="sm:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label for="prod-image" class="admin-label">Product Image <span class="text-rose-600">* (Required)</span></label>
+                        <p class="admin-hint">Upload an image file, enter an image URL/path, or choose a showroom preset below.</p>
+                      </div>
+                      <button type="button" id="prod-image-clear-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
+                        Clear Image
+                      </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                      <div class="md:col-span-2 space-y-3">
+                        <div>
+                          <label for="prod-image-file" class="block text-xs font-semibold text-slate-700 mb-1">Upload Image File</label>
+                          <input
+                            id="prod-image-file"
+                            type="file"
+                            accept="image/*"
+                            class="admin-input text-xs"
+                            style="padding-top: 0.4rem;"
+                          />
+                        </div>
+                        <div>
+                          <label for="prod-image" class="block text-xs font-semibold text-slate-700 mb-1">Image URL or Asset Path</label>
+                          <input
+                            id="prod-image"
+                            type="text"
+                            required
+                            value=""
+                            placeholder="e.g. assets/images/category_dining_tables.jpg or https://..."
+                            class="admin-input font-mono-tech text-xs"
+                          />
+                        </div>
+                        <div>
+                          <p class="text-[11px] font-semibold text-slate-500 mb-1.5">Quick Showroom Image Presets:</p>
+                          <div class="flex flex-wrap gap-1.5">
+                            <button type="button" data-prod-image-preset="assets/images/category_living_lounge.jpg" class="admin-btn admin-btn-sm admin-btn-secondary">
+                              Living &amp; Lounge
+                            </button>
+                            <button type="button" data-prod-image-preset="assets/images/category_dining_tables.jpg" class="admin-btn admin-btn-sm admin-btn-secondary">
+                              Dining &amp; Tables
+                            </button>
+                            <button type="button" data-prod-image-preset="assets/images/category_bedroom_sanctuary.jpg" class="admin-btn admin-btn-sm admin-btn-secondary">
+                              Bedroom Sanctuary
+                            </button>
+                            <button type="button" data-prod-image-preset="assets/images/category_office_storage.jpg" class="admin-btn admin-btn-sm admin-btn-secondary">
+                              Study &amp; Credenzas
+                            </button>
+                            <button type="button" data-prod-image-preset="assets/images/hero_living_room_atelier.jpg" class="admin-btn admin-btn-sm admin-btn-secondary">
+                              Showroom Atelier
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="p-3 rounded-xl bg-white border border-slate-200 flex flex-col items-center justify-center min-h-[150px] text-center">
+                        <img
+                          id="prod-image-preview"
+                          src=""
+                          alt="Product image preview"
+                          class="hidden w-full h-36 object-cover rounded-lg border border-slate-200"
+                        />
+                        <div id="prod-image-empty-state" class="py-6 px-2 space-y-1">
+                          <p class="text-xs font-bold text-slate-700">No Image Selected</p>
+                          <p class="text-[11px] text-slate-400">An image is required before saving this product.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                  <button type="button" id="admin-cancel-product-btn" class="admin-btn admin-btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" id="admin-save-product-btn" class="admin-btn admin-btn-primary">
+                    Save Product
+                  </button>
+                </div>
+              </form>
+
+              <div id="admin-catalog-list" class="space-y-4"></div>
+            </div>
+
+            <!-- PAGE 4: SUPPLIER MANAGEMENT -->
+            <div id="admin-tab-suppliers" class="admin-tab-panel hidden space-y-6"></div>
+
+            <!-- PAGE 5: SUPPLY & INVENTORY MANAGEMENT -->
+            <div id="admin-tab-inventory" class="admin-tab-panel hidden space-y-6"></div>
+
+            <!-- PAGE 6: VOUCHERS -->
+            <div id="admin-tab-vouchers" class="admin-tab-panel hidden space-y-6">
+              <form id="admin-voucher-form" novalidate class="admin-card p-6 sm:p-8 space-y-6">
+                <div class="pb-4 border-b border-slate-200">
+                  <h2 class="text-lg font-bold text-slate-900">
+                    Create Discount Voucher
+                  </h2>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Create a single-item discount code linked to a customer's email address.
+                  </p>
+                </div>
+
+                <div id="admin-voucher-form-error" role="alert" class="hidden px-4 py-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold"></div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label for="vch-email" class="admin-label">Customer Email</label>
+                    <input id="vch-email" type="email" required value="rowena.vance@vancearchitects.com" placeholder="customer@example.com" class="admin-input" />
+                  </div>
+                  <div>
+                    <label for="vch-product" class="admin-label">Eligible Product</label>
+                    <select id="vch-product" class="admin-select"></select>
+                  </div>
+                  <div>
+                    <label for="vch-code" class="admin-label">Voucher Code</label>
+                    <div class="flex gap-2">
+                      <input id="vch-code" type="text" required placeholder="e.g. SAVE-300" class="admin-input font-mono-tech uppercase" />
+                      <button type="button" id="admin-generate-voucher-btn" class="admin-btn admin-btn-secondary shrink-0">
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label for="vch-discount-type" class="admin-label">Discount Type</label>
+                      <select id="vch-discount-type" class="admin-select">
+                        <option value="fixed">Fixed Amount ($)</option>
+                        <option value="percentage">Percentage (%)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label id="vch-discount-label" for="vch-discount" class="admin-label">Discount Value</label>
+                      <input id="vch-discount" type="number" min="1" required value="300" class="admin-input font-mono-tech" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                  <button type="submit" class="admin-btn admin-btn-primary">
+                    Create Voucher
+                  </button>
+                </div>
+              </form>
+
+              <div id="admin-vouchers-list" class="space-y-4"></div>
+            </div>
+
+            <!-- PAGE 7: ORDERS -->
+            <div id="admin-tab-orders" class="admin-tab-panel hidden space-y-6"></div>
+          </div>
+        </div>
+
+        <!-- Straightforward Confirmation Dialog Modal -->
+        <div id="admin-confirm-modal" class="admin-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-confirm-title">
+          <div class="admin-modal-card space-y-4">
+            <div class="space-y-1.5">
+              <h3 id="admin-confirm-title" class="text-base font-bold text-slate-900">Confirm Action</h3>
+              <p id="admin-confirm-message" class="text-sm text-slate-600">Are you sure you want to proceed?</p>
+            </div>
+            <div class="flex items-center justify-end gap-2.5 pt-2">
+              <button type="button" id="admin-confirm-cancel" class="admin-btn admin-btn-secondary">
+                Cancel
+              </button>
+              <button type="button" id="admin-confirm-accept" class="admin-btn admin-btn-danger">
+                Confirm
               </button>
             </div>
           </div>
-
-          <div id="admin-status-banner" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm font-medium"></div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <aside class="lg:col-span-3 bg-white rounded-3xl border border-[#BCE3FF] p-6 space-y-6 shadow-2xs">
-              <div>
-                <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
-                  Management Modules
-                </p>
-                <p class="text-xs text-[#64748B] mt-1">
-                  Select a record table on the left
-                </p>
-              </div>
-
-              <nav class="space-y-2.5">
-                <button
-                  type="button"
-                  data-admin-tab="catalog"
-                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#0095FF] text-white border-[#0095FF] shadow-sm"
-                >
-                  <p class="text-xs font-bold">Products, Colors &amp; Discounts</p>
-                  <p class="text-[11px] opacity-85 mt-0.5">Add custom designs &amp; color prices</p>
-                </button>
-                <button
-                  type="button"
-                  data-admin-tab="vouchers"
-                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#F8FBFF] text-[#0D1015] border-[#E2E8F0] hover:border-[#0095FF]"
-                >
-                  <p class="text-xs font-bold">Single-Product Vouchers</p>
-                  <p class="text-[11px] text-[#64748B] mt-0.5">Issue Messenger offer codes</p>
-                </button>
-                <button
-                  type="button"
-                  data-admin-tab="orders"
-                  class="admin-tab-btn w-full text-left p-4 rounded-2xl transition-all border cursor-pointer bg-[#F8FBFF] text-[#0D1015] border-[#E2E8F0] hover:border-[#0095FF]"
-                >
-                  <p class="text-xs font-bold">Client Orders (`Customer_Order`)</p>
-                  <p class="text-[11px] text-[#64748B] mt-0.5">Update production status</p>
-                </button>
-              </nav>
-            </aside>
-
-            <div class="lg:col-span-9 space-y-8">
-              <div id="admin-tab-catalog" class="admin-tab-panel space-y-8">
-                <form id="admin-product-form" class="bg-white rounded-3xl border border-[#BCE3FF] p-8 space-y-6 shadow-2xs hidden">
-                  <div class="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
-                    <div>
-                      <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
-                        Product &amp; Custom Messenger Design Editor
-                      </p>
-                      <h3 id="admin-product-form-title" class="font-serif-display text-2xl font-bold text-[#0D1015] mt-0.5">
-                        Add Product or Client's Custom Design
-                      </h3>
-                    </div>
-                    <button type="button" id="admin-close-product-form" class="text-xs font-semibold text-[#64748B] hover:text-[#0D1015] cursor-pointer">
-                      Cancel ✕
-                    </button>
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Product Name</label>
-                      <input id="prod-name" type="text" required placeholder="e.g. Custom 280cm Walnut Dining Table" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-sm" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">SKU Code</label>
-                      <input id="prod-sku" type="text" required placeholder="e.g. LR-CUST-109" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm uppercase" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Room Category</label>
-                      <select id="prod-category" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-sm">
-                        <option value="living">Living &amp; Lounge</option>
-                        <option value="dining">Dining &amp; Tables</option>
-                        <option value="bedroom">Bedroom Sanctuary</option>
-                        <option value="office">Study &amp; Credenzas</option>
-                      </select>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Base Price (USD)</label>
-                        <input id="prod-price" type="number" min="50" required value="2850" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
-                      </div>
-                      <div>
-                        <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Storewide Discount %</label>
-                        <input id="prod-discount" type="number" min="0" max="80" value="0" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Dimensions</label>
-                      <input id="prod-dimensions" type="text" value="240cm L × 100cm W × 75cm H" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-sm" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Color Variants (`Name | Hex | +Delta`)</label>
-                      <input id="prod-colors" type="text" value="Natural Walnut|#5C3A21|0, Smoked Oak|#3D312A|180, Ebonized Ash|#1C1917|260" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
-                    </div>
-                  </div>
-
-                  <div class="flex justify-end gap-3 pt-2">
-                    <button type="submit" class="px-6 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold cursor-pointer">
-                      Save Product to Catalog
-                    </button>
-                  </div>
-                </form>
-
-                <div id="admin-catalog-list" class="space-y-5"></div>
-              </div>
-
-              <div id="admin-tab-vouchers" class="admin-tab-panel hidden space-y-8">
-                <form id="admin-voucher-form" class="bg-white rounded-3xl border border-[#BCE3FF] p-8 space-y-6 shadow-2xs">
-                  <div>
-                    <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0095FF] font-semibold">
-                      Issue Single-User, Single-Product Voucher (`Voucher` Table)
-                    </p>
-                    <h3 class="font-serif-display text-2xl font-bold text-[#0D1015] mt-1">
-                      Generate Messenger Offer Voucher
-                    </h3>
-                    <p class="text-xs text-[#475569] mt-1">
-                      After agreeing on a reduced price in Messenger (<a href="https://www.messenger.com/t/100000505712325" target="_blank" rel="noopener noreferrer" class="text-[#0095FF] underline">https://www.messenger.com/t/100000505712325</a>), issue a voucher locked to that specific customer and product.
-                    </p>
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Customer Email (`Customer.Email`)</label>
-                      <input id="vch-email" type="email" required value="rowena.vance@vancearchitects.com" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Target Product (`Product.ProductID`)</label>
-                      <select id="vch-product" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-xs font-semibold"></select>
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Voucher Code (`Voucher.Code`)</label>
-                      <input id="vch-code" type="text" required placeholder="e.g. VCH-ROWENA-500" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs uppercase" />
-                    </div>
-                    <div>
-                      <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Fixed Discount Amount ($ USD)</label>
-                      <input id="vch-discount" type="number" min="25" required value="300" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] font-mono-tech text-xs" />
-                    </div>
-                  </div>
-
-                  <button type="submit" class="px-6 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold cursor-pointer">
-                    Issue Single-Product Voucher
-                  </button>
-                </form>
-
-                <div id="admin-vouchers-list" class="space-y-4"></div>
-              </div>
-
-              <div id="admin-tab-orders" class="admin-tab-panel hidden space-y-6"></div>
-            </div>
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
 
     <script type="module" src="assets/js/app.js"></script>
