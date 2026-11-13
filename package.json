@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "sh -c 'exec python3 -m http.server 3000 --bind 0.0.0.0'",
-    "build": "rm -rf dist && mkdir -p dist && cp -r index.html login.html dashboard.html assets data database dist/",
+    "build": "rm -rf dist && mkdir -p dist && cp -r index.html catalog.html login.html dashboard.html assets data database dist/",
     "preview": "sh -c 'exec python3 -m http.server 3000 --bind 0.0.0.0 --directory dist'",
     "clean": "rm -rf dist",
-    "lint": "python3 -m json.tool data/store.json >/dev/null && test -f index.html && test -f login.html && test -f dashboard.html && test -f assets/css/style.css && test -f assets/css/login.css && test -f assets/js/app.js && test -f assets/js/store.js && test -f assets/js/login.js"
+    "lint": "python3 -m json.tool data/store.json >/dev/null && test -f index.html && test -f catalog.html && test -f login.html && test -f dashboard.html && test -f assets/css/style.css && test -f assets/css/login.css && test -f assets/js/app.js && test -f assets/js/store.js && test -f assets/js/login.js"
   }
 }

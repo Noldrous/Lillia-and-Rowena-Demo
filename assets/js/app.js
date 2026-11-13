@@ -6,9 +6,14 @@
 
 import {
   ADMIN_MESSENGER_PLACEHOLDER_URL,
+  CATALOG_COLOR_FILTERS,
   calculateOrderPricing,
   computeVariantPricing,
+  filterCatalogPageItems,
   filterFurnitureItems,
+  findMatchingColorVariant,
+  getColorFilterCounts,
+  getRecommendedBestSellers,
   validateVoucherForOrder,
 } from './store.js';
 
@@ -98,9 +103,14 @@ const state = {
   vouchers: [],
   orders: [],
   selectedColorByProduct: {},
-  selectedCategory: 'all',
+  selectedCategory: 'recommended',
   searchQuery: '',
   sortBy: 'featured',
+  catalogPageCategory: 'all',
+  catalogPageColorKey: 'all',
+  catalogPageMaxPrice: 5500,
+  catalogPageSpotlightProductId: '',
+  catalogPageSearchQuery: '',
   cartItems: [],
   appliedVoucher: null,
   sessionUser: null, // null when logged out, { email, name, role: 'client' | 'admin' } when logged in
@@ -343,97 +353,68 @@ function initShowroomPage() {
       }
 
       const primaryCta = document.getElementById('hero-primary-cta');
-      if (primaryCta) primaryCta.setAttribute('data-filter-target', data.filterTarget);
+      if (primaryCta) {
+        primaryCta.setAttribute('data-filter-target', data.filterTarget);
+        primaryCta.setAttribute('href', `catalog.html?category=${encodeURIComponent(data.filterTarget)}`);
+      }
       const cardCta = document.getElementById('hero-card-cta');
-      if (cardCta) cardCta.setAttribute('data-filter-target', data.filterTarget);
+      if (cardCta) {
+        cardCta.setAttribute('data-filter-target', data.filterTarget);
+        cardCta.setAttribute('href', `catalog.html?category=${encodeURIComponent(data.filterTarget)}`);
+      }
     });
   });
 
-  // Smooth category links inside Hero & Footer
-  document.querySelectorAll('[data-filter-target]').forEach((link) => {
-    link.addEventListener('click', () => {
-      const cat = link.getAttribute('data-filter-target') || 'all';
-      setActiveCategoryFilter(cat);
+  const showRecommendedBtn = document.getElementById('catalog-show-recommended-btn');
+  if (showRecommendedBtn) {
+    showRecommendedBtn.addEventListener('click', () => {
+      state.searchQuery = '';
+      const topSearch = document.getElementById('top-nav-search');
+      const topClear = document.getElementById('top-nav-search-clear');
+      if (topSearch) topSearch.value = '';
+      if (topClear) {
+        topClear.classList.add('hidden');
+        topClear.classList.remove('flex');
+      }
+      setActiveCategoryFilter('recommended');
     });
-  });
+  }
 
-  // Search Inputs (Top Nav + Catalog Search + Clear Buttons)
+  // Top Nav Search Input + Clear Button (On Homepage: typing only updates input; pressing Enter opens catalog.html)
   const topSearch = document.getElementById('top-nav-search');
-  const catSearch = document.getElementById('catalog-search-input');
   const topClear = document.getElementById('top-nav-search-clear');
-  const catClear = document.getElementById('catalog-search-clear');
 
   const syncClearButtons = (val) => {
     const hasQuery = Boolean(String(val || '').trim());
-    [topClear, catClear].forEach((btn) => {
-      if (!btn) return;
-      btn.classList.toggle('hidden', !hasQuery);
-      btn.classList.toggle('flex', hasQuery);
-    });
-    document.querySelectorAll('[data-material-chip]').forEach((chip) => {
-      const mat = chip.getAttribute('data-material-chip') || '';
-      const active = hasQuery && val.trim().toLowerCase() === mat.toLowerCase();
-      chip.className = active
-        ? 'px-3 py-1 rounded-lg text-xs font-semibold border bg-[#0095FF] text-white border-[#0095FF] cursor-pointer transition-colors'
-        : 'px-3 py-1 rounded-lg text-xs font-medium border bg-white text-[#475569] border-[#E2E8F0] hover:border-[#0095FF] cursor-pointer transition-colors';
-    });
-  };
-
-  const handleSearch = (val) => {
-    state.searchQuery = val;
-    if (topSearch && topSearch.value !== val) topSearch.value = val;
-    if (catSearch && catSearch.value !== val) catSearch.value = val;
-    syncClearButtons(val);
-    renderCatalogGrid();
+    if (topClear) {
+      topClear.classList.toggle('hidden', !hasQuery);
+      topClear.classList.toggle('flex', hasQuery);
+    }
   };
 
   if (topSearch) {
-    topSearch.addEventListener('input', (e) => handleSearch(e.target.value));
+    topSearch.addEventListener('input', (e) => {
+      syncClearButtons(e.target.value);
+    });
     topSearch.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        const catalogEl = document.getElementById('catalog-section');
-        if (catalogEl) catalogEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const trimmed = String(topSearch.value || '').trim();
+        window.location.href = trimmed
+          ? `catalog.html?q=${encodeURIComponent(trimmed)}`
+          : 'catalog.html';
       }
     });
   }
-  if (catSearch) catSearch.addEventListener('input', (e) => handleSearch(e.target.value));
   if (topClear) {
     topClear.addEventListener('click', () => {
-      handleSearch('');
-      if (topSearch) topSearch.focus();
+      if (topSearch) {
+        topSearch.value = '';
+        syncClearButtons('');
+        topSearch.focus();
+      }
     });
   }
-  if (catClear) {
-    catClear.addEventListener('click', () => {
-      handleSearch('');
-      if (catSearch) catSearch.focus();
-    });
-  }
-
-  // Sort Select
-  const sortSelect = document.getElementById('catalog-sort');
-  if (sortSelect) {
-    sortSelect.addEventListener('change', (e) => {
-      state.sortBy = e.target.value;
-      renderCatalogGrid();
-    });
-  }
-
-  // Category Filter Pills
-  document.querySelectorAll('[data-category-pill]').forEach((pill) => {
-    pill.addEventListener('click', () => {
-      setActiveCategoryFilter(pill.getAttribute('data-category-pill') || 'all');
-    });
-  });
-
-  // Material Quick Chips
-  document.querySelectorAll('[data-material-chip]').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const mat = chip.getAttribute('data-material-chip') || '';
-      handleSearch(state.searchQuery.trim().toLowerCase() === mat.toLowerCase() ? '' : mat);
-    });
-  });
 
   // Cart Drawer Toggle (Open, Close Button, Backdrop Click, Escape Key)
   const cartDrawer = document.getElementById('cart-drawer');
@@ -498,13 +479,8 @@ function initShowroomPage() {
 }
 
 function setActiveCategoryFilter(cat) {
-  state.selectedCategory = cat;
-  document.querySelectorAll('[data-category-pill]').forEach((pill) => {
-    const active = pill.getAttribute('data-category-pill') === cat;
-    pill.className = active
-      ? 'cat-pill px-4 py-2 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer bg-[#0095FF] text-white shadow-xs'
-      : 'cat-pill px-4 py-2 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer bg-white text-[#475569] border border-[#BCE3FF] hover:border-[#0095FF] hover:text-[#0D1015]';
-  });
+  state.selectedCategory = cat || 'recommended';
+  renderRoomCollections();
   renderCatalogGrid();
 }
 
@@ -515,85 +491,100 @@ function renderRoomCollections() {
   container.innerHTML = state.categories
     .map((cat) => {
       const items = state.catalog.filter((p) => p.categoryId === cat.id);
+      const isSelected = state.selectedCategory === cat.id;
+      const catHref = `catalog.html?category=${encodeURIComponent(cat.id)}`;
       return `
-        <article class="group rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-          <div>
+        <article class="group rounded-2xl bg-white border ${
+          isSelected ? 'border-[#0095FF] ring-2' : 'border-[#BCE3FF] hover:border-[#0095FF]'
+        } overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
+          <a href="${esc(catHref)}" class="block">
             <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
               <img src="${esc(cat.image)}" alt="${esc(cat.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/80 via-[#0D1015]/15 to-transparent"></div>
-              <div class="absolute top-3 left-3">
-                <span class="px-2.5 py-1 rounded-md bg-[#0D1015]/80 text-white font-mono-tech text-[11px] font-medium">
-                  ${items.length} Pieces
-                </span>
-              </div>
+              <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
               <div class="absolute bottom-3 left-3 right-3 text-white">
-                <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From ${usd(cat.startingPrice)} · ${esc(cat.leadTimeRange)}</p>
-                <h3 class="font-serif-display text-xl font-bold leading-snug mt-0.5">${esc(cat.name)}</h3>
+                <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From ${usd(cat.startingPrice)} · ${items.length} Pieces</p>
+                <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">${esc(cat.name)}</h3>
               </div>
             </div>
             <div class="p-4 space-y-2">
               <p class="text-xs text-[#475569] line-clamp-2">${esc(cat.tagline)}</p>
-              <div class="pt-2 border-t border-[#EBF6FF] space-y-1">
-                ${items
-                  .slice(0, 2)
-                  .map(
-                    (i) => `
-                  <div class="flex justify-between text-xs">
-                    <span class="truncate text-[#0D1015] font-medium pr-2">${esc(i.name)}</span>
-                    <span class="font-mono-tech font-semibold text-[#0D1015]">${usd(i.effectivePrice)}</span>
-                  </div>`
-                  )
-                  .join('')}
-              </div>
             </div>
-          </div>
+          </a>
           <div class="px-4 pb-4">
             <a
-              href="#catalog-section"
-              data-room-filter="${esc(cat.id)}"
-              class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between"
+              href="${esc(catHref)}"
+              data-testid="category-card-link-${esc(cat.id)}"
+              class="w-full py-2.5 px-3.5 rounded-xl ${
+                isSelected
+                  ? 'bg-[#0095FF] text-white'
+                  : 'bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white'
+              } text-xs font-semibold transition-colors flex items-center justify-between"
             >
-              <span>Filter ${esc(cat.name)} (${items.length})</span>
-              <span>↓</span>
+              <span>Explore ${esc(cat.name)}</span>
+              <span>→</span>
             </a>
           </div>
         </article>
       `;
     })
     .join('');
-
-  container.querySelectorAll('[data-room-filter]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      setActiveCategoryFilter(btn.getAttribute('data-room-filter') || 'all');
-    });
-  });
 }
 
 function renderCatalogGrid() {
   const grid = document.getElementById('product-catalog-grid');
   const countLabel = document.getElementById('catalog-count-label');
+  const eyebrowEl = document.getElementById('catalog-section-eyebrow');
+  const titleEl = document.getElementById('catalog-section-title');
+  const subtitleEl = document.getElementById('catalog-section-subtitle');
+  const backBtn = document.getElementById('catalog-show-recommended-btn');
   if (!grid) return;
 
-  const filtered = filterFurnitureItems(state.catalog, state.searchQuery, state.selectedCategory);
-  const sorted = [...filtered].sort((a, b) => {
-    const pA = computeVariantPricing(a, state.selectedColorByProduct[a.id]).effectivePrice;
-    const pB = computeVariantPricing(b, state.selectedColorByProduct[b.id]).effectivePrice;
-    if (state.sortBy === 'price-asc') return pA - pB;
-    if (state.sortBy === 'price-desc') return pB - pA;
-    if (state.sortBy === 'lead-time') return a.leadTimeWeeks - b.leadTimeWeeks;
-    return 0;
-  });
+  const hasQuery = Boolean(String(state.searchQuery || '').trim());
+  const isRecommendedView = !hasQuery && (!state.selectedCategory || state.selectedCategory === 'recommended' || state.selectedCategory === 'all');
 
-  if (countLabel) {
-    countLabel.textContent = `Showing ${sorted.length} of ${state.catalog.length} pieces`;
+  let displayed = [];
+  if (isRecommendedView) {
+    displayed = getRecommendedBestSellers(state.catalog, 4);
+    if (eyebrowEl) eyebrowEl.textContent = '02. Most Commissioned Showroom Pieces';
+    if (titleEl) titleEl.textContent = 'Recommended & Best Sellers';
+    if (subtitleEl) {
+      subtitleEl.textContent =
+        'Our four signature client favorites—featuring customizable timber and upholstery finishes, direct Messenger price offers, and custom millwork sizing.';
+    }
+    if (countLabel) countLabel.textContent = `Showing ${displayed.length} Recommended Best Sellers`;
+    if (backBtn) backBtn.classList.add('hidden');
+  } else {
+    const activeCatId = state.selectedCategory === 'recommended' ? 'all' : state.selectedCategory;
+    displayed = filterFurnitureItems(state.catalog, state.searchQuery, activeCatId);
+    const matchedCat = state.categories.find((c) => c.id === activeCatId);
+
+    if (eyebrowEl) {
+      eyebrowEl.textContent = matchedCat ? `${matchedCat.code} · Category Showcase` : '02. Showroom Search Results';
+    }
+    if (titleEl) {
+      titleEl.textContent = hasQuery
+        ? `Results for "${state.searchQuery.trim()}"`
+        : matchedCat
+        ? `${matchedCat.name} Collection`
+        : 'Recommended & Best Sellers';
+    }
+    if (subtitleEl) {
+      subtitleEl.textContent = matchedCat
+        ? matchedCat.description
+        : 'Showing matching handcrafted pieces from our showroom collection.';
+    }
+    if (countLabel) {
+      countLabel.textContent = `Showing ${displayed.length} ${displayed.length === 1 ? 'piece' : 'pieces'}`;
+    }
+    if (backBtn) backBtn.classList.remove('hidden');
   }
 
-  if (sorted.length === 0) {
+  if (displayed.length === 0) {
     grid.innerHTML = `
       <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
         <p class="font-serif-display text-xl font-bold text-[#0D1015]">No matching furniture pieces found</p>
         <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
-          No catalog items match "${esc(state.searchQuery || state.selectedCategory)}". Try another timber, upholstery material, or SKU.
+          No catalog items match "${esc(state.searchQuery || state.selectedCategory)}". Return to our Recommended &amp; Best Sellers showcase below.
         </p>
         <div class="pt-1">
           <button
@@ -601,7 +592,7 @@ function renderCatalogGrid() {
             id="catalog-reset-filters-btn"
             class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
           >
-            Reset Search &amp; Filters
+            Show Recommended &amp; Best Sellers (4)
           </button>
         </div>
       </div>
@@ -610,40 +601,43 @@ function renderCatalogGrid() {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         state.searchQuery = '';
-        state.selectedCategory = 'all';
         const topSearch = document.getElementById('top-nav-search');
-        const catSearch = document.getElementById('catalog-search-input');
-        if (topSearch) topSearch.value = '';
-        if (catSearch) catSearch.value = '';
         const topClear = document.getElementById('top-nav-search-clear');
-        const catClear = document.getElementById('catalog-search-clear');
-        [topClear, catClear].forEach((b) => {
-          if (b) {
-            b.classList.add('hidden');
-            b.classList.remove('flex');
-          }
-        });
-        setActiveCategoryFilter('all');
+        if (topSearch) topSearch.value = '';
+        if (topClear) {
+          topClear.classList.add('hidden');
+          topClear.classList.remove('flex');
+        }
+        setActiveCategoryFilter('recommended');
       });
     }
     return;
   }
 
-  grid.innerHTML = sorted
+  grid.innerHTML = displayed
     .map((item) => {
       const selectedFinish = state.selectedColorByProduct[item.id] || item.colorVariants?.[0]?.name || item.defaultFinish;
       const pricing = computeVariantPricing(item, selectedFinish);
-      const variants = item.colorVariants || [];
+      const productPageUrl = `catalog.html?category=${encodeURIComponent(item.categoryId)}&product=${encodeURIComponent(item.id)}`;
 
       return `
-        <article class="rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
+        <article class="group rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
           <div>
-            <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
-              <img src="${esc(item.image)}" alt="${esc(item.name)}" class="w-full h-full object-cover" />
+            <a
+              href="${esc(productPageUrl)}"
+              data-testid="home-product-card-link-${esc(item.id)}"
+              class="block aspect-[4/3] relative overflow-hidden bg-slate-100"
+            >
+              <img src="${esc(item.image)}" alt="${esc(item.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
                 ${
+                  item.isBestSeller
+                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">${esc(item.bestSellerBadge || 'Best Seller')}</span>`
+                    : ''
+                }
+                ${
                   item.discountPercent > 0
-                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-mono-tech text-[11px] font-bold">${item.discountPercent}% OFF Storewide</span>`
+                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-mono-tech text-[11px] font-bold">${item.discountPercent}% OFF</span>`
                     : ''
                 }
                 ${
@@ -657,11 +651,16 @@ function renderCatalogGrid() {
                   ${esc(item.sku)} · ${esc(item.categoryName)}
                 </span>
               </div>
-            </div>
+            </a>
 
             <div class="p-5 space-y-3">
               <div class="flex items-start justify-between gap-3">
-                <h3 class="font-serif-display text-lg font-bold text-[#0D1015] leading-snug">${esc(item.name)}</h3>
+                <a
+                  href="${esc(productPageUrl)}"
+                  class="font-serif-display text-lg font-bold text-[#0D1015] hover:text-[#0095FF] leading-snug transition-colors"
+                >
+                  ${esc(item.name)}
+                </a>
                 <div class="text-right shrink-0">
                   ${
                     item.discountPercent > 0
@@ -674,38 +673,6 @@ function renderCatalogGrid() {
 
               <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">${esc(item.description)}</p>
 
-              <!-- Color Swatches (Varies in Price) -->
-              <div class="p-3 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] space-y-2">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="font-semibold text-[#0D1015]">Color: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
-                  <span class="font-mono-tech font-semibold text-[#475569]">
-                    ${pricing.priceDelta === 0 ? 'Base Price' : pricing.priceDelta > 0 ? `+${usd(pricing.priceDelta)}` : `-${usd(Math.abs(pricing.priceDelta))}`}
-                  </span>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  ${variants
-                    .map((v) => {
-                      const isSel = v.name === pricing.colorName;
-                      return `
-                        <button
-                          type="button"
-                          data-color-product="${esc(item.id)}"
-                          data-color-name="${esc(v.name)}"
-                          class="px-2.5 py-1 rounded-lg text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
-                            isSel
-                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                              : 'bg-white text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
-                          }"
-                        >
-                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                          <span class="truncate max-w-[115px]">${esc(v.name.split('/')[0].trim())}</span>
-                        </button>
-                      `;
-                    })
-                    .join('')}
-                </div>
-              </div>
-
               <div class="pt-1 flex items-center justify-between text-[11px] text-[#64748B] font-mono-tech">
                 <span>${esc(item.dimensions)}</span>
                 <span>${item.leadTimeWeeks} wks lead</span>
@@ -714,6 +681,13 @@ function renderCatalogGrid() {
           </div>
 
           <div class="px-5 pb-5 pt-2 space-y-2">
+            <a
+              href="${esc(productPageUrl)}"
+              data-testid="home-product-open-catalog-${esc(item.id)}"
+              class="block w-full py-2.5 px-3 rounded-xl bg-[#0D1015] hover:bg-[#0095FF] text-white text-xs font-semibold transition-colors text-center"
+            >
+              View in Catalog &amp; Filter by Color →
+            </a>
             <div class="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -731,31 +705,11 @@ function renderCatalogGrid() {
                 Make Offer ↗
               </a>
             </div>
-            <a
-              href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="block w-full py-2 px-3 rounded-xl bg-[#F8FBFF] hover:bg-[#EBF6FF] text-[#0077CC] border border-[#BCE3FF] text-[11px] font-semibold text-center transition-colors"
-            >
-              Want to request a custom design? Message Owner ↗
-            </a>
           </div>
         </article>
       `;
     })
     .join('');
-
-  // Bind color swatch buttons
-  grid.querySelectorAll('[data-color-product]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-color-product');
-      const cname = btn.getAttribute('data-color-name');
-      if (pid && cname) {
-        state.selectedColorByProduct[pid] = cname;
-        renderCatalogGrid();
-      }
-    });
-  });
 
   // Bind Add to Cart buttons
   grid.querySelectorAll('[data-add-cart]').forEach((btn) => {
@@ -1230,12 +1184,14 @@ function initDashboardPage() {
         categoryId,
         categoryName:
           categoryId === 'living'
-            ? 'Living & Lounge'
+            ? 'Living Room'
             : categoryId === 'dining'
-            ? 'Dining & Tables'
+            ? 'Dining Room'
             : categoryId === 'bedroom'
-            ? 'Bedroom Sanctuary'
-            : 'Study & Credenzas',
+            ? 'Bedroom'
+            : categoryId === 'kitchen'
+            ? 'Kitchen'
+            : 'Study/Work Desks',
         price,
         discountPercent,
         effectivePrice: Math.round(price * (1 - discountPercent / 100)),
@@ -1868,6 +1824,773 @@ function renderDashboardContent() {
 }
 
 /* ==========================================================================
+   1B. DEDICATED CATALOG & COLOR FILTER PAGE (catalog.html)
+   ========================================================================== */
+function syncCatalogUrlParams() {
+  try {
+    const url = new URL(window.location.href);
+    if (state.catalogPageCategory && state.catalogPageCategory !== 'all') {
+      url.searchParams.set('category', state.catalogPageCategory);
+    } else {
+      url.searchParams.delete('category');
+    }
+    if (state.catalogPageColorKey && state.catalogPageColorKey !== 'all') {
+      url.searchParams.set('color', state.catalogPageColorKey);
+    } else {
+      url.searchParams.delete('color');
+    }
+    if (state.catalogPageSpotlightProductId) {
+      url.searchParams.set('product', state.catalogPageSpotlightProductId);
+    } else {
+      url.searchParams.delete('product');
+    }
+    if (state.catalogPageSearchQuery && state.catalogPageSearchQuery.trim()) {
+      url.searchParams.set('q', state.catalogPageSearchQuery.trim());
+    } else {
+      url.searchParams.delete('q');
+    }
+    window.history.replaceState({}, '', url.toString());
+  } catch (_e) {
+    // Ignore history API errors
+  }
+}
+
+function initCatalogPage() {
+  // Parse query params (?category=..., ?product=..., ?color=..., ?q=...)
+  const params = new URLSearchParams(window.location.search);
+  const paramCat = params.get('category') || 'all';
+  const paramProduct = params.get('product') || '';
+  const paramColor = params.get('color') || 'all';
+  const paramQuery = params.get('q') || '';
+
+  state.catalogPageCategory = paramCat;
+  state.catalogPageColorKey = paramColor;
+  state.catalogPageSpotlightProductId = paramProduct;
+  state.catalogPageSearchQuery = paramQuery;
+  state.catalogPageMaxPrice = 5500;
+
+  // If a specific product was clicked on the homepage and no explicit category was passed, default to All or its category
+  if (paramProduct && !params.has('category')) {
+    const matchedProd = state.catalog.find((p) => p.id === paramProduct);
+    if (matchedProd) {
+      state.catalogPageCategory = matchedProd.categoryId || 'all';
+    }
+  }
+
+  // Update Top Nav Auth Button & Cart User Email
+  const navAuthActions = document.getElementById('nav-auth-actions');
+  const cartUserEmailEl = document.getElementById('cart-user-email');
+  const cartCheckoutLink = document.getElementById('cart-checkout-link');
+
+  if (state.sessionUser) {
+    const isAdmin = state.sessionUser.role === 'admin';
+    const dashUrl = `dashboard.html?role=${isAdmin ? 'admin' : 'client'}`;
+    const dashLabel = isAdmin ? 'Admin Dashboard' : 'My Dashboard';
+
+    if (navAuthActions) {
+      navAuthActions.innerHTML = `
+        <a
+          href="${dashUrl}"
+          data-testid="nav-dashboard-button"
+          class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#0095FF] text-white hover:bg-[#0077CC] shadow-xs"
+        >
+          <span>${esc(dashLabel)}</span>
+        </a>
+        <button
+          type="button"
+          id="nav-logout-btn"
+          class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] border border-[#BCE3FF] cursor-pointer"
+        >
+          Log Out
+        </button>
+      `;
+      const logoutBtn = document.getElementById('nav-logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          localStorage.removeItem('lr_session_user');
+          localStorage.removeItem('lr_cart_items');
+          window.location.href = 'index.html';
+        });
+      }
+    }
+    if (cartUserEmailEl) cartUserEmailEl.textContent = state.sessionUser.email;
+    if (cartCheckoutLink) {
+      cartCheckoutLink.href = dashUrl;
+      cartCheckoutLink.textContent = isAdmin ? 'Open Admin Dashboard →' : 'Go to My Dashboard →';
+    }
+  } else {
+    if (cartUserEmailEl) cartUserEmailEl.textContent = 'Sign in to verify your email';
+    if (cartCheckoutLink) {
+      cartCheckoutLink.href = 'login.html';
+      cartCheckoutLink.textContent = 'Sign In to Checkout →';
+    }
+  }
+
+  // Top Nav Search Input on catalog.html
+  const topSearch = document.getElementById('catalog-page-search') || document.getElementById('top-nav-search');
+  const topClear = document.getElementById('catalog-page-search-clear') || document.getElementById('top-nav-search-clear');
+  if (topSearch && state.catalogPageSearchQuery) {
+    topSearch.value = state.catalogPageSearchQuery;
+  }
+  const syncClear = (val) => {
+    const hasQ = Boolean(String(val || '').trim());
+    if (topClear) {
+      topClear.classList.toggle('hidden', !hasQ);
+      topClear.classList.toggle('flex', hasQ);
+    }
+  };
+  if (topSearch) {
+    syncClear(topSearch.value);
+    topSearch.addEventListener('input', (e) => {
+      syncClear(e.target.value);
+    });
+    topSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        state.catalogPageSearchQuery = topSearch.value;
+        syncClear(state.catalogPageSearchQuery);
+        syncCatalogUrlParams();
+        renderCatalogPage();
+      }
+    });
+  }
+  if (topClear) {
+    topClear.addEventListener('click', () => {
+      state.catalogPageSearchQuery = '';
+      if (topSearch) {
+        topSearch.value = '';
+        topSearch.focus();
+      }
+      syncClear('');
+      syncCatalogUrlParams();
+      renderCatalogPage();
+    });
+  }
+
+  // Top Horizontal Category Tabs
+  document.querySelectorAll('[data-catalog-top-tab]').forEach((tabLink) => {
+    tabLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cat = tabLink.getAttribute('data-catalog-top-tab') || 'all';
+      state.catalogPageCategory = cat;
+      state.catalogPageSpotlightProductId = '';
+      syncCatalogUrlParams();
+      renderCatalogPage();
+    });
+  });
+
+  // Price Slider & Filter Button
+  const priceSlider = document.getElementById('catalog-price-slider');
+  const priceDisplay = document.getElementById('catalog-price-label') || document.getElementById('catalog-price-display');
+  const priceApplyBtn = document.getElementById('catalog-price-apply-btn');
+
+  if (priceSlider) {
+    priceSlider.addEventListener('input', (e) => {
+      const val = Number(e.target.value || 5500);
+      if (priceDisplay) {
+        priceDisplay.textContent = usd(val);
+      }
+      state.catalogPageMaxPrice = val;
+      renderCatalogPage();
+    });
+  }
+  if (priceApplyBtn && priceSlider) {
+    priceApplyBtn.addEventListener('click', () => {
+      state.catalogPageMaxPrice = Number(priceSlider.value || 5500);
+      renderCatalogPage();
+    });
+  }
+
+  // Clear Color Filter Button
+  const clearColorBtn = document.getElementById('catalog-clear-color-btn');
+  if (clearColorBtn) {
+    clearColorBtn.addEventListener('click', () => {
+      state.catalogPageColorKey = 'all';
+      syncCatalogUrlParams();
+      renderCatalogPage();
+    });
+  }
+
+  // Reset All Filters Button in Header
+  const resetAllBtn = document.getElementById('catalog-reset-all-btn');
+  if (resetAllBtn) {
+    resetAllBtn.addEventListener('click', () => {
+      state.catalogPageCategory = 'all';
+      state.catalogPageColorKey = 'all';
+      state.catalogPageMaxPrice = 5500;
+      state.catalogPageSpotlightProductId = '';
+      state.catalogPageSearchQuery = '';
+      if (priceSlider) priceSlider.value = '5500';
+      if (priceDisplay) priceDisplay.textContent = '$5,500';
+      if (topSearch) topSearch.value = '';
+      syncClear('');
+      syncCatalogUrlParams();
+      renderCatalogPage();
+    });
+  }
+
+  // Cart Drawer Toggle & Voucher Apply
+  const cartDrawer = document.getElementById('cart-drawer');
+  const openCartBtn = document.getElementById('open-cart-btn');
+  const closeCartBtn = document.getElementById('close-cart-btn');
+  const closeDrawer = () => {
+    if (!cartDrawer) return;
+    cartDrawer.classList.add('hidden');
+    cartDrawer.classList.remove('flex');
+  };
+  if (openCartBtn && cartDrawer) {
+    openCartBtn.addEventListener('click', () => {
+      cartDrawer.classList.remove('hidden');
+      cartDrawer.classList.add('flex');
+      renderCartDrawer();
+    });
+  }
+  if (closeCartBtn && cartDrawer) {
+    closeCartBtn.addEventListener('click', closeDrawer);
+  }
+  if (cartDrawer) {
+    cartDrawer.addEventListener('click', (e) => {
+      if (e.target === cartDrawer) closeDrawer();
+    });
+  }
+  const applyVoucherBtn = document.getElementById('apply-voucher-btn');
+  if (applyVoucherBtn) {
+    applyVoucherBtn.addEventListener('click', () => {
+      const codeInput = document.getElementById('voucher-code-input');
+      const feedback = document.getElementById('voucher-feedback');
+      const code = codeInput ? codeInput.value : '';
+      const activeEmail = state.sessionUser ? state.sessionUser.email : 'rowena.vance@vancearchitects.com';
+      const productIds = state.cartItems.map((c) => c.product.id);
+      const check = validateVoucherForOrder(state.vouchers, code, activeEmail, productIds);
+
+      if (feedback) {
+        feedback.classList.remove('hidden', 'text-emerald-700', 'text-rose-600');
+        if (check.valid) {
+          state.appliedVoucher = check.voucher;
+          feedback.textContent = `✓ Voucher ${check.voucher.code} applied (-${usd(check.discountAmount)})!`;
+          feedback.classList.add('text-emerald-700');
+        } else {
+          state.appliedVoucher = null;
+          feedback.textContent = check.errorMessage;
+          feedback.classList.add('text-rose-600');
+        }
+      }
+      renderCartDrawer();
+    });
+  }
+
+  renderCatalogPage();
+  renderCartDrawer();
+}
+
+function renderCatalogPage() {
+  const grid = document.getElementById('catalog-page-grid');
+  if (!grid) return;
+
+  const activeCatId = state.catalogPageCategory || 'all';
+  const activeColorKey = state.catalogPageColorKey || 'all';
+  const maxPrice = state.catalogPageMaxPrice || 5500;
+  const searchQuery = state.catalogPageSearchQuery || '';
+
+  // 1. Update Top Horizontal Category Bar active state (matching reference screenshot orange/blue top bar)
+  document.querySelectorAll('[data-catalog-top-tab]').forEach((tabEl) => {
+    const tabCat = tabEl.getAttribute('data-catalog-top-tab') || 'all';
+    const isActive = tabCat === activeCatId;
+    tabEl.className = isActive
+      ? 'catalog-top-tab py-3.5 border-t-2 border-[#0095FF] text-[#0095FF] font-semibold whitespace-nowrap transition-colors'
+      : 'catalog-top-tab py-3.5 border-t-2 border-transparent text-[#1E293B] hover:text-[#0095FF] font-medium whitespace-nowrap transition-colors';
+  });
+
+  // 2. Update Page Heading & Active Filter Summary
+  const matchedCat = state.categories.find((c) => c.id === activeCatId);
+  const matchedColorDef = CATALOG_COLOR_FILTERS.find((c) => c.key === activeColorKey);
+  const titleEl = document.getElementById('catalog-page-heading') || document.getElementById('catalog-page-title');
+  const subtitleEl = document.getElementById('catalog-page-subheading') || document.getElementById('catalog-page-subtitle');
+  const activeFilterBar = document.getElementById('catalog-active-filter-bar');
+  const activeFilterSummary = document.getElementById('catalog-active-filter-summary');
+  const clearColorBtn = document.getElementById('catalog-clear-color-btn');
+
+  if (titleEl) {
+    if (searchQuery.trim()) {
+      titleEl.textContent = `Search Results for "${searchQuery.trim()}"`;
+    } else if (matchedCat && matchedColorDef) {
+      titleEl.textContent = `${matchedCat.name} · ${matchedColorDef.label}`;
+    } else if (matchedCat) {
+      titleEl.textContent = matchedCat.name;
+    } else if (matchedColorDef) {
+      titleEl.textContent = `All Furniture · ${matchedColorDef.label}`;
+    } else {
+      titleEl.textContent = 'All Showroom Furniture';
+    }
+  }
+  if (subtitleEl) {
+    if (matchedColorDef) {
+      subtitleEl.textContent = `Showing only furniture pieces crafted in "${matchedColorDef.label}". Click another color on the left sidebar or Reset Color to view all finishes.`;
+    } else if (matchedCat) {
+      subtitleEl.textContent = `${matchedCat.description} Select a color tag on the left sidebar to filter by finish.`;
+    } else {
+      subtitleEl.textContent = 'Select a color on the left sidebar to display only furniture pieces crafted in that color finish.';
+    }
+  }
+
+  const hasAnyFilter = activeCatId !== 'all' || activeColorKey !== 'all' || maxPrice < 5500 || Boolean(searchQuery.trim());
+  if (activeFilterBar && activeFilterSummary) {
+    activeFilterBar.classList.toggle('hidden', !hasAnyFilter);
+    activeFilterBar.classList.toggle('flex', hasAnyFilter);
+    const pills = [];
+    if (matchedCat) {
+      pills.push(`<span class="px-2.5 py-1 rounded-md bg-white border border-[#BCE3FF] font-semibold">Category: ${esc(matchedCat.name)}</span>`);
+    }
+    if (matchedColorDef) {
+      pills.push(`
+        <span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-semibold inline-flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full border border-white/40" style="background-color: ${esc(matchedColorDef.hex)}"></span>
+          <span>Color: ${esc(matchedColorDef.label)}</span>
+        </span>
+      `);
+    }
+    if (maxPrice < 5500) {
+      pills.push(`<span class="px-2.5 py-1 rounded-md bg-white border border-[#BCE3FF] font-semibold">Max Price: ${usd(maxPrice)}</span>`);
+    }
+    if (searchQuery.trim()) {
+      pills.push(`<span class="px-2.5 py-1 rounded-md bg-white border border-[#BCE3FF] font-semibold">Search: "${esc(searchQuery.trim())}"</span>`);
+    }
+    activeFilterSummary.innerHTML = `<span class="text-[#475569]">Active Filters:</span> ${pills.join('')}`;
+  }
+  if (clearColorBtn) {
+    clearColorBtn.classList.toggle('hidden', activeColorKey === 'all');
+  }
+
+  // 3. Render Left Sidebar: Filter by Color (bordered chips with swatch + color label + count, matching reference image)
+  const colorContainer = document.getElementById('catalog-sidebar-colors');
+  if (colorContainer) {
+    const colorCounts = getColorFilterCounts(state.catalog, activeCatId, maxPrice);
+    colorContainer.innerHTML = colorCounts
+      .map((c) => {
+        const isSelected = c.key === activeColorKey;
+        return `
+          <button
+            type="button"
+            data-sidebar-color-key="${esc(c.key)}"
+            data-testid="sidebar-color-chip-${esc(c.key)}"
+            aria-pressed="${isSelected ? 'true' : 'false'}"
+            class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-all ${
+              isSelected
+                ? 'bg-[#0D1015] text-white border-[#0D1015] shadow-xs'
+                : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]'
+            }"
+          >
+            <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(c.hex)}"></span>
+            <span>${esc(c.label)} (${c.count})</span>
+          </button>
+        `;
+      })
+      .join('');
+
+    colorContainer.querySelectorAll('[data-sidebar-color-key]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const clickedKey = btn.getAttribute('data-sidebar-color-key') || 'all';
+        // Toggle off if clicking the already-active color, or select the clicked color
+        state.catalogPageColorKey = state.catalogPageColorKey === clickedKey ? 'all' : clickedKey;
+
+        // Automatically switch every matching product's selected color variant to the chosen color!
+        if (state.catalogPageColorKey !== 'all') {
+          state.catalog.forEach((item) => {
+            const matchedVar = findMatchingColorVariant(item, state.catalogPageColorKey);
+            if (matchedVar) {
+              state.selectedColorByProduct[item.id] = matchedVar.name;
+            }
+          });
+        }
+        syncCatalogUrlParams();
+        renderCatalogPage();
+      });
+    });
+  }
+
+  // 4. Render Left Sidebar: Filter by Room Category Tags
+  const roomTagsContainer = document.getElementById('catalog-sidebar-room-tags');
+  if (roomTagsContainer) {
+    const allCount = state.catalog.length;
+    const roomButtons = [
+      { id: 'all', label: 'all rooms', count: allCount },
+      ...state.categories.map((cat) => ({
+        id: cat.id,
+        label: cat.name.toLowerCase(),
+        count: state.catalog.filter((p) => p.categoryId === cat.id).length,
+      })),
+    ];
+
+    roomTagsContainer.innerHTML = roomButtons
+      .map((r) => {
+        const isSel = r.id === activeCatId;
+        return `
+          <button
+            type="button"
+            data-sidebar-room-id="${esc(r.id)}"
+            data-testid="sidebar-room-chip-${esc(r.id)}"
+            class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-all ${
+              isSel
+                ? 'bg-[#0095FF] text-white border-[#0095FF]'
+                : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]'
+            }"
+          >
+            <span>${esc(r.label)} (${r.count})</span>
+          </button>
+        `;
+      })
+      .join('');
+
+    roomTagsContainer.querySelectorAll('[data-sidebar-room-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const roomId = btn.getAttribute('data-sidebar-room-id') || 'all';
+        state.catalogPageCategory = roomId;
+        state.catalogPageSpotlightProductId = '';
+        syncCatalogUrlParams();
+        renderCatalogPage();
+      });
+    });
+  }
+
+  // 5. Render Spotlight Product Banner if ?product=<id> was clicked from the Homepage
+  const spotlightContainer = document.getElementById('catalog-spotlight-container');
+  if (spotlightContainer) {
+    const spotlightItem = state.catalogPageSpotlightProductId
+      ? state.catalog.find((p) => p.id === state.catalogPageSpotlightProductId)
+      : null;
+
+    if (spotlightItem) {
+      // If a color filter is active and spotlightItem has that color, make sure it's selected
+      if (activeColorKey !== 'all') {
+        const matchedVar = findMatchingColorVariant(spotlightItem, activeColorKey);
+        if (matchedVar) {
+          state.selectedColorByProduct[spotlightItem.id] = matchedVar.name;
+        }
+      }
+      const selFinish =
+        state.selectedColorByProduct[spotlightItem.id] ||
+        spotlightItem.colorVariants?.[0]?.name ||
+        spotlightItem.defaultFinish;
+      const pricing = computeVariantPricing(spotlightItem, selFinish);
+      const variants = spotlightItem.colorVariants || [];
+
+      spotlightContainer.classList.remove('hidden');
+      spotlightContainer.innerHTML = `
+        <div class="rounded-2xl bg-[#F8FBFF] border border-[#0095FF] p-5 sm:p-6 shadow-md">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-[#BCE3FF]">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">
+                Selected from Homepage
+              </span>
+              <span class="font-mono-tech text-xs text-[#475569]">
+                ${esc(spotlightItem.sku)} · ${esc(spotlightItem.categoryName)}
+              </span>
+            </div>
+            <button
+              type="button"
+              id="catalog-close-spotlight-btn"
+              class="text-xs font-semibold text-[#475569] hover:text-[#0D1015] cursor-pointer"
+            >
+              Dismiss Spotlight ✕
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <div class="lg:col-span-5">
+              <div class="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-[#BCE3FF]">
+                <img src="${esc(spotlightItem.image)}" alt="${esc(spotlightItem.name)}" class="w-full h-full object-cover" />
+              </div>
+            </div>
+            <div class="lg:col-span-7 space-y-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015]">${esc(spotlightItem.name)}</h2>
+                  <p class="text-xs sm:text-sm text-[#475569] mt-1">${esc(spotlightItem.description)}</p>
+                </div>
+                <div class="text-right">
+                  ${
+                    spotlightItem.discountPercent > 0
+                      ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(pricing.variantBasePrice)}</p>`
+                      : ''
+                  }
+                  <p class="font-mono-tech text-2xl font-bold text-[#0095FF]">${usd(pricing.effectivePrice)}</p>
+                </div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-white border border-[#BCE3FF] space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
+                  <span class="font-mono-tech text-[#475569]">${esc(spotlightItem.dimensions)} · ${spotlightItem.leadTimeWeeks} wks lead</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  ${variants
+                    .map((v) => {
+                      const isSel = v.name === pricing.colorName;
+                      return `
+                        <button
+                          type="button"
+                          data-spotlight-color-product="${esc(spotlightItem.id)}"
+                          data-spotlight-color-name="${esc(v.name)}"
+                          class="px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
+                            isSel
+                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
+                              : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
+                          }"
+                        >
+                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+                          <span>${esc(v.name)}</span>
+                        </button>
+                      `;
+                    })
+                    .join('')}
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  data-add-cart="${esc(spotlightItem.id)}"
+                  class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Add to Cart (${usd(pricing.effectivePrice)})
+                </button>
+                <a
+                  href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-4 py-2.5 rounded-xl bg-[#D8EEFF] hover:bg-[#BCE3FF] text-[#0D1015] text-xs font-semibold transition-colors"
+                >
+                  Make Offer on Messenger ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const closeSpotBtn = document.getElementById('catalog-close-spotlight-btn');
+      if (closeSpotBtn) {
+        closeSpotBtn.addEventListener('click', () => {
+          state.catalogPageSpotlightProductId = '';
+          syncCatalogUrlParams();
+          renderCatalogPage();
+        });
+      }
+      spotlightContainer.querySelectorAll('[data-spotlight-color-product]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const pid = btn.getAttribute('data-spotlight-color-product');
+          const cname = btn.getAttribute('data-spotlight-color-name');
+          if (pid && cname) {
+            state.selectedColorByProduct[pid] = cname;
+            renderCatalogPage();
+          }
+        });
+      });
+    } else {
+      spotlightContainer.classList.add('hidden');
+      spotlightContainer.innerHTML = '';
+    }
+  }
+
+  // 6. Filter & Render Right-Hand 3-Column Product Grid
+  const filteredItems = filterCatalogPageItems(state.catalog, {
+    categoryId: activeCatId,
+    colorKey: activeColorKey,
+    maxPrice,
+    searchQuery,
+  });
+
+  const countLabel = document.getElementById('catalog-page-result-count') || document.getElementById('catalog-results-count');
+  if (countLabel) {
+    if (matchedColorDef) {
+      countLabel.textContent = `${filteredItems.length} ${
+        filteredItems.length === 1 ? 'PRODUCT' : 'PRODUCTS'
+      } (${matchedColorDef.label.toUpperCase()})`;
+    } else {
+      countLabel.textContent = `${filteredItems.length} ${
+        filteredItems.length === 1 ? 'PRODUCT' : 'PRODUCTS'
+      }`;
+    }
+  }
+
+  if (filteredItems.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
+        <p class="font-serif-display text-xl font-bold text-[#0D1015]">No products match this filter combination</p>
+        <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
+          Try clearing the active color filter or selecting "All Furniture" to see all available pieces.
+        </p>
+        <div class="pt-1">
+          <button
+            type="button"
+            id="catalog-empty-reset-btn"
+            class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
+          >
+            Show All Products
+          </button>
+        </div>
+      </div>
+    `;
+    const emptyResetBtn = document.getElementById('catalog-empty-reset-btn');
+    if (emptyResetBtn) {
+      emptyResetBtn.addEventListener('click', () => {
+        state.catalogPageCategory = 'all';
+        state.catalogPageColorKey = 'all';
+        state.catalogPageMaxPrice = 5500;
+        syncCatalogUrlParams();
+        renderCatalogPage();
+      });
+    }
+    return;
+  }
+
+  grid.innerHTML = filteredItems
+    .map((item) => {
+      // If a color filter is active on the sidebar, ensure the matching variant is selected on the card
+      if (activeColorKey !== 'all') {
+        const matchedVariant = findMatchingColorVariant(item, activeColorKey);
+        if (matchedVariant) {
+          state.selectedColorByProduct[item.id] = matchedVariant.name;
+        }
+      }
+      const selectedFinish =
+        state.selectedColorByProduct[item.id] || item.colorVariants?.[0]?.name || item.defaultFinish;
+      const pricing = computeVariantPricing(item, selectedFinish);
+      const variants = item.colorVariants || [];
+      const isSpotlighted = state.catalogPageSpotlightProductId === item.id;
+
+      return `
+        <article
+          data-testid="catalog-product-card-${esc(item.id)}"
+          class="group rounded-2xl bg-white border ${
+            isSpotlighted ? 'border-[#0095FF] ring-2' : 'border-[#E2E8F0] hover:border-[#0095FF]'
+          } overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between"
+        >
+          <div>
+            <!-- Product Visual Header styled cleanly like the reference showcase + live finish badge -->
+            <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+              <img src="${esc(item.image)}" alt="${esc(item.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+                  ${esc(item.categoryName)}
+                </span>
+                ${
+                  matchedColorDef
+                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[10px] font-bold uppercase tracking-wider">
+                        ✓ ${esc(matchedColorDef.label)}
+                      </span>`
+                    : ''
+                }
+              </div>
+              <div class="absolute bottom-3 right-3">
+                <span class="px-2.5 py-1 rounded-md bg-[#0D1015]/90 text-white font-mono-tech text-xs font-bold">
+                  ${usd(pricing.effectivePrice)}
+                </span>
+              </div>
+            </div>
+
+            <div class="p-5 space-y-3">
+              <div class="text-center border-b border-[#E2E8F0] pb-3">
+                <h3 class="font-serif-display text-base sm:text-lg font-bold text-[#0D1015] uppercase tracking-wide leading-snug">
+                  ${esc(item.name)}
+                </h3>
+                <p class="font-mono-tech text-[11px] text-[#64748B] uppercase tracking-widest mt-0.5">
+                  ${variants.length} COLOR FINISHES · ${esc(pricing.colorName)}
+                </p>
+              </div>
+
+              <!-- Interactive Color Swatches on each card -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="font-semibold text-[#0D1015] truncate">Finish: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
+                  <span class="font-mono-tech font-bold text-[#0095FF] shrink-0">${usd(pricing.effectivePrice)}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  ${variants
+                    .map((v) => {
+                      const isSel = v.name === pricing.colorName;
+                      return `
+                        <button
+                          type="button"
+                          data-catalog-card-color-product="${esc(item.id)}"
+                          data-catalog-card-color-name="${esc(v.name)}"
+                          class="px-2 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
+                            isSel
+                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
+                              : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
+                          }"
+                        >
+                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+                          <span class="truncate max-w-[115px]">${esc(v.name.split('/')[0].trim())}</span>
+                        </button>
+                      `;
+                    })
+                    .join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-5 pb-5 pt-1 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              data-add-cart="${esc(item.id)}"
+              class="py-2.5 px-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Add to Cart
+            </button>
+            <a
+              href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="py-2.5 px-3 rounded-xl bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] border border-[#BCE3FF] text-xs font-semibold transition-colors text-center"
+            >
+              Make Offer ↗
+            </a>
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+
+  // Bind card color swatches
+  grid.querySelectorAll('[data-catalog-card-color-product]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pid = btn.getAttribute('data-catalog-card-color-product');
+      const cname = btn.getAttribute('data-catalog-card-color-name');
+      if (pid && cname) {
+        state.selectedColorByProduct[pid] = cname;
+        renderCatalogPage();
+      }
+    });
+  });
+
+  // Bind Add to Cart buttons inside catalog page (both spotlight and grid)
+  document.querySelectorAll('[data-add-cart]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pid = btn.getAttribute('data-add-cart');
+      const product = state.catalog.find((p) => p.id === pid);
+      if (!product) return;
+      const finish =
+        state.selectedColorByProduct[product.id] || product.colorVariants?.[0]?.name || product.defaultFinish;
+      const existing = state.cartItems.find((c) => c.product.id === product.id && c.finish === finish);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        state.cartItems.push({ product, finish, quantity: 1 });
+      }
+      saveCartToStorage();
+      renderCartDrawer();
+      const cartDrawer = document.getElementById('cart-drawer');
+      if (cartDrawer) {
+        cartDrawer.classList.remove('hidden');
+        cartDrawer.classList.add('flex');
+      }
+    });
+  });
+}
+
+/* ==========================================================================
    BOOTSTRAP
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1888,6 +2611,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (document.getElementById('product-catalog-grid')) {
     initShowroomPage();
+  }
+  if (document.getElementById('catalog-page-grid')) {
+    initCatalogPage();
   }
   if (document.getElementById('client-portal-view') || document.getElementById('admin-portal-view')) {
     initDashboardPage();

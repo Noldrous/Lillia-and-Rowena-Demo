@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lillia and Rowena Furniture — Showroom Catalog &amp; Color Filter</title>
+    <meta name="description" content="Browse Lillia and Rowena Furniture by room category, price range, and custom timber or upholstery color finishes." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body id="top" class="bg-white text-[#0F172A] antialiased selection:bg-[#0095FF] selection:text-white min-h-screen flex flex-col">
+    <!-- Top Announcement Bar -->
+    <div id="top-promo-bar" class="bg-[#0D1015] text-white border-b border-slate-800 px-4 py-2 text-xs">
+      <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <a
+            href="https://www.messenger.com/t/100000505712325"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-[#0095FF] font-semibold hover:underline"
+          >
+            Make Offer &amp; Request a Custom Design
+          </a>
+          <span class="text-slate-500">·</span>
+          <span class="text-slate-300">
+            Click any color on the left sidebar to filter furniture pieces available in that exact timber, stone, or upholstery finish
+          </span>
+        </div>
+        <div id="top-bar-user-status" class="flex items-center gap-3 text-slate-300">
+          <span>Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#BCE3FF] shadow-xs">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
+        <!-- Brand Logo Left -->
+        <a
+          href="index.html"
+          aria-label="Lillia and Rowena Furniture Homepage"
+          class="flex items-center gap-3 group shrink-0"
+        >
+          <div class="w-9 h-9 rounded-lg bg-[#0D1015] text-white flex items-center justify-center font-serif-display text-sm font-bold tracking-wider group-hover:bg-[#0095FF] transition-colors shadow-xs">
+            LR
+          </div>
+          <span class="font-serif-display text-lg sm:text-xl font-bold tracking-tight text-[#0D1015] leading-none">
+            Lillia and Rowena Furniture
+          </span>
+        </a>
+
+        <!-- Search Bar in the Middle -->
+        <div class="flex-1 max-w-xl mx-auto">
+          <label for="catalog-page-search" class="sr-only">Search furniture in catalog</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0095FF] pointer-events-none flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </span>
+            <input
+              id="catalog-page-search"
+              data-testid="catalog-page-search"
+              type="search"
+              autocomplete="off"
+              placeholder="Search sofas, walnut tables, travertine, SKU..."
+              class="w-full pl-10 pr-9 py-2.5 rounded-full bg-[#F0F8FF] border border-[#BCE3FF] text-xs sm:text-sm text-[#0D1015] placeholder:text-[#64748B] focus:outline-none focus:border-[#0095FF] focus:bg-white transition-all"
+            />
+            <button
+              type="button"
+              id="catalog-page-search-clear"
+              aria-label="Clear search"
+              class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[#D8EEFF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white text-xs font-bold items-center justify-center cursor-pointer transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Cart Icon & Login / Account Button Right -->
+        <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            id="open-cart-btn"
+            data-testid="nav-cart-icon-button"
+            aria-label="Open Cart &amp; Voucher Drawer"
+            class="relative w-10 h-10 rounded-xl border border-[#BCE3FF] bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            <span
+              id="cart-count-badge"
+              class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold items-center justify-center shadow-xs"
+            >
+              0
+            </span>
+          </button>
+
+          <div id="nav-auth-actions" class="flex items-center gap-2">
+            <a
+              href="login.html"
+              id="nav-login-link"
+              data-testid="nav-login-button"
+              class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#0095FF] text-white hover:bg-[#0077CC] shadow-xs"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span id="nav-auth-label">Login</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horizontal Category Navigation Bar (Modeled after reference screenshot) -->
+      <nav aria-label="Showroom Categories" class="border-t border-[#E2E8F0] bg-white">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-8 flex items-center justify-center gap-6 sm:gap-10 overflow-x-auto">
+          <button
+            type="button"
+            data-catalog-top-tab="all"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-semibold text-[#0095FF] border-t-2 border-[#0095FF] whitespace-nowrap cursor-pointer transition-colors"
+          >
+            All Furniture ▾
+          </button>
+          <button
+            type="button"
+            data-catalog-top-tab="living"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-medium text-[#0D1015] hover:text-[#0095FF] border-t-2 border-transparent whitespace-nowrap cursor-pointer transition-colors"
+          >
+            Living Room ▾
+          </button>
+          <button
+            type="button"
+            data-catalog-top-tab="dining"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-medium text-[#0D1015] hover:text-[#0095FF] border-t-2 border-transparent whitespace-nowrap cursor-pointer transition-colors"
+          >
+            Dining Room ▾
+          </button>
+          <button
+            type="button"
+            data-catalog-top-tab="bedroom"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-medium text-[#0D1015] hover:text-[#0095FF] border-t-2 border-transparent whitespace-nowrap cursor-pointer transition-colors"
+          >
+            Bedroom ▾
+          </button>
+          <button
+            type="button"
+            data-catalog-top-tab="office"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-medium text-[#0D1015] hover:text-[#0095FF] border-t-2 border-transparent whitespace-nowrap cursor-pointer transition-colors"
+          >
+            Study/Work Desks ▾
+          </button>
+          <button
+            type="button"
+            data-catalog-top-tab="kitchen"
+            class="catalog-top-tab py-3.5 text-xs sm:text-sm font-medium text-[#0D1015] hover:text-[#0095FF] border-t-2 border-transparent whitespace-nowrap cursor-pointer transition-colors"
+          >
+            Kitchen ▾
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Main Catalog Content (Left Filter Sidebar + Right Product Grid) -->
+    <main class="flex-1 bg-white text-[#0D1015] py-8 sm:py-12">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 space-y-8">
+        <!-- Category Title Row -->
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E2E8F0]">
+          <div>
+            <h1 id="catalog-page-heading" class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015]">
+              All Showroom Furniture
+            </h1>
+            <p id="catalog-page-subheading" class="text-xs sm:text-sm text-[#475569] mt-1">
+              Select a color on the left sidebar to display only furniture pieces crafted in that color finish.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="catalog-page-result-count" class="font-mono-tech text-xs font-semibold text-[#475569]">
+              11 PRODUCTS
+            </span>
+            <a
+              href="index.html"
+              class="px-3.5 py-2 rounded-xl bg-[#F0F8FF] hover:bg-[#D8EEFF] border border-[#BCE3FF] text-[#0D1015] text-xs font-semibold transition-colors whitespace-nowrap"
+            >
+              ← Back to Homepage
+            </a>
+          </div>
+        </div>
+
+        <!-- Highlighted Clicked Product Banner (Shown when arriving via ?product=...) -->
+        <div id="catalog-spotlight-container" class="hidden"></div>
+
+        <!-- 2-Column Layout: Left Sidebar (Price + Colors + Room Tags) & Right 3-Col Product Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          <!-- LEFT SIDEBAR -->
+          <aside class="lg:col-span-3 space-y-8">
+            <!-- 1. Filter by price -->
+            <div class="space-y-4">
+              <div>
+                <h2 class="font-serif-display text-lg font-bold text-[#0D1015]">Filter by price</h2>
+                <div class="w-8 h-0.5 bg-[#CBD5E1] mt-2"></div>
+              </div>
+
+              <div class="space-y-3 pt-1">
+                <label for="catalog-price-slider" class="sr-only">Maximum price filter</label>
+                <input
+                  id="catalog-price-slider"
+                  data-testid="catalog-price-slider"
+                  type="range"
+                  min="1000"
+                  max="5500"
+                  step="100"
+                  value="5500"
+                  class="w-full accent-[#0D1015] cursor-pointer"
+                />
+                <div class="flex items-center justify-between gap-3 pt-1">
+                  <button
+                    type="button"
+                    id="catalog-price-apply-btn"
+                    class="px-4 py-1.5 rounded-md bg-[#475569] hover:bg-[#0D1015] text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Filter
+                  </button>
+                  <p class="text-xs sm:text-sm text-[#475569]">
+                    Price: <strong class="font-mono-tech text-[#0D1015]">$0 — <span id="catalog-price-label">$5,500</span></strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Filter by color (Left Sidebar Color Tags — Clicking filters products by that color!) -->
+            <div class="space-y-4 pt-2 border-t border-[#E2E8F0]">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="font-serif-display text-lg font-bold text-[#0D1015]">Filter by color</h2>
+                  <div class="w-8 h-0.5 bg-[#CBD5E1] mt-2"></div>
+                </div>
+                <button
+                  type="button"
+                  id="catalog-clear-color-btn"
+                  class="hidden text-xs font-semibold text-[#0095FF] hover:underline cursor-pointer"
+                >
+                  Reset Color
+                </button>
+              </div>
+
+              <p class="text-xs text-[#64748B]">
+                Click a color below to show only products available in that color finish:
+              </p>
+
+              <div id="catalog-sidebar-colors" class="flex flex-wrap gap-2">
+                <!-- Populated dynamically by app.js with color swatch + name + (count) -->
+              </div>
+            </div>
+
+            <!-- 3. Filter by category tag -->
+            <div class="space-y-4 pt-2 border-t border-[#E2E8F0]">
+              <div>
+                <h2 class="font-serif-display text-lg font-bold text-[#0D1015]">Filter by room tag</h2>
+                <div class="w-8 h-0.5 bg-[#CBD5E1] mt-2"></div>
+              </div>
+
+              <div id="catalog-sidebar-room-tags" class="flex flex-wrap gap-2">
+                <!-- Populated dynamically by app.js with room category name + (count) -->
+              </div>
+            </div>
+          </aside>
+
+          <!-- RIGHT 3-COLUMN PRODUCT GRID -->
+          <div class="lg:col-span-9 space-y-6">
+            <!-- Active Filter Bar -->
+            <div id="catalog-active-filter-bar" class="hidden p-3.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] items-center justify-between gap-3">
+              <div id="catalog-active-filter-summary" class="text-xs font-medium text-[#0D1015] flex flex-wrap items-center gap-2"></div>
+              <button
+                type="button"
+                id="catalog-reset-all-btn"
+                class="px-3 py-1.5 rounded-lg bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              >
+                Show All Products
+              </button>
+            </div>
+
+            <!-- 3-Column Product Showcase Grid -->
+            <div id="catalog-page-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+              <!-- Populated by app.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#F4F9FF] text-[#475569] border-t border-[#BCE3FF] mt-16">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-md bg-[#0095FF] text-white flex items-center justify-center font-serif-display text-xs font-bold">
+              LR
+            </div>
+            <span class="font-serif-display text-base font-bold text-[#0D1015]">Lillia and Rowena Furniture</span>
+          </div>
+          <p class="text-xs text-[#475569] leading-relaxed">
+            2240 Chino Roces Avenue Extension, Makati Flagship Showroom · Cebu Custom Millwork Foundry
+          </p>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="font-mono-tech text-[11px] uppercase tracking-widest text-[#0D1015] font-semibold">Shop by Category</p>
+          <ul class="space-y-1.5">
+            <li><a href="catalog.html?category=living" class="hover:text-[#0095FF]">Living Room</a></li>
+            <li><a href="catalog.html?category=dining" class="hover:text-[#0095FF]">Dining Room</a></li>
+            <li><a href="catalog.html?category=bedroom" class="hover:text-[#0095FF]">Bedroom</a></li>
+            <li><a href="catalog.html?category=office" class="hover:text-[#0095FF]">Study/Work Desks</a></li>
+            <li><a href="catalog.html?category=kitchen" class="hover:text-[#0095FF]">Kitchen</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="font-mono-tech text-[11px] uppercase tracking-widest text-[#0D1015] font-semibold">Messenger &amp; Vouchers</p>
+          <ul class="space-y-1.5">
+            <li><a href="https://www.messenger.com/t/100000505712325" target="_blank" rel="noopener noreferrer" class="hover:text-[#0095FF]">Make Offer on Messenger</a></li>
+            <li><a href="https://www.messenger.com/t/100000505712325" target="_blank" rel="noopener noreferrer" class="hover:text-[#0095FF]">Want to Request a Custom Design?</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="font-mono-tech text-[11px] uppercase tracking-widest text-[#0D1015] font-semibold">Account Access</p>
+          <ul class="space-y-1.5">
+            <li><a href="login.html" class="hover:text-[#0095FF]">Sign In to Your Account</a></li>
+            <li class="text-[#64748B]">Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Cart & Single-Product Messenger Voucher Drawer -->
+    <div
+      id="cart-drawer"
+      class="fixed inset-0 z-50 bg-[#0D1015]/60 backdrop-blur-xs hidden justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Shopping Cart and Voucher Drawer"
+    >
+      <div class="bg-white w-full max-w-lg h-full flex flex-col justify-between p-6 sm:p-8 overflow-y-auto shadow-2xl">
+        <div class="space-y-6">
+          <div class="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
+            <div>
+              <p class="font-mono-tech text-[10px] uppercase tracking-widest text-[#0095FF] font-semibold">
+                Lillia and Rowena Furniture · Shopping Cart
+              </p>
+              <h2 class="font-serif-display text-2xl font-bold text-[#0D1015]">Your Cart</h2>
+            </div>
+            <button
+              type="button"
+              id="close-cart-btn"
+              class="p-2 rounded-lg bg-[#F0F8FF] text-[#0D1015] cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div id="cart-items-list" class="space-y-4"></div>
+
+          <!-- Single-User Single-Product Voucher Box -->
+          <div id="cart-voucher-section" class="p-4 rounded-2xl bg-[#F0F8FF] border border-[#BCE3FF] space-y-3 hidden">
+            <div class="flex items-center justify-between">
+              <span class="font-mono-tech text-[11px] uppercase tracking-wider text-[#0077CC] font-bold">
+                Single-Product Messenger Voucher
+              </span>
+              <span id="cart-user-email" class="font-mono-tech text-[11px] text-[#475569]"></span>
+            </div>
+            <div class="flex gap-2">
+              <input
+                id="voucher-code-input"
+                type="text"
+                placeholder="e.g. VCH-ROWENA-SOFA400"
+                class="flex-1 px-3 py-2 rounded-xl bg-white border border-[#BCE3FF] font-mono-tech text-xs uppercase text-[#0D1015]"
+              />
+              <button
+                type="button"
+                id="apply-voucher-btn"
+                class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer"
+              >
+                Apply
+              </button>
+            </div>
+            <p id="voucher-feedback" class="text-xs font-medium hidden"></p>
+          </div>
+        </div>
+
+        <div id="cart-footer-totals" class="pt-6 border-t border-[#E2E8F0] space-y-4 hidden">
+          <div class="space-y-1.5 text-xs">
+            <div class="flex justify-between text-[#475569]">
+              <span>Items Subtotal</span>
+              <span id="cart-subtotal" class="font-mono-tech font-semibold">$0</span>
+            </div>
+            <div id="cart-voucher-row" class="hidden justify-between text-emerald-700 font-semibold">
+              <span>Messenger Voucher Discount</span>
+              <span id="cart-voucher-discount" class="font-mono-tech">-$0</span>
+            </div>
+            <div class="flex justify-between text-[#475569]">
+              <span>White-Glove Delivery &amp; Placement</span>
+              <span id="cart-delivery" class="font-mono-tech font-semibold">$0</span>
+            </div>
+            <div class="flex justify-between text-base font-bold text-[#0D1015] pt-2 border-t border-[#E2E8F0]">
+              <span>Total</span>
+              <span id="cart-total" class="font-mono-tech text-[#0095FF]">$0</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <a
+              href="https://www.messenger.com/t/100000505712325"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="px-4 py-3 rounded-xl bg-[#D8EEFF] hover:bg-[#BCE3FF] text-[#0D1015] text-xs font-semibold text-center"
+            >
+              Make Offer on Messenger ↗
+            </a>
+            <a
+              id="cart-checkout-link"
+              href="login.html"
+              class="px-4 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold text-center"
+            >
+              Sign In to Checkout →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="assets/js/app.js"></script>
+  </body>
+</html>
