@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 /**
- * Login Page Entry Point (index.php) — Lillia and Rowena Furniture
+ * Login Page Entry Point (src/index.php) — Lillia and Rowena Furniture
  * Delegates to App\Controllers\HomeControllers::login().
  */
 
-require_once __DIR__ . '/config/bootstrap.php';
+require_once dirname(__DIR__) . '/config/bootstrap.php';
 
 use App\Controllers\HomeControllers;
 

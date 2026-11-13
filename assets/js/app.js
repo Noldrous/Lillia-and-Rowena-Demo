@@ -948,9 +948,11 @@ function initDashboardPage() {
     state.sessionUser = activeUser;
   }
 
-  // If still not logged in, redirect to index.php (on PHP) or login.html
+  // If still not logged in, redirect to src/index.php (on PHP) or login.html
   if (!activeUser) {
-    window.location.href = window.location.pathname.endsWith('.php') ? 'index.php' : 'login.html';
+    window.location.href = window.location.pathname.endsWith('.php')
+      ? new URL('index.php', window.location.href).href
+      : 'login.html';
     return;
   }
 
@@ -998,7 +1000,9 @@ function initDashboardPage() {
       e.preventDefault();
       localStorage.removeItem('lr_session_user');
       localStorage.removeItem('lr_cart_items');
-      window.location.href = window.location.pathname.endsWith('.php') ? 'logout.php' : 'login.html';
+      window.location.href = window.location.pathname.endsWith('.php')
+        ? new URL('logout.php', window.location.href).href
+        : 'login.html';
     });
   }
 

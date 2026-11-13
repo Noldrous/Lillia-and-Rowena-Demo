@@ -19,6 +19,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="../" />
     <title>Lillia and Rowena Furniture — Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -28,7 +29,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
   <body class="lr-login-body">
     <main class="login-shell">
       <div style="margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between;">
-        <a href="home.php" style="text-decoration: none; font-size: 0.875rem; font-weight: 700; color: #475569;">
+        <a href="index.html" style="text-decoration: none; font-size: 0.875rem; font-weight: 700; color: #475569;">
           ← Back to Showroom Collection
         </a>
         <span class="lr-mono" style="font-size: 0.75rem; color: #0095FF; font-weight: 600;">
@@ -127,7 +128,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
             </div>
 
             <!-- Login Form -->
-            <form id="lr-login-form" method="post" action="index.php" novalidate>
+            <form id="lr-login-form" method="post" action="src/index.php" novalidate>
               <input type="hidden" id="login-role" name="role" value="<?= e($activeRole) ?>" />
 
               <div class="form-group">

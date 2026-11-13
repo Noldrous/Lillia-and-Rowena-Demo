@@ -16,6 +16,7 @@ $sessionPayload = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="../" />
     <title>Lillia and Rowena Furniture — Account Dashboard</title>
     <meta name="description" content="Lillia and Rowena Furniture — Customer Account Dashboard and Admin Management Console." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -60,7 +61,7 @@ $sessionPayload = [
             ← Back to Showroom
           </a>
           <a
-            href="logout.php"
+            href="src/logout.php"
             id="portal-logout-btn"
             class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
           >

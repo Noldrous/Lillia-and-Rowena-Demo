@@ -10,15 +10,15 @@
   },
   "autoload": {
     "psr-4": {
-      "App\\": "../App/",
-      "Library\\": "../Library/"
+      "App\\": "../src/App/",
+      "Library\\": "../src/Library/"
     },
     "files": [
-      "../Library/helpers.php"
+      "../src/Library/helpers.php"
     ]
   },
   "scripts": {
-    "serve": "php -S 0.0.0.0:8000 -t .. ../index.php"
+    "serve": "php -S 0.0.0.0:8000 -t .. ../src/index.php"
   },
   "config": {
     "optimize-autoloader": true,

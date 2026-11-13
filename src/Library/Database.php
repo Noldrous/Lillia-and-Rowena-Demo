@@ -24,7 +24,7 @@ class Database
      */
     public function __construct(array $config = [])
     {
-        $this->jsonPath = $config['json_path'] ?? (dirname(__DIR__) . '/data/store.json');
+        $this->jsonPath = $config['json_path'] ?? (dirname(__DIR__, 2) . '/data/store.json');
 
         $host = $config['host'] ?? (getenv('DB_HOST') ?: '');
         $port = $config['port'] ?? (getenv('DB_PORT') ?: '3306');
