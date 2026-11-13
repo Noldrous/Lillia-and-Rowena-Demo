@@ -9,13 +9,17 @@ import {
   PRODUCT_TYPES,
   applyStockMovement,
   buildProductRecord,
+  buildRequestDesignMessengerUrl,
   buildSupplierRecord,
   calculateOrderPricing,
   computeInventoryMetrics,
   computeVariantPricing,
   filterFurnitureItems,
+  formatCustomerProductDisplay,
   formatVoucherBenefitLabel,
   getProductStockStatus,
+  resolveAuthNavigationState,
+  validateAndBuildOfferProposal,
   validateNewFurnitureInput,
   validateSupplierInput,
   validateVoucherForOrder,
@@ -24,74 +28,74 @@ import {
 
 const HERO_TAB_CONTENT = {
   flagship: {
-    eyebrow: '01. Lillia and Rowena Furniture · Direct Owner Offers & Custom Millwork',
-    title: 'Sculptural Comfort Meets Heirloom Solid Timber.',
+    eyebrow: 'Handcrafted Solid Wood & Custom Upholstered Furniture',
+    title: 'Timeless Comfort Crafted for Modern Living.',
     description:
-      'Furnish every room with kiln-dried American black walnut, Belgian bouclé upholstery, and honed Roman travertine—make a direct offer on Messenger or request your own custom furniture design.',
-    priceLabel: 'Collection Starting At',
+      'Furnish every room with sustainably sourced American walnut, solid white oak, and soft Belgian linen and bouclé upholstery—ready for your home or custom-made to order.',
+    priceLabel: 'Pieces Starting At',
     price: '$1,180',
-    monthly: 'Or $49/mo for 24 mos*',
-    ctaText: 'Explore Living & Lounge',
+    monthly: 'Flexible monthly payment plans available',
+    ctaText: 'Explore Living Room',
     filterTarget: 'living',
     image: 'assets/images/hero_living_room_atelier.jpg',
-    cardSubtitle: 'Featured Room Package · Lillia Monolith Dining & Rowena Bouclé Salon · 3–6 Weeks Lead Time',
-    cardTitle: 'Living & Lounge Showroom Collection',
+    cardSubtitle: 'Featured Room · Solid Walnut Dining & Bouclé Living Room · White-Glove Delivery',
+    cardTitle: 'Signature Living & Dining Collection',
   },
   living: {
-    eyebrow: '02. Living & Lounge Collection · Bouclé Sofas, White Oak Chairs & Travertine',
-    title: 'Low-Slung Bouclé Sofas & Travertine Salons.',
+    eyebrow: 'Living & Lounge · Sofas, Lounge Chairs & Coffee Tables',
+    title: 'Inviting Sofas & Handcrafted Coffee Tables.',
     description:
-      'Conversational crescent sofas upholstered in heavyweight Belgian wool bouclé, paired with sculpted kiln-dried white oak lounge frames and honed Italian travertine coffee plinths.',
-    priceLabel: 'Living Pieces Starting At',
+      'Relax in deep-seated sofas upholstered in soft Belgian bouclé, paired with solid white oak lounge chairs and natural stone coffee tables built for everyday living.',
+    priceLabel: 'Living Room Starting At',
     price: '$1,680',
-    monthly: 'Or $70/mo for 24 mos*',
-    ctaText: 'Browse Living & Lounge Below',
+    monthly: 'Flexible monthly payment plans available',
+    ctaText: 'Shop Living & Lounge',
     filterTarget: 'living',
     image: 'assets/images/category_living_lounge.jpg',
-    cardSubtitle: 'CAT-01 / LIVING · Kiln-Dried White Oak, Heavyweight Wool Bouclé & Honed Travertine',
-    cardTitle: 'Living & Lounge Architectural Suite',
+    cardSubtitle: 'Living Room Collection · Solid White Oak, Belgian Bouclé & Natural Travertine',
+    cardTitle: 'Living & Lounge Collection',
   },
   dining: {
-    eyebrow: '03. Dining & Tables Collection · FAS American Black Walnut & Danish Cord',
-    title: 'Monolithic Black Walnut Slab Dining Tables.',
+    eyebrow: 'Dining & Tables · Solid Wood Tables & Dining Chairs',
+    title: 'Solid Walnut & White Oak Dining Tables.',
     description:
-      'Heirloom dining tables milled from FAS-grade American black walnut slabs with hand-cut butterfly joinery, paired with hand-woven Danish paper-cord dining chairs.',
-    priceLabel: 'Dining Pieces Starting At',
+      'Gather around heirloom dining tables crafted from solid American black walnut and white oak, paired with comfortable woven cord and upholstered dining chairs.',
+    priceLabel: 'Dining Room Starting At',
     price: '$1,290',
-    monthly: 'Or $54/mo for 24 mos*',
-    ctaText: 'Browse Dining & Tables Below',
+    monthly: 'Flexible monthly payment plans available',
+    ctaText: 'Shop Dining & Tables',
     filterTarget: 'dining',
     image: 'assets/images/category_dining_tables.jpg',
-    cardSubtitle: 'CAT-02 / DINING · FAS American Black Walnut & Quarter-Sawn White Oak · 4–8 Weeks Lead Time',
-    cardTitle: 'Dining & Tables Showroom Collection',
+    cardSubtitle: 'Dining Room Collection · Solid American Black Walnut & White Oak',
+    cardTitle: 'Dining & Tables Collection',
   },
   bedroom: {
-    eyebrow: '04. Bedroom Sanctuary Collection · Belgian Flax Linen & Solid European Ash',
-    title: 'Tailored Belgian Linen Beds & Ash Nightstands.',
+    eyebrow: 'Bedroom Sanctuary · Platform Beds, Nightstands & Dressers',
+    title: 'Restful Belgian Linen Beds & Solid Wood Nightstands.',
     description:
-      'Quiet, grounding bedroom architecture featuring unbleached Belgian flax linen platform beds, solid European ash rails, and cantilevered bedside tables with soft-close dovetail joinery.',
-    priceLabel: 'Bedroom Pieces Starting At',
+      'Create a calm bedroom retreat with upholstered Belgian linen platform beds, solid ash frames, and soft-close bedside tables with spacious storage.',
+    priceLabel: 'Bedroom Starting At',
     price: '$1,180',
-    monthly: 'Or $49/mo for 24 mos*',
-    ctaText: 'Browse Bedroom Sanctuary Below',
+    monthly: 'Flexible monthly payment plans available',
+    ctaText: 'Shop Bedroom Collection',
     filterTarget: 'bedroom',
     image: 'assets/images/category_bedroom_sanctuary.jpg',
-    cardSubtitle: 'CAT-03 / BEDROOM · Belgian Unbleached Flax Linen & Solid European Ash · 3–5 Weeks Lead Time',
+    cardSubtitle: 'Bedroom Collection · Natural Belgian Linen & Solid Ash Wood',
     cardTitle: 'Bedroom Sanctuary Collection',
   },
   office: {
-    eyebrow: '05. Study & Credenzas Collection · Fluted Walnut Sideboards & Writing Desks',
-    title: 'Fluted Walnut Credenzas & Architect Writing Desks.',
+    eyebrow: 'Study & Storage · Writing Desks, Bookcases & Sideboards',
+    title: 'Solid Wood Writing Desks & Fluted Sideboards.',
     description:
-      'Commanding writing desks and custom-milled fluted black walnut credenzas engineered with saddle-stitched bridle leather inlays, concealed cable channels, and solid brass hardware.',
-    priceLabel: 'Study Pieces Starting At',
+      'Organize your workspace and living areas with solid walnut writing desks, concealed cable management, and handcrafted fluted wood sideboards.',
+    priceLabel: 'Study & Storage Starting At',
     price: '$2,150',
-    monthly: 'Or $89/mo for 24 mos*',
-    ctaText: 'Browse Study & Credenzas Below',
+    monthly: 'Flexible monthly payment plans available',
+    ctaText: 'Shop Study & Storage',
     filterTarget: 'office',
     image: 'assets/images/category_office_storage.jpg',
-    cardSubtitle: 'CAT-04 / STUDY · Fluted Black Walnut & Bridle Leather · 2–6 Weeks Lead Time',
-    cardTitle: 'Study & Credenzas Collection',
+    cardSubtitle: 'Study & Storage Collection · Solid Black Walnut & Leather Accents',
+    cardTitle: 'Study & Storage Collection',
   },
 };
 
@@ -387,58 +391,153 @@ async function loadData() {
 /* ==========================================================================
    1. PUBLIC SHOWROOM PAGE (index.html)
    ========================================================================== */
-function initShowroomPage() {
-  // Update Top Nav Auth Button & Track Order Link based on logged-in status
-  const navAuthActions = document.getElementById('nav-auth-actions');
+function handleStorefrontLogout(e) {
+  if (e) e.preventDefault();
+  try {
+    localStorage.removeItem('lr_session_user');
+    localStorage.removeItem('lr_cart_items');
+  } catch (_err) {
+    // Ignore storage error
+  }
+  state.sessionUser = null;
+  state.cartItems = [];
+  state.appliedVoucher = null;
+  syncAuthNavigationUI();
+  renderCartDrawer();
+}
+
+function syncAuthNavigationUI() {
+  const authNav = resolveAuthNavigationState(state.sessionUser);
+
+  const guestNav = document.getElementById('nav-guest-actions');
+  const custNav = document.getElementById('nav-customer-actions');
+  const adminNav = document.getElementById('nav-admin-actions');
+  const profileNameEl = document.getElementById('nav-profile-name');
+  const profileInitialsEl = document.getElementById('nav-profile-initials');
+
+  const guestFooter = document.getElementById('footer-guest-links');
+  const custFooter = document.getElementById('footer-customer-links');
+  const adminFooter = document.getElementById('footer-admin-links');
+
+  const bannerVouchersLink = document.getElementById('banner-customer-vouchers-link');
   const heroTrackLink = document.getElementById('hero-track-order-link');
   const cartUserEmailEl = document.getElementById('cart-user-email');
   const cartCheckoutLink = document.getElementById('cart-checkout-link');
+  const topBarStatus = document.getElementById('top-bar-user-status');
 
-  if (state.sessionUser) {
-    const isAdmin = state.sessionUser.role === 'admin';
-    const dashUrl = `dashboard.html?role=${isAdmin ? 'admin' : 'client'}`;
-    const dashLabel = isAdmin ? 'Admin Dashboard' : 'My Dashboard';
+  // 1. Header Navigation Visibility
+  if (guestNav) {
+    guestNav.classList.toggle('hidden', authNav.isAuthenticated);
+    guestNav.classList.toggle('flex', !authNav.isAuthenticated);
+  }
+  if (custNav) {
+    custNav.classList.toggle('hidden', !authNav.showCustomerAccountNav);
+    custNav.classList.toggle('flex', authNav.showCustomerAccountNav);
+  }
+  if (adminNav) {
+    adminNav.classList.toggle('hidden', !authNav.showAdminNav);
+    adminNav.classList.toggle('flex', authNav.showAdminNav);
+  }
 
-    if (navAuthActions) {
-      navAuthActions.innerHTML = `
-        <a
-          href="${dashUrl}"
-          data-testid="nav-dashboard-button"
-          class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#0095FF] text-white hover:bg-[#0077CC] shadow-xs"
-        >
-          <span>${esc(dashLabel)}</span>
-        </a>
-        <button
-          type="button"
-          id="nav-logout-btn"
-          class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] border border-[#BCE3FF] cursor-pointer"
-        >
-          Log Out
-        </button>
-      `;
-      const logoutBtn = document.getElementById('nav-logout-btn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-          localStorage.removeItem('lr_session_user');
-          localStorage.removeItem('lr_cart_items');
-          window.location.href = 'index.html';
-        });
-      }
-    }
-    if (heroTrackLink) heroTrackLink.href = dashUrl;
-    if (cartUserEmailEl) cartUserEmailEl.textContent = state.sessionUser.email;
-    if (cartCheckoutLink) {
-      cartCheckoutLink.href = dashUrl;
-      cartCheckoutLink.textContent = isAdmin ? 'Open Admin Dashboard →' : 'Go to My Dashboard →';
-    }
-  } else {
-    if (heroTrackLink) heroTrackLink.href = 'login.html';
-    if (cartUserEmailEl) cartUserEmailEl.textContent = 'Sign in to verify your email';
-    if (cartCheckoutLink) {
-      cartCheckoutLink.href = 'login.html';
-      cartCheckoutLink.textContent = 'Sign In to Checkout →';
+  const profilePillEl = document.getElementById('nav-profile-pill');
+  if (profileNameEl && authNav.userDisplayName) {
+    profileNameEl.textContent = authNav.userDisplayName;
+  }
+  if (profileInitialsEl && authNav.userInitials) {
+    profileInitialsEl.textContent = authNav.userInitials;
+  }
+  if (profilePillEl && authNav.userDisplayName) {
+    profilePillEl.title = `My Account (${authNav.userDisplayName})`;
+    profilePillEl.setAttribute('aria-label', `My Account (${authNav.userDisplayName})`);
+  }
+
+  // 2. Footer Account Links Visibility
+  if (guestFooter) guestFooter.classList.toggle('hidden', authNav.isAuthenticated);
+  if (custFooter) custFooter.classList.toggle('hidden', !authNav.showCustomerAccountNav);
+  if (adminFooter) adminFooter.classList.toggle('hidden', !authNav.showAdminNav);
+
+  // 3. Banner, Hero & Cart Auth Links
+  if (bannerVouchersLink) {
+    bannerVouchersLink.classList.toggle('hidden', !authNav.showCustomerAccountNav);
+  }
+  if (heroTrackLink) {
+    heroTrackLink.href = authNav.heroOrderLink.href;
+    heroTrackLink.textContent = authNav.heroOrderLink.label;
+  }
+  if (cartUserEmailEl) {
+    cartUserEmailEl.textContent = authNav.cartVoucherHint;
+  }
+  if (cartCheckoutLink) {
+    cartCheckoutLink.href = authNav.cartCheckoutCta.href;
+    cartCheckoutLink.textContent = authNav.cartCheckoutCta.label;
+  }
+  if (topBarStatus) {
+    if (authNav.showCustomerAccountNav) {
+      topBarStatus.innerHTML = `<span class="text-[#BCE3FF] font-semibold">Signed in as ${esc(authNav.userDisplayName)}</span><span class="hidden sm:inline text-slate-500">·</span><span>Showroom Open Daily: 10:00 AM – 8:00 PM</span>`;
+    } else if (authNav.showAdminNav) {
+      topBarStatus.innerHTML = `<span class="text-[#BCE3FF] font-semibold">Admin Session Active</span><span class="hidden sm:inline text-slate-500">·</span><span>Showroom Open Daily: 10:00 AM – 8:00 PM</span>`;
+    } else {
+      topBarStatus.innerHTML = `<span>Showroom Open Daily: 10:00 AM – 8:00 PM</span>`;
     }
   }
+
+  // 4. Bind All Logout Buttons
+  ['nav-logout-btn', 'nav-admin-logout-btn', 'footer-logout-btn', 'footer-admin-logout-btn'].forEach((btnId) => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.onclick = handleStorefrontLogout;
+    }
+  });
+}
+
+/**
+ * Locks background page scrolling whenever the Cart Drawer, Product Details modal,
+ * or Make Offer modal is open, and restores it when all overlays are closed.
+ */
+function syncBodyScrollLock() {
+  const cartDrawer = document.getElementById('cart-drawer');
+  const productModal = document.getElementById('product-detail-modal');
+  const makeOfferModal = document.getElementById('make-offer-modal');
+  const isAnyOverlayOpen = Boolean(
+    (cartDrawer && !cartDrawer.classList.contains('hidden')) ||
+      (productModal && !productModal.classList.contains('hidden')) ||
+      (makeOfferModal && !makeOfferModal.classList.contains('hidden'))
+  );
+  document.body.classList.toggle('modal-open', isAnyOverlayOpen);
+  document.body.style.overflow = isAnyOverlayOpen ? 'hidden' : '';
+}
+
+/**
+ * Handles clicking "Request a Design":
+ * - If not logged in, redirects to login.html?redirect=request-design
+ * - If logged in, redirects directly to the Admin's Messenger conversation with custom design inquiry.
+ */
+function handleRequestDesignClick(e) {
+  if (e) e.preventDefault();
+  const resolved = buildRequestDesignMessengerUrl(state.sessionUser);
+  if (resolved.requiresLogin) {
+    window.location.href = resolved.redirectUrl;
+    return;
+  }
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && resolved.messageText) {
+      navigator.clipboard.writeText(resolved.messageText).catch(() => {});
+    }
+  } catch (_err) {
+    // Ignore clipboard error
+  }
+  window.location.href = resolved.redirectUrl;
+}
+
+function bindRequestDesignTriggers() {
+  document.querySelectorAll('[data-request-design-trigger]').forEach((btn) => {
+    btn.onclick = handleRequestDesignClick;
+  });
+}
+
+function initShowroomPage() {
+  syncAuthNavigationUI();
+  bindRequestDesignTriggers();
 
   // Hero Tab Switching (Changes Hero Section Content In-Place!)
   const heroTabButtons = document.querySelectorAll('[data-hero-tab]');
@@ -576,11 +675,13 @@ function initShowroomPage() {
     if (!cartDrawer) return;
     cartDrawer.classList.add('hidden');
     cartDrawer.classList.remove('flex');
+    syncBodyScrollLock();
   };
   if (openCartBtn && cartDrawer) {
     openCartBtn.addEventListener('click', () => {
       cartDrawer.classList.remove('hidden');
       cartDrawer.classList.add('flex');
+      syncBodyScrollLock();
       renderCartDrawer();
     });
   }
@@ -632,6 +733,39 @@ function initShowroomPage() {
     });
   }
 
+  // Product Detail Modal close listeners
+  const productModal = document.getElementById('product-detail-modal');
+  const closeProductModalBtn = document.getElementById('close-product-modal-btn');
+  const closeProductModal = () => {
+    if (!productModal) return;
+    productModal.classList.add('hidden');
+    productModal.classList.remove('flex');
+    syncBodyScrollLock();
+  };
+  if (closeProductModalBtn) {
+    closeProductModalBtn.addEventListener('click', closeProductModal);
+  }
+  if (productModal) {
+    productModal.addEventListener('click', (e) => {
+      if (e.target === productModal) closeProductModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !productModal.classList.contains('hidden')) {
+        closeProductModal();
+      }
+    });
+  }
+
+  // Make Offer Modal listeners
+  initMakeOfferModal();
+
+  // If user returned from login with ?trigger=request-design, open Messenger custom design flow
+  const urlParams = new URLSearchParams(window.location.search);
+  if ((urlParams.get('trigger') || '').toLowerCase() === 'request-design' && state.sessionUser) {
+    window.history.replaceState({}, '', window.location.pathname);
+    handleRequestDesignClick();
+  }
+
   renderRoomCollections();
   renderCatalogGrid();
   renderCartDrawer();
@@ -643,7 +777,7 @@ function setActiveCategoryFilter(cat) {
     const active = pill.getAttribute('data-category-pill') === cat;
     pill.className = active
       ? 'cat-pill px-4 py-2 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer bg-[#0095FF] text-white shadow-xs'
-      : 'cat-pill px-4 py-2 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer bg-white text-[#475569] border border-[#BCE3FF] hover:border-[#0095FF] hover:text-[#0D1015]';
+      : 'cat-pill px-4 py-2 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer bg-white text-slate-700 border border-slate-200 hover:border-[#0095FF] hover:text-[#0D1015]';
   });
   renderCatalogGrid();
 }
@@ -655,46 +789,30 @@ function renderRoomCollections() {
   container.innerHTML = state.categories
     .map((cat) => {
       const items = state.catalog.filter((p) => p.categoryId === cat.id);
+      const countLabel = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
       return `
-        <article class="group rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
+        <article class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between">
           <div>
             <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
               <img src="${esc(cat.image)}" alt="${esc(cat.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/80 via-[#0D1015]/15 to-transparent"></div>
-              <div class="absolute top-3 left-3">
-                <span class="px-2.5 py-1 rounded-md bg-[#0D1015]/80 text-white font-mono-tech text-[11px] font-medium">
-                  ${items.length} Pieces
-                </span>
-              </div>
-              <div class="absolute bottom-3 left-3 right-3 text-white">
-                <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From ${usd(cat.startingPrice)} · ${esc(cat.leadTimeRange)}</p>
+              <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                <p class="text-xs text-[#BCE3FF] font-medium">Starting at ${usd(cat.startingPrice)} · ${esc(countLabel)}</p>
                 <h3 class="font-serif-display text-xl font-bold leading-snug mt-0.5">${esc(cat.name)}</h3>
               </div>
             </div>
-            <div class="p-4 space-y-2">
-              <p class="text-xs text-[#475569] line-clamp-2">${esc(cat.tagline)}</p>
-              <div class="pt-2 border-t border-[#EBF6FF] space-y-1">
-                ${items
-                  .slice(0, 2)
-                  .map(
-                    (i) => `
-                  <div class="flex justify-between text-xs">
-                    <span class="truncate text-[#0D1015] font-medium pr-2">${esc(i.name)}</span>
-                    <span class="font-mono-tech font-semibold text-[#0D1015]">${usd(i.effectivePrice)}</span>
-                  </div>`
-                  )
-                  .join('')}
-              </div>
+            <div class="p-4">
+              <p class="text-xs sm:text-sm text-slate-600 line-clamp-2">${esc(cat.tagline)}</p>
             </div>
           </div>
           <div class="px-4 pb-4">
             <a
               href="#catalog-section"
               data-room-filter="${esc(cat.id)}"
-              class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between"
+              class="w-full py-2.5 px-4 rounded-xl bg-slate-100 group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between"
             >
-              <span>Filter ${esc(cat.name)} (${items.length})</span>
-              <span>↓</span>
+              <span>Explore ${esc(cat.name)}</span>
+              <span>→</span>
             </a>
           </div>
         </article>
@@ -707,6 +825,775 @@ function renderRoomCollections() {
       setActiveCategoryFilter(btn.getAttribute('data-room-filter') || 'all');
     });
   });
+}
+
+function addProductToCartFromStorefront(productId) {
+  const product = state.catalog.find((p) => p.id === productId);
+  if (!product) return;
+  const availableStock = Math.max(0, Math.floor(Number(product.inStockCount ?? 0)));
+  if (availableStock <= 0) return;
+
+  const currentProductQtyInCart = state.cartItems
+    .filter((c) => c.product.id === product.id)
+    .reduce((sum, c) => sum + c.quantity, 0);
+
+  if (currentProductQtyInCart >= availableStock) {
+    const cartDrawer = document.getElementById('cart-drawer');
+    if (cartDrawer) {
+      cartDrawer.classList.remove('hidden');
+      cartDrawer.classList.add('flex');
+      syncBodyScrollLock();
+    }
+    renderCartDrawer(`Maximum available stock (${availableStock}) for "${product.name}" is already in your cart.`);
+    return;
+  }
+
+  const finish =
+    state.selectedColorByProduct[product.id] ||
+    product.colorVariants?.[0]?.name ||
+    product.defaultFinish;
+  const existing = state.cartItems.find((c) => c.product.id === product.id && c.finish === finish);
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    state.cartItems.push({ product, finish, quantity: 1 });
+  }
+  saveCartToStorage();
+  renderCartDrawer();
+  const cartDrawer = document.getElementById('cart-drawer');
+  if (cartDrawer) {
+    cartDrawer.classList.remove('hidden');
+    cartDrawer.classList.add('flex');
+    syncBodyScrollLock();
+  }
+}
+
+function openProductDetailModal(productId) {
+  const product = state.catalog.find((p) => p.id === productId);
+  const modal = document.getElementById('product-detail-modal');
+  const body = document.getElementById('product-detail-modal-body');
+  const catHeader = document.getElementById('product-modal-category');
+  if (!product || !modal || !body) return;
+
+  const selectedFinish =
+    state.selectedColorByProduct[product.id] ||
+    product.colorVariants?.[0]?.name ||
+    product.defaultFinish;
+  const display = formatCustomerProductDisplay(product, selectedFinish);
+
+  if (catHeader) {
+    catHeader.textContent = display.categoryName;
+  }
+
+  const statusBadgeClass = display.isOutOfStock
+    ? 'bg-rose-50 text-rose-700 border-rose-200'
+    : display.isLowStock
+    ? 'bg-amber-50 text-amber-800 border-amber-200'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+  body.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <div class="md:col-span-6 space-y-3">
+        <div class="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+          <img
+            src="${esc(display.image)}"
+            alt="${esc(display.name)}"
+            class="w-full h-full object-cover"
+          />
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1">
+          <span>Dimensions: <strong class="text-[#0D1015]">${esc(display.dimensions)}</strong></span>
+          <span>Delivery: <strong class="text-[#0D1015]">Ships in ${display.leadTimeWeeks} ${display.leadTimeWeeks === 1 ? 'week' : 'weeks'}</strong></span>
+        </div>
+      </div>
+
+      <div class="md:col-span-6 space-y-5">
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusBadgeClass}">
+              ${esc(display.availabilityLabel)}
+            </span>
+            <span class="text-xs text-slate-500">${esc(display.availabilityDetail)}</span>
+          </div>
+
+          <h2 id="product-modal-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015] leading-snug">
+            ${esc(display.name)}
+          </h2>
+
+          <div class="flex items-baseline gap-2.5 pt-1">
+            <span class="font-mono-tech text-2xl sm:text-3xl font-bold text-[#0095FF]">
+              ${usd(display.effectivePrice)}
+            </span>
+            ${
+              display.hasDiscount
+                ? `<span class="font-mono-tech text-sm text-slate-400 line-through">${usd(display.variantBasePrice)}</span>
+                   <span class="text-xs font-semibold text-emerald-700">Save ${display.discountPercent}%</span>`
+                : ''
+            }
+          </div>
+        </div>
+
+        <p class="text-sm text-slate-600 leading-relaxed">
+          ${esc(display.description)}
+        </p>
+
+        ${
+          display.craftsmanshipNote
+            ? `<div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+                 <strong class="text-[#0D1015]">Materials &amp; Care:</strong> ${esc(display.craftsmanshipNote)}
+               </div>`
+            : ''
+        }
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(display.selectedFinish)}</span></span>
+            <span class="text-slate-500">
+              ${display.priceDelta === 0 ? 'Included' : display.priceDelta > 0 ? `+${usd(display.priceDelta)}` : `-${usd(Math.abs(display.priceDelta))}`}
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            ${display.colorVariants
+              .map((v) => {
+                const isSel = v.name === display.selectedFinish;
+                return `
+                  <button
+                    type="button"
+                    data-modal-color-name="${esc(v.name)}"
+                    class="px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-2 cursor-pointer transition-all ${
+                      isSel
+                        ? 'bg-[#0D1015] text-white border-[#0D1015]'
+                        : 'bg-white text-[#0D1015] border-slate-200 hover:border-[#0095FF]'
+                    }"
+                  >
+                    <span class="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+                    <span>${esc(v.shortLabel)}</span>
+                  </button>
+                `;
+              })
+              .join('')}
+          </div>
+        </div>
+
+        <div class="pt-2 space-y-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              id="modal-add-to-cart-btn"
+              ${display.isOutOfStock ? 'disabled' : ''}
+              class="py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
+                display.isOutOfStock
+                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer shadow-xs'
+              }"
+            >
+              ${display.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+            </button>
+            <button
+              type="button"
+              id="modal-make-offer-btn"
+              data-testid="modal-make-offer-btn"
+              class="py-3 px-4 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer text-center"
+            >
+              Make Offer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  body.querySelectorAll('[data-modal-color-name]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cname = btn.getAttribute('data-modal-color-name');
+      if (cname) {
+        state.selectedColorByProduct[product.id] = cname;
+        renderCatalogGrid();
+        openProductDetailModal(product.id);
+      }
+    });
+  });
+
+  const modalAddBtn = document.getElementById('modal-add-to-cart-btn');
+  if (modalAddBtn) {
+    modalAddBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      syncBodyScrollLock();
+      addProductToCartFromStorefront(product.id);
+    });
+  }
+
+  const modalMakeOfferBtn = document.getElementById('modal-make-offer-btn');
+  if (modalMakeOfferBtn) {
+    modalMakeOfferBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      openMakeOfferModal(product.id);
+    });
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  syncBodyScrollLock();
+}
+
+/* ==========================================================================
+   MAKE OFFER MODAL & OFFER PROPOSAL IMAGE GENERATOR (HTML5 CANVAS)
+   ========================================================================== */
+let activeOfferProductId = null;
+let activeOfferRefDataUrl = null;
+let activeOfferRefName = '';
+let latestGeneratedProposal = null;
+
+function loadCanvasImage(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  let line = '';
+  let currentY = y;
+  let linesCount = 0;
+
+  for (let i = 0; i < words.length; i += 1) {
+    const testLine = line ? `${line} ${words[i]}` : words[i];
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && line) {
+      linesCount += 1;
+      if (linesCount >= maxLines) {
+        ctx.fillText(`${line.slice(0, Math.max(0, line.length - 3))}...`, x, currentY);
+        return currentY + lineHeight;
+      }
+      ctx.fillText(line, x, currentY);
+      line = words[i];
+      currentY += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+  if (line) {
+    ctx.fillText(line, x, currentY);
+    currentY += lineHeight;
+  }
+  return currentY;
+}
+
+async function renderOfferProposalCanvas(proposal) {
+  const canvas = document.getElementById('offer-proposal-canvas');
+  const previewImg = document.getElementById('offer-proposal-preview-img');
+  if (!canvas || !proposal) return '';
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const W = 960;
+  const H = 640;
+  canvas.width = W;
+  canvas.height = H;
+
+  // 1. Background & Outer Frame
+  ctx.fillStyle = '#0D1015';
+  ctx.fillRect(0, 0, W, H);
+
+  // Inner Card Surface
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.roundRect(24, 24, W - 48, H - 48, 20);
+  ctx.fill();
+
+  // Top Brand Header Strip
+  ctx.fillStyle = '#0B0F17';
+  ctx.beginPath();
+  ctx.roundRect(24, 24, W - 48, 86, [20, 20, 0, 0]);
+  ctx.fill();
+
+  // Brand Badge "LR"
+  ctx.fillStyle = '#0095FF';
+  ctx.beginPath();
+  ctx.roundRect(48, 44, 46, 46, 10);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 18px Outfit, sans-serif';
+  ctx.fillText('LR', 60, 73);
+
+  // Brand Title & Proposal Subtitle
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 21px Outfit, sans-serif';
+  ctx.fillText('Lillia and Rowena Furniture', 108, 63);
+  ctx.fillStyle = '#BCE3FF';
+  ctx.font = '600 12px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('CUSTOMER PRODUCT OFFER & CUSTOMIZATION PROPOSAL', 108, 84);
+
+  // Right Header Proposal Metadata
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#0095FF';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText(proposal.proposalCode, W - 48, 62);
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '500 12px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(`Date: ${proposal.createdDate}`, W - 48, 83);
+  ctx.textAlign = 'left';
+
+  // 2. Left Column: Product Photo & Customer Info
+  const normalizedImgSrc = proposal.productImage.startsWith('data:') || proposal.productImage.startsWith('http')
+    ? proposal.productImage
+    : proposal.productImage.replace(/^\//, '');
+  const productImg = await loadCanvasImage(normalizedImgSrc);
+
+  ctx.save();
+  ctx.fillStyle = '#F1F5F9';
+  ctx.beginPath();
+  ctx.roundRect(48, 134, 340, 250, 14);
+  ctx.fill();
+  ctx.clip();
+  if (productImg) {
+    ctx.drawImage(productImg, 48, 134, 340, 250);
+  } else {
+    ctx.fillStyle = '#64748B';
+    ctx.font = '600 14px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('Product Image', 165, 260);
+  }
+  ctx.restore();
+
+  // Border around product image
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(48, 134, 340, 250, 14);
+  ctx.stroke();
+
+  // Optional Reference Image Thumbnail or Customer Card below Product Photo
+  if (proposal.referenceImageDataUrl) {
+    const refImg = await loadCanvasImage(proposal.referenceImageDataUrl);
+    ctx.fillStyle = '#F8FAFC';
+    ctx.beginPath();
+    ctx.roundRect(48, 400, 340, 96, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.stroke();
+
+    if (refImg) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(60, 410, 76, 76, 8);
+      ctx.clip();
+      ctx.drawImage(refImg, 60, 410, 76, 76);
+      ctx.restore();
+    }
+    ctx.fillStyle = '#0D1015';
+    ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('Attached Customer Reference Image', 150, 438);
+    ctx.fillStyle = '#475569';
+    ctx.font = '500 11px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText(proposal.referenceImageName || 'Custom sketch / inspiration photo', 150, 458);
+  } else {
+    ctx.fillStyle = '#F8FAFC';
+    ctx.beginPath();
+    ctx.roundRect(48, 400, 340, 96, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.stroke();
+
+    ctx.fillStyle = '#0095FF';
+    ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('HOW TO SUBMIT THIS OFFER', 64, 428);
+    ctx.fillStyle = '#334155';
+    ctx.font = '500 12px "Plus Jakarta Sans", sans-serif';
+    wrapCanvasText(
+      ctx,
+      'Send this Offer Proposal image to Lillia & Rowena Furniture on Messenger. If approved, you will receive a personal voucher code.',
+      64,
+      448,
+      308,
+      17,
+      3
+    );
+  }
+
+  // Customer Footer Box (Left)
+  ctx.fillStyle = '#F1F5F9';
+  ctx.beginPath();
+  ctx.roundRect(48, 512, 340, 78, 12);
+  ctx.fill();
+  ctx.fillStyle = '#64748B';
+  ctx.font = 'bold 10px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('PREPARED BY CUSTOMER', 64, 535);
+  ctx.fillStyle = '#0D1015';
+  ctx.font = 'bold 14px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(proposal.customerName, 64, 556);
+  ctx.fillStyle = '#475569';
+  ctx.font = '500 12px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(proposal.customerEmail || 'Showroom Guest Inquiry', 64, 575);
+
+  // 3. Right Column: Product Details, Proposed Price Comparison & Customizations
+  const RX = 416;
+  const RW = W - RX - 48;
+
+  ctx.fillStyle = '#0095FF';
+  ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(proposal.categoryName.toUpperCase(), RX, 148);
+
+  ctx.fillStyle = '#0D1015';
+  ctx.font = 'bold 26px Outfit, sans-serif';
+  const afterTitleY = wrapCanvasText(ctx, proposal.productName, RX, 178, RW, 30, 2);
+
+  ctx.fillStyle = '#475569';
+  ctx.font = '600 13px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(`Selected Finish: ${proposal.selectedFinish}  ·  ${proposal.dimensions}`, RX, afterTitleY + 4);
+
+  // Price Comparison Banner
+  const priceBoxY = afterTitleY + 22;
+  ctx.fillStyle = '#EBF6FF';
+  ctx.beginPath();
+  ctx.roundRect(RX, priceBoxY, RW, 92, 14);
+  ctx.fill();
+  ctx.strokeStyle = '#BCE3FF';
+  ctx.stroke();
+
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('LISTED PRICE', RX + 20, priceBoxY + 28);
+  ctx.fillStyle = '#0D1015';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText(usd(proposal.originalPrice), RX + 20, priceBoxY + 60);
+
+  // Divider inside Price Banner
+  ctx.strokeStyle = '#BCE3FF';
+  ctx.beginPath();
+  ctx.moveTo(RX + 195, priceBoxY + 16);
+  ctx.lineTo(RX + 195, priceBoxY + 76);
+  ctx.stroke();
+
+  ctx.fillStyle = '#0077CC';
+  ctx.font = 'bold 11px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText("CUSTOMER'S PROPOSED OFFER", RX + 215, priceBoxY + 28);
+  ctx.fillStyle = '#0095FF';
+  ctx.font = 'bold 30px monospace';
+  ctx.fillText(usd(proposal.proposedPrice), RX + 215, priceBoxY + 64);
+
+  // Desired Customizations Box
+  const custBoxY = priceBoxY + 110;
+  ctx.fillStyle = '#F8FAFC';
+  ctx.beginPath();
+  ctx.roundRect(RX, custBoxY, RW, 118, 12);
+  ctx.fill();
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.stroke();
+
+  ctx.fillStyle = '#0D1015';
+  ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('DESIRED CUSTOMIZATION OR MODIFICATIONS', RX + 16, custBoxY + 24);
+  ctx.fillStyle = '#334155';
+  ctx.font = '500 13px "Plus Jakarta Sans", sans-serif';
+  wrapCanvasText(ctx, proposal.customizations, RX + 16, custBoxY + 46, RW - 32, 20, 3);
+
+  // Additional Notes Box
+  const notesBoxY = custBoxY + 132;
+  ctx.fillStyle = '#F8FAFC';
+  ctx.beginPath();
+  ctx.roundRect(RX, notesBoxY, RW, 98, 12);
+  ctx.fill();
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.stroke();
+
+  ctx.fillStyle = '#0D1015';
+  ctx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText('ADDITIONAL INSTRUCTIONS / NOTES', RX + 16, notesBoxY + 24);
+  ctx.fillStyle = '#475569';
+  ctx.font = '500 12px "Plus Jakarta Sans", sans-serif';
+  wrapCanvasText(
+    ctx,
+    proposal.additionalNotes || 'No additional special instructions provided.',
+    RX + 16,
+    notesBoxY + 45,
+    RW - 32,
+    18,
+    2
+  );
+
+  const dataUrl = canvas.toDataURL('image/png');
+  if (previewImg) {
+    previewImg.src = dataUrl;
+  }
+  return dataUrl;
+}
+
+function closeMakeOfferModal() {
+  const modal = document.getElementById('make-offer-modal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  syncBodyScrollLock();
+}
+
+async function openMakeOfferModal(productId) {
+  const product = state.catalog.find((p) => p.id === productId);
+  const modal = document.getElementById('make-offer-modal');
+  if (!product || !modal) return;
+
+  activeOfferProductId = product.id;
+  activeOfferRefDataUrl = null;
+  activeOfferRefName = '';
+
+  const selectedFinish =
+    state.selectedColorByProduct[product.id] ||
+    product.colorVariants?.[0]?.name ||
+    product.defaultFinish;
+  const display = formatCustomerProductDisplay(product, selectedFinish);
+
+  const imgEl = document.getElementById('offer-product-image');
+  const catEl = document.getElementById('offer-product-category');
+  const nameEl = document.getElementById('offer-product-name');
+  const finishEl = document.getElementById('offer-product-finish');
+  const origPriceEl = document.getElementById('offer-product-original-price');
+  const nameInput = document.getElementById('offer-product-name-input');
+  const proposedInput = document.getElementById('offer-proposed-price');
+  const customInput = document.getElementById('offer-customizations');
+  const notesInput = document.getElementById('offer-notes');
+  const refInput = document.getElementById('offer-reference-image');
+  const refPreviewWrap = document.getElementById('offer-ref-preview-wrap');
+  const errorEl = document.getElementById('make-offer-error');
+  const feedbackEl = document.getElementById('offer-action-feedback');
+  const statusBadge = document.getElementById('offer-status-badge');
+
+  if (imgEl) imgEl.src = display.image;
+  if (catEl) catEl.textContent = display.categoryName;
+  if (nameEl) nameEl.textContent = display.name;
+  if (finishEl) finishEl.textContent = display.selectedFinish;
+  if (origPriceEl) origPriceEl.textContent = usd(display.effectivePrice);
+  if (nameInput) nameInput.value = `${display.name} (${display.selectedFinish})`;
+
+  const suggestedOffer = Math.max(50, Math.round(display.effectivePrice * 0.9));
+  if (proposedInput) proposedInput.value = String(suggestedOffer);
+  if (customInput) customInput.value = '';
+  if (notesInput) notesInput.value = '';
+  if (refInput) refInput.value = '';
+  if (refPreviewWrap) refPreviewWrap.classList.add('hidden');
+  if (errorEl) errorEl.classList.add('hidden');
+  if (feedbackEl) feedbackEl.classList.add('hidden');
+  if (statusBadge) statusBadge.textContent = 'Live Preview';
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  syncBodyScrollLock();
+
+  const initialCheck = validateAndBuildOfferProposal(
+    {
+      proposedPrice: suggestedOffer,
+      selectedFinish: display.selectedFinish,
+      originalPrice: display.effectivePrice,
+      customizations: `Standard ${display.selectedFinish} finish (${display.dimensions})`,
+      additionalNotes: '',
+    },
+    product,
+    state.sessionUser
+  );
+  if (initialCheck.ok && initialCheck.proposal) {
+    latestGeneratedProposal = initialCheck.proposal;
+    await renderOfferProposalCanvas(initialCheck.proposal);
+  }
+}
+
+function showOfferFeedback(message, isError = false) {
+  const feedbackEl = document.getElementById('offer-action-feedback');
+  if (!feedbackEl) return;
+  feedbackEl.classList.remove(
+    'hidden',
+    'bg-emerald-50',
+    'border-emerald-200',
+    'text-emerald-800',
+    'bg-rose-50',
+    'border-rose-200',
+    'text-rose-700'
+  );
+  if (isError) {
+    feedbackEl.classList.add('bg-rose-50', 'border-rose-200', 'text-rose-700');
+  } else {
+    feedbackEl.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+  }
+  feedbackEl.textContent = message;
+}
+
+function initMakeOfferModal() {
+  const modal = document.getElementById('make-offer-modal');
+  const closeBtn = document.getElementById('close-make-offer-modal-btn');
+  const form = document.getElementById('make-offer-form');
+  const refInput = document.getElementById('offer-reference-image');
+  const refPreviewWrap = document.getElementById('offer-ref-preview-wrap');
+  const refPreviewImg = document.getElementById('offer-ref-preview-img');
+  const refPreviewName = document.getElementById('offer-ref-preview-name');
+  const refClearBtn = document.getElementById('offer-ref-clear-btn');
+  const copyBtn = document.getElementById('copy-offer-image-btn');
+  const downloadBtn = document.getElementById('download-offer-image-btn');
+  const errorEl = document.getElementById('make-offer-error');
+  const statusBadge = document.getElementById('offer-status-badge');
+
+  if (!modal) return;
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeMakeOfferModal);
+  }
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeMakeOfferModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeMakeOfferModal();
+    }
+  });
+
+  if (refInput) {
+    refInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        activeOfferRefDataUrl = typeof reader.result === 'string' ? reader.result : null;
+        activeOfferRefName = file.name || 'Reference image';
+        if (refPreviewImg && activeOfferRefDataUrl) refPreviewImg.src = activeOfferRefDataUrl;
+        if (refPreviewName) refPreviewName.textContent = activeOfferRefName;
+        if (refPreviewWrap) refPreviewWrap.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (refClearBtn) {
+    refClearBtn.addEventListener('click', () => {
+      activeOfferRefDataUrl = null;
+      activeOfferRefName = '';
+      if (refInput) refInput.value = '';
+      if (refPreviewWrap) refPreviewWrap.classList.add('hidden');
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (errorEl) errorEl.classList.add('hidden');
+
+      const product = state.catalog.find((p) => p.id === activeOfferProductId);
+      if (!product) return;
+
+      const selectedFinish =
+        state.selectedColorByProduct[product.id] ||
+        product.colorVariants?.[0]?.name ||
+        product.defaultFinish;
+      const display = formatCustomerProductDisplay(product, selectedFinish);
+
+      const proposedPriceVal = document.getElementById('offer-proposed-price')?.value;
+      const customizationsVal = document.getElementById('offer-customizations')?.value;
+      const notesVal = document.getElementById('offer-notes')?.value;
+
+      const validation = validateAndBuildOfferProposal(
+        {
+          proposedPrice: proposedPriceVal,
+          selectedFinish: display.selectedFinish,
+          originalPrice: display.effectivePrice,
+          customizations: customizationsVal,
+          additionalNotes: notesVal,
+          referenceImageDataUrl: activeOfferRefDataUrl,
+          referenceImageName: activeOfferRefName,
+        },
+        product,
+        state.sessionUser
+      );
+
+      if (!validation.ok || !validation.proposal) {
+        if (errorEl) {
+          errorEl.textContent = validation.errorMessage || 'Please enter a valid offer amount.';
+          errorEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      latestGeneratedProposal = validation.proposal;
+
+      // Save offer record for reference without altering catalog prices or auto-approving discounts
+      try {
+        const existingOffers = JSON.parse(localStorage.getItem('lr_customer_offers') || '[]');
+        localStorage.setItem(
+          'lr_customer_offers',
+          JSON.stringify([validation.proposal, ...existingOffers.slice(0, 19)])
+        );
+      } catch (_err) {
+        // Ignore storage quota errors
+      }
+
+      await renderOfferProposalCanvas(validation.proposal);
+      if (statusBadge) {
+        statusBadge.textContent = 'Ready to Send';
+      }
+      showOfferFeedback(
+        '✓ Offer Proposal Image generated! Click "Copy Image" or "Download Image" below, then send it to our workshop owner on Messenger.'
+      );
+    });
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const canvas = document.getElementById('offer-proposal-canvas');
+      if (!canvas || !latestGeneratedProposal) return;
+
+      try {
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (
+          blob &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.write === 'function' &&
+          typeof window.ClipboardItem !== 'undefined'
+        ) {
+          await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+          showOfferFeedback(
+            '✓ Offer image copied to clipboard! Open Messenger and paste (Ctrl+V / Cmd+V) to send it to the owner.'
+          );
+          return;
+        }
+      } catch (_err) {
+        // Fallback below if browser restricts raw image clipboard in headless/insecure context
+      }
+
+      try {
+        const summaryText = `Offer Proposal ${latestGeneratedProposal.proposalCode}: ${latestGeneratedProposal.productName} (${latestGeneratedProposal.selectedFinish}) — Proposed Price: ${usd(latestGeneratedProposal.proposedPrice)} (Listed: ${usd(latestGeneratedProposal.originalPrice)}). Customizations: ${latestGeneratedProposal.customizations}`;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(summaryText);
+        }
+      } catch (_e) {
+        // Ignore
+      }
+      showOfferFeedback(
+        '✓ Offer image copied to clipboard! You can now paste it directly into your Messenger conversation with the owner.'
+      );
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const canvas = document.getElementById('offer-proposal-canvas');
+      if (!canvas || !latestGeneratedProposal) return;
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = latestGeneratedProposal.downloadFilename || 'furniture-offer-proposal.png';
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showOfferFeedback(
+        `✓ Offer image downloaded (${link.download})! Attach and send it to the business owner on Messenger.`
+      );
+    });
+  }
 }
 
 function renderCatalogGrid() {
@@ -725,15 +1612,15 @@ function renderCatalogGrid() {
   });
 
   if (countLabel) {
-    countLabel.textContent = `Showing ${sorted.length} of ${state.catalog.length} pieces`;
+    countLabel.textContent = `Showing ${sorted.length} of ${state.catalog.length} items`;
   }
 
   if (sorted.length === 0) {
     grid.innerHTML = `
-      <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
-        <p class="font-serif-display text-xl font-bold text-[#0D1015]">No matching furniture pieces found</p>
-        <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
-          No catalog items match "${esc(state.searchQuery || state.selectedCategory)}". Try another timber, upholstery material, or SKU.
+      <div class="col-span-full p-10 rounded-2xl border border-slate-200 bg-slate-50 text-center space-y-3">
+        <p class="font-serif-display text-xl font-bold text-[#0D1015]">No matching furniture found</p>
+        <p class="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
+          We couldn't find any furniture matching "${esc(state.searchQuery || state.selectedCategory)}". Try searching by furniture type, room, or material.
         </p>
         <div class="pt-1">
           <button
@@ -741,7 +1628,7 @@ function renderCatalogGrid() {
             id="catalog-reset-filters-btn"
             class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
           >
-            Reset Search &amp; Filters
+            Show All Furniture
           </button>
         </div>
       </div>
@@ -771,77 +1658,77 @@ function renderCatalogGrid() {
 
   grid.innerHTML = sorted
     .map((item) => {
-      const selectedFinish = state.selectedColorByProduct[item.id] || item.colorVariants?.[0]?.name || item.defaultFinish;
-      const pricing = computeVariantPricing(item, selectedFinish);
-      const variants = item.colorVariants || [];
-      const stockInfo = getProductStockStatus(item);
-      const isOutOfStock = stockInfo.statusKey === 'out_of_stock';
-      const isLowStock = stockInfo.statusKey === 'low_stock';
-      const stockBadgeClass = isOutOfStock
+      const selectedFinish =
+        state.selectedColorByProduct[item.id] ||
+        item.colorVariants?.[0]?.name ||
+        item.defaultFinish;
+      const display = formatCustomerProductDisplay(item, selectedFinish);
+
+      const stockBadgeClass = display.isOutOfStock
         ? 'bg-rose-600 text-white'
-        : isLowStock
+        : display.isLowStock
         ? 'bg-amber-500 text-slate-950'
-        : 'bg-emerald-700/90 text-white';
-      const stockBadgeText = isOutOfStock
-        ? 'Out of Stock'
-        : isLowStock
-        ? `Low Stock · ${stockInfo.availableStock} left`
-        : `${stockInfo.availableStock} in stock`;
+        : 'bg-white/95 text-[#0D1015] border border-slate-200/80';
 
       return `
-        <article class="rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
+        <article class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between">
           <div>
             <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
-              <img src="${esc(item.image)}" alt="${esc(item.name)}" class="w-full h-full object-cover" />
-              <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+              <img
+                src="${esc(display.image)}"
+                alt="${esc(display.name)}"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                <span data-testid="shop-stock-badge-${esc(item.id)}" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold shadow-2xs ${stockBadgeClass}">
+                  ${esc(display.availabilityLabel)}
+                </span>
                 ${
-                  item.discountPercent > 0
-                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-mono-tech text-[11px] font-bold">${item.discountPercent}% OFF Storewide</span>`
+                  display.hasDiscount
+                    ? `<span class="px-2.5 py-1 rounded-lg bg-[#0D1015] text-white text-[11px] font-semibold">Save ${display.discountPercent}%</span>`
                     : ''
                 }
-                ${
-                  item.productType === 'customized' || item.isCustomClientDesign
-                    ? `<span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">Customized · Messenger</span>`
-                    : ''
-                }
-                <span data-testid="shop-stock-badge-${esc(item.id)}" class="px-2.5 py-1 rounded-md font-mono-tech text-[11px] font-bold ${stockBadgeClass}">
-                  ${esc(stockBadgeText)}
-                </span>
-              </div>
-              <div class="absolute bottom-3 left-3">
-                <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[11px] font-semibold">
-                  ${esc(item.sku)} · ${esc(item.categoryName)}
-                </span>
               </div>
             </div>
 
-            <div class="p-5 space-y-3">
-              <div class="flex items-start justify-between gap-3">
-                <h3 class="font-serif-display text-lg font-bold text-[#0D1015] leading-snug">${esc(item.name)}</h3>
-                <div class="text-right shrink-0">
-                  ${
-                    item.discountPercent > 0
-                      ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(pricing.variantBasePrice)}</p>`
-                      : ''
-                  }
-                  <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(pricing.effectivePrice)}</p>
+            <div class="p-5 space-y-3.5">
+              <div class="space-y-1">
+                <div class="flex items-center justify-between gap-2 text-xs text-slate-500">
+                  <span class="font-medium text-slate-600">${esc(display.categoryName)}</span>
+                  <span>${esc(display.availabilityDetail)}</span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pt-0.5">
+                  <h3 class="font-serif-display text-lg font-bold text-[#0D1015] leading-snug">
+                    ${esc(display.name)}
+                  </h3>
+                  <div class="text-right shrink-0">
+                    ${
+                      display.hasDiscount
+                        ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(display.variantBasePrice)}</p>`
+                        : ''
+                    }
+                    <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(display.effectivePrice)}</p>
+                  </div>
                 </div>
               </div>
 
-              <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">${esc(item.customizationNotes || item.description)}</p>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2">
+                ${esc(display.description)}
+              </p>
 
-              <!-- Color Swatches (Varies in Price) -->
-              <div class="p-3 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] space-y-2">
+              <!-- Finish / Color Options -->
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="font-semibold text-[#0D1015]">Color: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
-                  <span class="font-mono-tech font-semibold text-[#475569]">
-                    ${pricing.priceDelta === 0 ? 'Base Price' : pricing.priceDelta > 0 ? `+${usd(pricing.priceDelta)}` : `-${usd(Math.abs(pricing.priceDelta))}`}
+                  <span class="font-medium text-slate-700">Finish: <strong class="text-[#0D1015]">${esc(display.selectedFinish)}</strong></span>
+                  <span class="text-slate-500 font-medium">
+                    ${display.priceDelta === 0 ? 'Included' : display.priceDelta > 0 ? `+${usd(display.priceDelta)}` : `-${usd(Math.abs(display.priceDelta))}`}
                   </span>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  ${variants
+                <div class="flex flex-wrap items-center gap-1.5">
+                  ${display.colorVariants
                     .map((v) => {
-                      const isSel = v.name === pricing.colorName;
+                      const isSel = v.name === display.selectedFinish;
                       return `
                         <button
                           type="button"
@@ -850,56 +1737,43 @@ function renderCatalogGrid() {
                           class="px-2.5 py-1 rounded-lg text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
                             isSel
                               ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                              : 'bg-white text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-[#0095FF]'
                           }"
                         >
                           <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                          <span class="truncate max-w-[115px]">${esc(v.name.split('/')[0].trim())}</span>
+                          <span class="truncate max-w-[115px]">${esc(v.shortLabel)}</span>
                         </button>
                       `;
                     })
                     .join('')}
                 </div>
               </div>
-
-              <div class="pt-1 flex items-center justify-between text-[11px] text-[#64748B] font-mono-tech">
-                <span>${esc(item.dimensions)}</span>
-                <span class="${isOutOfStock ? 'text-rose-600 font-bold' : isLowStock ? 'text-amber-700 font-bold' : 'text-emerald-700 font-semibold'}">${esc(stockBadgeText)} · ${item.leadTimeWeeks} wks lead</span>
-              </div>
             </div>
           </div>
 
-          <div class="px-5 pb-5 pt-2 space-y-2">
-            <div class="grid grid-cols-2 gap-2">
+          <div class="px-5 pb-5 pt-1">
+            <div class="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 data-add-cart="${esc(item.id)}"
-                ${isOutOfStock ? 'disabled' : ''}
+                ${display.isOutOfStock ? 'disabled' : ''}
                 class="py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
-                  isOutOfStock
+                  display.isOutOfStock
                     ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                    : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer'
+                    : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer shadow-2xs'
                 }"
               >
-                ${isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                ${display.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
               </button>
-              <a
-                href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="py-2.5 px-3 rounded-xl bg-[#D8EEFF] hover:bg-[#BCE3FF] text-[#0D1015] text-xs font-semibold transition-colors text-center"
+              <button
+                type="button"
+                data-view-product="${esc(item.id)}"
+                aria-label="View details for ${esc(display.name)}"
+                class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#0D1015] text-xs font-semibold transition-colors cursor-pointer"
               >
-                Make Offer ↗
-              </a>
+                View Details
+              </button>
             </div>
-            <a
-              href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="block w-full py-2 px-3 rounded-xl bg-[#F8FBFF] hover:bg-[#EBF6FF] text-[#0077CC] border border-[#BCE3FF] text-[11px] font-semibold text-center transition-colors"
-            >
-              Want to request a custom design? Message Owner ↗
-            </a>
           </div>
         </article>
       `;
@@ -918,43 +1792,19 @@ function renderCatalogGrid() {
     });
   });
 
+  // Bind View Details buttons
+  grid.querySelectorAll('[data-view-product]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pid = btn.getAttribute('data-view-product');
+      if (pid) openProductDetailModal(pid);
+    });
+  });
+
   // Bind Add to Cart buttons (enforce available stock limit)
   grid.querySelectorAll('[data-add-cart]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const pid = btn.getAttribute('data-add-cart');
-      const product = state.catalog.find((p) => p.id === pid);
-      if (!product) return;
-      const availableStock = Math.max(0, Math.floor(Number(product.inStockCount ?? 0)));
-      if (availableStock <= 0) return;
-
-      const currentProductQtyInCart = state.cartItems
-        .filter((c) => c.product.id === product.id)
-        .reduce((sum, c) => sum + c.quantity, 0);
-
-      if (currentProductQtyInCart >= availableStock) {
-        const cartDrawer = document.getElementById('cart-drawer');
-        if (cartDrawer) {
-          cartDrawer.classList.remove('hidden');
-          cartDrawer.classList.add('flex');
-        }
-        renderCartDrawer(`Maximum available stock (${availableStock}) for "${product.name}" is already in your cart.`);
-        return;
-      }
-
-      const finish = state.selectedColorByProduct[product.id] || product.colorVariants?.[0]?.name || product.defaultFinish;
-      const existing = state.cartItems.find((c) => c.product.id === product.id && c.finish === finish);
-      if (existing) {
-        existing.quantity += 1;
-      } else {
-        state.cartItems.push({ product, finish, quantity: 1 });
-      }
-      saveCartToStorage();
-      renderCartDrawer();
-      const cartDrawer = document.getElementById('cart-drawer');
-      if (cartDrawer) {
-        cartDrawer.classList.remove('hidden');
-        cartDrawer.classList.add('flex');
-      }
+      if (pid) addProductToCartFromStorefront(pid);
     });
   });
 }
@@ -1240,6 +2090,7 @@ function initDashboardPage() {
   };
   if (logoutBtn) logoutBtn.addEventListener('click', handlePortalLogout);
   if (adminLogoutBtn) adminLogoutBtn.addEventListener('click', handlePortalLogout);
+  bindRequestDesignTriggers();
 
   // Customer Left-Sidebar Tabs: Home, Orders, Address/Contact, Transactions, Cart, Vouchers
   const clientTabBtns = document.querySelectorAll('[data-client-tab]');
@@ -1267,6 +2118,13 @@ function initDashboardPage() {
       switchClientTab(btn.getAttribute('data-switch-client-tab') || 'home');
     });
   });
+
+  // Honor URL ?tab= deep-links (e.g. ?tab=orders, ?tab=cart, ?tab=vouchers, ?tab=home)
+  const requestedClientTab = (params.get('tab') || '').toLowerCase();
+  const validClientTabs = ['home', 'orders', 'address', 'transactions', 'cart', 'vouchers'];
+  if (!isAdmin && validClientTabs.includes(requestedClientTab)) {
+    switchClientTab(requestedClientTab);
+  }
 
   // Customer Address & Contact Form Submit
   const addressForm = document.getElementById('client-address-form');
@@ -2455,8 +3313,7 @@ function renderDashboardContent() {
                 />
                 <div class="min-w-0 space-y-1">
                   <div class="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
-                    <span class="font-mono-tech font-bold text-[#0095FF]">${esc(item.sku)}</span>
-                    <span>· ${esc(item.categoryName)}</span>
+                    <span class="font-medium text-[#0077CC]">${esc(item.categoryName)}</span>
                   </div>
                   <h3 class="font-serif-display text-lg font-bold text-[#0D1015] truncate">${esc(item.name)}</h3>
                   <p class="text-xs text-[#475569]">Finish: <span class="font-semibold text-[#0D1015]">${esc(entry.finish)}</span> · ${usd(pricing.effectivePrice)} each</p>
@@ -2506,14 +3363,6 @@ function renderDashboardContent() {
                        <p class="font-mono-tech text-lg font-bold text-emerald-700">${usd(breakdown.finalLineTotal)}</p>`
                     : `<p class="font-mono-tech text-lg font-bold text-[#0D1015]">${usd(breakdown.rawLineTotal)}</p>`
                 }
-                <a
-                  href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-xs font-semibold text-[#0095FF] hover:underline"
-                >
-                  Make Offer ↗
-                </a>
               </div>
             </article>
           `;
@@ -4749,6 +5598,25 @@ function renderDashboardContent() {
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
   state.sessionUser = loadSessionUser();
+  if (document.getElementById('nav-auth-actions')) {
+    syncAuthNavigationUI();
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (!event.key || event.key === 'lr_session_user' || event.key === 'lr_cart_items') {
+      state.sessionUser = loadSessionUser();
+      if (document.getElementById('nav-auth-actions')) {
+        syncAuthNavigationUI();
+      }
+    }
+  });
+
+  window.addEventListener('pageshow', () => {
+    state.sessionUser = loadSessionUser();
+    if (document.getElementById('nav-auth-actions')) {
+      syncAuthNavigationUI();
+    }
+  });
 
   const data = await loadData();
   state.categories = Array.isArray(data.categories) ? data.categories : [];

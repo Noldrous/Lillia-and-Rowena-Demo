@@ -48,17 +48,37 @@ $sessionPayload = [
           </a>
         </div>
 
-        <!-- Logged-In User + Back to Showroom & Log Out -->
-        <div class="flex items-center gap-3">
-          <div class="hidden sm:flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
-            <span id="portal-user-badge" class="text-xs font-semibold text-slate-200">Signed In</span>
-          </div>
+        <!-- Logged-In Customer Navigation: Shop, My Account, My Orders, Profile & Log Out -->
+        <div class="flex items-center gap-2 sm:gap-3">
           <a
             href="index.html"
-            class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors whitespace-nowrap"
+            class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors whitespace-nowrap"
           >
-            ← Back to Showroom
+            ← Shop Furniture
           </a>
+          <button
+            type="button"
+            data-switch-client-tab="orders"
+            class="hidden md:inline-flex px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+          >
+            My Orders
+          </button>
+          <button
+            type="button"
+            data-switch-client-tab="home"
+            aria-label="My Account"
+            title="My Account"
+            class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-[#0095FF] text-[#BCE3FF] hover:text-white border border-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          <div class="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="portal-user-badge" class="text-xs font-semibold text-slate-200">Signed In</span>
+          </div>
           <a
             href="logout.php"
             id="portal-logout-btn"
@@ -174,19 +194,18 @@ $sessionPayload = [
               <!-- Direct Custom Design / Messenger Help Box -->
               <div class="rounded-2xl bg-[#0B0F17] text-white p-4 space-y-3 border border-slate-800">
                 <p class="font-serif-display text-sm font-bold text-white">
-                  Want to Request a Custom Design?
+                  Need a Custom Furniture Design?
                 </p>
                 <p class="text-xs text-slate-300 leading-relaxed">
-                  Message our workshop directly to request custom dimensions or negotiate an offer.
+                  Message our workshop owner directly on Messenger to discuss a custom furniture design.
                 </p>
-                <a
-                  href="https://www.messenger.com/t/100000505712325"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="block w-full py-2.5 px-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold text-center transition-colors"
+                <button
+                  type="button"
+                  data-request-design-trigger="true"
+                  class="block w-full py-2.5 px-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold text-center transition-colors cursor-pointer"
                 >
-                  Message Us on Messenger ↗
-                </a>
+                  Request a Design ↗
+                </button>
               </div>
             </aside>
 
@@ -586,14 +605,6 @@ $sessionPayload = [
                       >
                         Place Order
                       </button>
-                      <a
-                        href="https://www.messenger.com/t/100000505712325"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="block w-full py-2.5 px-4 rounded-xl bg-[#EBF6FF] hover:bg-[#D8EEFF] text-[#0077CC] text-xs font-semibold text-center transition-colors"
-                      >
-                        Make Offer on Messenger ↗
-                      </a>
                     </div>
                   </aside>
                 </div>
@@ -605,16 +616,14 @@ $sessionPayload = [
                   <div>
                     <h2 class="font-serif-display text-2xl font-bold text-[#0D1015]">My Voucher Wallet</h2>
                     <p class="text-xs text-[#475569] mt-1">
-                      Personal single-product discount codes issued to your account after negotiating with the owner on Messenger.
+                      Personal single-product discount codes issued to your account after reviewing your product offer on Messenger.
                     </p>
                   </div>
                   <a
-                    href="https://www.messenger.com/t/100000505712325"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="index.html#catalog-section"
                     class="px-4 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors whitespace-nowrap"
                   >
-                    Make an Offer on Messenger ↗
+                    Browse Products →
                   </a>
                 </div>
 

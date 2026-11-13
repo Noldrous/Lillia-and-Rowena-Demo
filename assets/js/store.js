@@ -938,6 +938,63 @@ export function getProductStockStatus(product) {
 }
 
 /**
+ * Formats a catalog item strictly for the customer-facing storefront.
+ * Strips internal administrative identifiers (SKU codes, database IDs, internal reference numbers)
+ * from the returned display object and provides clean, customer-friendly labels for price,
+ * finish options, availability status, and delivery estimate.
+ */
+export function formatCustomerProductDisplay(item, selectedFinishName) {
+  const selectedFinish =
+    selectedFinishName || item?.colorVariants?.[0]?.name || item?.defaultFinish || 'Natural Finish';
+  const pricing = computeVariantPricing(item, selectedFinish);
+  const stockInfo = getProductStockStatus(item);
+  const isOutOfStock = stockInfo.statusKey === 'out_of_stock';
+  const isLowStock = stockInfo.statusKey === 'low_stock';
+  const leadTimeWeeks = Math.max(1, Number(item?.leadTimeWeeks || 3));
+
+  const availabilityLabel = isOutOfStock
+    ? 'Out of Stock'
+    : isLowStock
+    ? `Low Stock · ${stockInfo.availableStock} left`
+    : 'In Stock';
+
+  const availabilityDetail = isOutOfStock
+    ? 'Currently unavailable'
+    : `${stockInfo.availableStock} available · Ships in ${leadTimeWeeks} ${leadTimeWeeks === 1 ? 'week' : 'weeks'}`;
+
+  const rawDescription = String(item?.customizationNotes || item?.description || '').trim();
+
+  return {
+    name: String(item?.name || 'Handcrafted Furniture Piece').trim(),
+    categoryName: String(item?.categoryName || 'Showroom Collection').trim(),
+    image: String(item?.image || 'assets/images/category_living_lounge.jpg').trim(),
+    effectivePrice: pricing.effectivePrice,
+    variantBasePrice: pricing.variantBasePrice,
+    discountPercent: Math.max(0, Number(item?.discountPercent || 0)),
+    hasDiscount: Number(item?.discountPercent || 0) > 0,
+    selectedFinish: pricing.colorName,
+    selectedColorHex: pricing.colorHex,
+    priceDelta: pricing.priceDelta,
+    colorVariants: (item?.colorVariants || []).map((v) => ({
+      name: v.name,
+      shortLabel: String(v.name || '').split('/')[0].trim(),
+      hex: v.hex || '#8B5A2B',
+      priceDelta: Number(v.priceDelta || 0),
+    })),
+    description: rawDescription,
+    craftsmanshipNote: String(item?.craftsmanshipNote || '').trim(),
+    dimensions: String(item?.dimensions || '').trim(),
+    availabilityStatus: stockInfo.statusKey,
+    availabilityLabel,
+    availabilityDetail,
+    availableStock: stockInfo.availableStock,
+    isOutOfStock,
+    isLowStock,
+    leadTimeWeeks,
+  };
+}
+
+/**
  * Computes summary metrics for the Supply & Inventory Management Overview:
  * - Total Products
  * - Total Stock Available
@@ -1098,5 +1155,286 @@ export function applyStockMovement(params = {}) {
     transaction,
   };
 }
+
+/**
+ * Resolves authentication-based navigation and UI visibility state across all customer-facing pages.
+ * Ensures:
+ * - Logged-out visitors see Sign In and Register options, and never see customer account links.
+ * - Logged-in customers see their account profile, My Account, My Orders, and Log Out, while all
+ *   Sign In / Register buttons and duplicate login prompts are hidden.
+ * - Logged-in admins see Admin Dashboard and Log Out, keeping admin navigation separate from customer navigation.
+ */
+export function resolveAuthNavigationState(rawSessionUser) {
+  let sessionObj = rawSessionUser;
+  if (typeof rawSessionUser === 'string') {
+    try {
+      sessionObj = JSON.parse(rawSessionUser);
+    } catch (_e) {
+      sessionObj = null;
+    }
+  }
+
+  const email = String(sessionObj?.email || '').trim();
+  const rawRole = String(sessionObj?.role || '').trim().toLowerCase();
+  const isValidSession = Boolean(email && (rawRole === 'client' || rawRole === 'customer' || rawRole === 'admin'));
+
+  if (!isValidSession) {
+    return {
+      isAuthenticated: false,
+      isCustomer: false,
+      isAdmin: false,
+      role: 'guest',
+      showSignIn: true,
+      showRegister: true,
+      showCustomerAccountNav: false,
+      showAdminNav: false,
+      showLoginPrompts: true,
+      userDisplayName: '',
+      userInitials: '',
+      userEmail: '',
+      accountLinks: {
+        signIn: { href: 'login.html', label: 'Sign In' },
+        register: { href: 'login.html?mode=register', label: 'Register' },
+        myAccount: null,
+        myOrders: null,
+        myCart: null,
+        myVouchers: null,
+        adminDashboard: null,
+      },
+      heroOrderLink: {
+        href: 'login.html',
+        label: 'Track My Order →',
+      },
+      cartCheckoutCta: {
+        href: 'login.html',
+        label: 'Sign In to Checkout →',
+      },
+      cartVoucherHint: 'Sign in to verify your email',
+    };
+  }
+
+  const isAdmin = rawRole === 'admin';
+  const isCustomer = !isAdmin;
+  const fallbackName = isAdmin
+    ? 'Lillia Mercier'
+    : email.toLowerCase() === 'rowena.vance@vancearchitects.com'
+    ? 'Rowena Vance'
+    : email.split('@')[0] || 'Customer';
+  const userDisplayName = String(sessionObj?.name || fallbackName).trim();
+  const userInitials =
+    userDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => (part[0] || '').toUpperCase())
+      .join('') || (isAdmin ? 'AD' : 'CU');
+
+  if (isAdmin) {
+    return {
+      isAuthenticated: true,
+      isCustomer: false,
+      isAdmin: true,
+      role: 'admin',
+      showSignIn: false,
+      showRegister: false,
+      showCustomerAccountNav: false,
+      showAdminNav: true,
+      showLoginPrompts: false,
+      userDisplayName,
+      userInitials,
+      userEmail: email,
+      accountLinks: {
+        signIn: null,
+        register: null,
+        myAccount: null,
+        myOrders: null,
+        myCart: null,
+        myVouchers: null,
+        adminDashboard: { href: 'dashboard.html?role=admin', label: 'Admin Dashboard' },
+      },
+      heroOrderLink: {
+        href: 'dashboard.html?role=admin',
+        label: 'Admin Dashboard →',
+      },
+      cartCheckoutCta: {
+        href: 'dashboard.html?role=admin',
+        label: 'Open Admin Dashboard →',
+      },
+      cartVoucherHint: email,
+    };
+  }
+
+  return {
+    isAuthenticated: true,
+    isCustomer: true,
+    isAdmin: false,
+    role: 'client',
+    showSignIn: false,
+    showRegister: false,
+    showCustomerAccountNav: true,
+    showAdminNav: false,
+    showLoginPrompts: false,
+    userDisplayName,
+    userInitials,
+    userEmail: email,
+    accountLinks: {
+      signIn: null,
+      register: null,
+      myAccount: { href: 'dashboard.html?role=client&tab=home', label: 'My Account' },
+      myOrders: { href: 'dashboard.html?role=client&tab=orders', label: 'My Orders' },
+      myCart: { href: 'dashboard.html?role=client&tab=cart', label: 'My Cart' },
+      myVouchers: { href: 'dashboard.html?role=client&tab=vouchers', label: 'My Vouchers' },
+      adminDashboard: null,
+    },
+    heroOrderLink: {
+      href: 'dashboard.html?role=client&tab=orders',
+      label: 'My Orders →',
+    },
+    cartCheckoutCta: {
+      href: 'dashboard.html?role=client&tab=cart',
+      label: 'Proceed to Checkout →',
+    },
+    cartVoucherHint: email,
+  };
+}
+
+/**
+ * Validates customer input for the "Make Offer" modal inside Product Details
+ * and constructs an offer proposal record ready to be rendered as a downloadable/copyable image.
+ * IMPORTANT: Submitting an offer does NOT modify product prices, inventory, or auto-approve discounts.
+ */
+export function validateAndBuildOfferProposal(offerInput = {}, product = null, sessionUser = null) {
+  if (!product || typeof product !== 'object' || !product.id || !product.name) {
+    return {
+      ok: false,
+      errorMessage: 'Please select a valid product before submitting an offer.',
+      proposal: null,
+    };
+  }
+
+  const rawProposed = offerInput?.proposedPrice;
+  const numericProposed = Number(rawProposed);
+  if (
+    rawProposed === undefined ||
+    rawProposed === null ||
+    String(rawProposed).trim() === '' ||
+    !Number.isFinite(numericProposed) ||
+    numericProposed <= 0
+  ) {
+    return {
+      ok: false,
+      errorMessage: 'Please enter a valid proposed price greater than $0.',
+      proposal: null,
+    };
+  }
+
+  if (numericProposed < 25) {
+    return {
+      ok: false,
+      errorMessage: 'Proposed price must be at least $25.',
+      proposal: null,
+    };
+  }
+
+  const selectedFinish = String(
+    offerInput?.selectedFinish ||
+      product.colorVariants?.[0]?.name ||
+      product.defaultFinish ||
+      'Natural Finish'
+  ).trim();
+  const pricing = computeVariantPricing(product, selectedFinish);
+  const originalPrice =
+    Number(offerInput?.originalPrice) > 0
+      ? Math.round(Number(offerInput.originalPrice))
+      : pricing.effectivePrice;
+  const proposedPrice = Math.round(numericProposed);
+  const customizations =
+    String(offerInput?.customizations || '').trim() || 'Standard showroom dimensions & finish';
+  const additionalNotes = String(offerInput?.additionalNotes || '').trim();
+  const referenceImageDataUrl = offerInput?.referenceImageDataUrl
+    ? String(offerInput.referenceImageDataUrl).trim()
+    : null;
+  const referenceImageName = offerInput?.referenceImageName
+    ? String(offerInput.referenceImageName).trim()
+    : null;
+
+  const customerName = String(
+    sessionUser?.name || offerInput?.customerName || 'Showroom Customer'
+  ).trim();
+  const customerEmail = String(sessionUser?.email || offerInput?.customerEmail || '').trim();
+  const createdDate = String(offerInput?.createdDate || new Date().toISOString().slice(0, 10));
+  const slug = String(product.name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  const proposal = {
+    id: `offer-${Date.now()}`,
+    proposalCode: `OFFER-${Math.floor(1000 + Math.random() * 8999)}`,
+    productId: String(product.id),
+    productName: String(product.name).trim(),
+    categoryName: String(product.categoryName || 'Showroom Collection').trim(),
+    productImage: String(product.image || 'assets/images/category_living_lounge.jpg').trim(),
+    dimensions: String(product.dimensions || 'Standard Showroom Dimensions').trim(),
+    selectedFinish,
+    originalPrice,
+    proposedPrice,
+    requestedSavings: Math.max(0, originalPrice - proposedPrice),
+    customizations,
+    additionalNotes,
+    referenceImageDataUrl,
+    referenceImageName,
+    customerName,
+    customerEmail,
+    createdDate,
+    downloadFilename: `offer-proposal-${slug || 'furniture'}.png`,
+    status: 'Pending Owner Review on Messenger',
+  };
+
+  return {
+    ok: true,
+    errorMessage: null,
+    proposal,
+  };
+}
+
+/**
+ * Resolves the "Request a Design" button action.
+ * - If the user is NOT logged in, requires login first (`login.html?redirect=request-design`).
+ * - If the user IS logged in, redirects directly to the Admin's Messenger conversation
+ *   with a pre-populated custom furniture design inquiry message.
+ */
+export function buildRequestDesignMessengerUrl(
+  rawSessionUser,
+  baseMessengerUrl = ADMIN_MESSENGER_PLACEHOLDER_URL
+) {
+  const authState = resolveAuthNavigationState(rawSessionUser);
+  if (!authState.isAuthenticated) {
+    return {
+      requiresLogin: true,
+      redirectUrl: 'login.html?redirect=request-design',
+      messengerUrl: baseMessengerUrl,
+      messageText: '',
+    };
+  }
+
+  const customerLabel = authState.userDisplayName
+    ? `${authState.userDisplayName} (${authState.userEmail})`
+    : authState.userEmail;
+  const messageText = `Hi Lillia and Rowena Furniture! I am ${customerLabel} and I would like to request a custom furniture design.`;
+  const separator = baseMessengerUrl.includes('?') ? '&' : '?';
+  const messengerUrl = `${baseMessengerUrl}${separator}ref=custom-design-request&text=${encodeURIComponent(
+    messageText
+  )}`;
+
+  return {
+    requiresLogin: false,
+    redirectUrl: messengerUrl,
+    messengerUrl,
+    messageText,
+  };
+}
+
+
 
 

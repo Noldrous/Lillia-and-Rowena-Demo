@@ -7,12 +7,16 @@ import {
   applyStockMovement,
   buildAdminMessengerUrl,
   buildProductRecord,
+  buildRequestDesignMessengerUrl,
   buildSupplierRecord,
   calculateOrderPricing,
   computeInventoryMetrics,
   computeVariantPricing,
   filterFurnitureItems,
+  formatCustomerProductDisplay,
   getProductStockStatus,
+  resolveAuthNavigationState,
+  validateAndBuildOfferProposal,
   validateLoginCredentials,
   validateNewFurnitureInput,
   validateSupplierInput,
@@ -447,7 +451,121 @@ describe('Pure JavaScript & JSON Store Logic Tests', () => {
     );
     assert.equal(editedWithNewImage.image, 'assets/images/hero_living_room_atelier.jpg');
   });
+
+  it('formats customer-facing product displays with only customer-relevant information and omits SKU/internal IDs', () => {
+    const sofa = INITIAL_FURNITURE_ITEMS[0]; // Rowena Curved Bouclé Lounge Sofa, SKU LR-LV-014, ID furn-lv-01
+    const display = formatCustomerProductDisplay(sofa, 'Alabaster Heavy Linen / Smoked Oak');
+
+    // Customer-relevant fields are present and accurate
+    assert.equal(display.name, 'Rowena Curved Bouclé Lounge Sofa');
+    assert.equal(display.categoryName, 'Living & Lounge');
+    assert.equal(display.image, 'assets/images/category_living_lounge.jpg');
+    assert.equal(display.selectedFinish, 'Alabaster Heavy Linen / Smoked Oak');
+    assert.equal(display.effectivePrice, Math.round(5070 * 0.9));
+    assert.equal(display.availabilityLabel, 'In Stock');
+    assert.ok(display.availabilityDetail.includes('available'));
+    assert.ok(display.colorVariants.length >= 3);
+
+    // Internal technical identifiers are omitted from the customer display object
+    assert.equal('sku' in display, false);
+    assert.equal('id' in display, false);
+    assert.equal('messengerConversationId' in display, false);
+  });
+
+  it('resolves authentication-based navigation visibility for logged-out visitors, logged-in customers, and admins', () => {
+    // 1. Logged-out visitor: shows Sign In & Register, hides customer account options and admin options
+    const guestState = resolveAuthNavigationState(null);
+    assert.equal(guestState.isAuthenticated, false);
+    assert.equal(guestState.showSignIn, true);
+    assert.equal(guestState.showRegister, true);
+    assert.equal(guestState.showCustomerAccountNav, false);
+    assert.equal(guestState.showAdminNav, false);
+    assert.equal(guestState.cartCheckoutCta.label, 'Sign In to Checkout →');
+
+    // 2. Logged-in customer: hides Sign In & Register, shows My Account, My Orders, Profile & Logout, keeps admin hidden
+    const customerState = resolveAuthNavigationState({
+      email: 'rowena.vance@vancearchitects.com',
+      name: 'Rowena Vance',
+      role: 'client',
+    });
+    assert.equal(customerState.isAuthenticated, true);
+    assert.equal(customerState.showSignIn, false);
+    assert.equal(customerState.showRegister, false);
+    assert.equal(customerState.showLoginPrompts, false);
+    assert.equal(customerState.showCustomerAccountNav, true);
+    assert.equal(customerState.showAdminNav, false);
+    assert.equal(customerState.userDisplayName, 'Rowena Vance');
+    assert.equal(customerState.userInitials, 'RV');
+    assert.equal(customerState.accountLinks.myAccount.href, 'dashboard.html?role=client&tab=home');
+    assert.equal(customerState.accountLinks.myOrders.href, 'dashboard.html?role=client&tab=orders');
+    assert.equal(customerState.cartCheckoutCta.label, 'Proceed to Checkout →');
+
+    // 3. Logged-in admin: hides Sign In & Register, hides customer account nav, shows Admin Dashboard nav
+    const adminState = resolveAuthNavigationState({
+      email: 'admin@lilliarowena.com',
+      name: 'Lillia Mercier (Business Owner)',
+      role: 'admin',
+    });
+    assert.equal(adminState.isAuthenticated, true);
+    assert.equal(adminState.showSignIn, false);
+    assert.equal(adminState.showRegister, false);
+    assert.equal(adminState.showCustomerAccountNav, false);
+    assert.equal(adminState.showAdminNav, true);
+    assert.equal(adminState.accountLinks.adminDashboard.href, 'dashboard.html?role=admin');
+  });
+
+  it('validates Make Offer inputs, generates Offer Proposal metadata without altering catalog prices, and resolves Request a Design Messenger redirects', () => {
+    const product = { ...INITIAL_FURNITURE_ITEMS[0] }; // Rowena Curved Bouclé Lounge Sofa
+    const originalCatalogPrice = product.price;
+    const originalStock = product.inStockCount;
+
+    // 1. Invalid offer (empty or zero price) is rejected
+    const invalidOffer = validateAndBuildOfferProposal({ proposedPrice: 0 }, product, null);
+    assert.equal(invalidOffer.ok, false);
+    assert.ok(invalidOffer.errorMessage.includes('valid proposed price'));
+
+    // 2. Valid offer builds full proposal metadata without changing product price or inventory
+    const sessionUser = {
+      name: 'Rowena Vance',
+      email: 'rowena.vance@vancearchitects.com',
+      role: 'client',
+    };
+    const validOffer = validateAndBuildOfferProposal(
+      {
+        proposedPrice: 3950,
+        selectedFinish: 'Warm Oat Bouclé / Natural Oak',
+        customizations: 'Custom 240cm length with smoked oak plinth',
+        additionalNotes: 'Ground floor elevator access available',
+        referenceImageDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        referenceImageName: 'living-room-sketch.png',
+      },
+      product,
+      sessionUser
+    );
+    assert.equal(validOffer.ok, true);
+    assert.equal(validOffer.proposal.productName, 'Rowena Curved Bouclé Lounge Sofa');
+    assert.equal(validOffer.proposal.proposedPrice, 3950);
+    assert.equal(validOffer.proposal.customizations, 'Custom 240cm length with smoked oak plinth');
+    assert.equal(validOffer.proposal.additionalNotes, 'Ground floor elevator access available');
+    assert.equal(validOffer.proposal.customerName, 'Rowena Vance');
+    assert.equal(validOffer.proposal.downloadFilename, 'offer-proposal-rowena-curved-boucl-lounge-sofa.png');
+    // Original catalog item price and stock remain completely unchanged
+    assert.equal(product.price, originalCatalogPrice);
+    assert.equal(product.inStockCount, originalStock);
+
+    // 3. Request a Design requires login when guest, and redirects to Admin Messenger when logged in
+    const guestDesignReq = buildRequestDesignMessengerUrl(null);
+    assert.equal(guestDesignReq.requiresLogin, true);
+    assert.equal(guestDesignReq.redirectUrl, 'login.html?redirect=request-design');
+
+    const loggedInDesignReq = buildRequestDesignMessengerUrl(sessionUser);
+    assert.equal(loggedInDesignReq.requiresLogin, false);
+    assert.ok(loggedInDesignReq.redirectUrl.startsWith('https://www.messenger.com/t/100000505712325'));
+    assert.ok(loggedInDesignReq.messageText.includes('Rowena Vance'));
+    assert.ok(loggedInDesignReq.messageText.includes('request a custom furniture design'));
+  });
 });
+
 
 
 

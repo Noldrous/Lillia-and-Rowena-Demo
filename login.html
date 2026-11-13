@@ -43,19 +43,19 @@
             </div>
 
             <p class="lr-mono" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.14em; color: #38BDF8; margin: 0 0 0.75rem;">
-              CLIENT &amp; ADMIN PORTAL
+              CUSTOMER &amp; ADMIN PORTAL
             </p>
             <h1 class="lr-serif" style="font-size: 2.15rem; line-height: 1.15; margin: 0 0 1rem; color: #FFF;">
-              Direct Access to Commission Ledgers &amp; Studio Records.
+              Track Your Orders, Vouchers &amp; Custom Designs.
             </h1>
             <p style="font-size: 0.925rem; line-height: 1.65; color: #CBD5E1; margin: 0;">
-              Customers track custom timber sizing, color finish variants, and single-product Messenger Vouchers. Administrators manage products, storewide discounts, and custom furniture designs requested via Messenger.
+              Sign in or create an account to manage your shopping cart, apply personal Messenger discount vouchers, and track white-glove delivery for your furniture orders.
             </p>
           </div>
 
           <div style="position: relative; z-index: 2; border-top: 1px solid rgba(255,255,255,0.14); padding-top: 1.25rem; margin-top: 2rem;">
             <div class="lr-mono" style="font-size: 0.72rem; color: #BAE6FD;">
-              TABLES: Admin · Customer · Product · Voucher · Customer_Order · Order_Item
+              Handcrafted Solid Wood · Custom Sizes Available · 15-Year Craftsmanship Guarantee
             </div>
           </div>
         </aside>
@@ -63,33 +63,71 @@
         <!-- Right Authentication Form Column -->
         <section class="login-form-panel">
           <div style="max-width: 440px; width: 100%; margin: 0 auto;">
-            <h2 class="lr-serif" style="font-size: 1.85rem; margin: 0 0 0.4rem; color: #0F172A;">
+            <!-- Active Session Banner (Shown automatically when the user is already logged in) -->
+            <div
+              id="login-active-session-banner"
+              style="display: none; background: #F0F9FF; border: 1px solid #7DD3FC; border-radius: 0.875rem; padding: 1rem; margin-bottom: 1.25rem;"
+            >
+              <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #0284C7;">
+                Currently Signed In
+              </div>
+              <div id="login-active-session-user" style="font-size: 0.925rem; font-weight: 700; color: #0F172A; margin-top: 0.25rem;"></div>
+              <div id="login-active-session-actions" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;"></div>
+            </div>
+
+            <h2 id="login-heading-title" class="lr-serif" style="font-size: 1.85rem; margin: 0 0 0.4rem; color: #0F172A;">
               Sign In to Your Account
             </h2>
-            <p style="font-size: 0.9rem; color: #475569; margin: 0 0 1.5rem;">
-              Select your portal role below or use the pre-filled demo credentials to open your dedicated dashboard page.
+            <p id="login-heading-subtitle" style="font-size: 0.9rem; color: #475569; margin: 0 0 1.25rem;">
+              Access your orders, saved delivery address, and personal vouchers, or create a new customer account.
             </p>
 
-            <!-- Role Switcher -->
+            <!-- Role Switcher (Customer vs Admin) -->
             <div class="role-switcher">
               <button
                 type="button"
                 class="role-btn active"
                 data-role-tab="Customer"
               >
-                Client Portal (`Customer`)
+                Customer Account
               </button>
               <button
                 type="button"
                 class="role-btn"
                 data-role-tab="Admin"
               >
-                Admin Console (`Admin`)
+                Admin Console
+              </button>
+            </div>
+
+            <!-- Customer Auth Mode Toggle: Sign In vs Create Account (Hidden when Admin role is selected) -->
+            <div
+              id="customer-auth-mode-tabs"
+              style="display: flex; gap: 0.5rem; margin-bottom: 1.1rem; background: #F8FAFC; padding: 0.3rem; border-radius: 0.75rem; border: 1px solid #E2E8F0;"
+            >
+              <button
+                type="button"
+                id="auth-mode-signin"
+                data-auth-mode="signin"
+                style="flex: 1; padding: 0.45rem 0.75rem; border-radius: 0.5rem; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; background: #0F172A; color: #FFFFFF;"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                id="auth-mode-register"
+                data-auth-mode="register"
+                style="flex: 1; padding: 0.45rem 0.75rem; border-radius: 0.5rem; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; background: transparent; color: #475569;"
+              >
+                Create Account
               </button>
             </div>
 
             <!-- Demo Credentials Helper -->
-            <div style="background: rgba(224, 242, 254, 0.75); border: 1px solid #BAE6FD; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div
+              id="demo-credentials-box"
+              style="background: rgba(224, 242, 254, 0.75); border: 1px solid #BAE6FD; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;"
+            >
               <div>
                 <div class="lr-mono" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #0284C7;">
                   Quick Demo Credentials
@@ -114,9 +152,21 @@
               style="display: none;"
             ></div>
 
-            <!-- Login Form -->
+            <!-- Login / Registration Form -->
             <form id="lr-login-form" method="post" action="dashboard.html" novalidate>
               <input type="hidden" id="login-role" name="role" value="Customer" />
+              <input type="hidden" id="login-mode" name="mode" value="signin" />
+
+              <div id="register-name-group" class="form-group" style="display: none;">
+                <label class="form-label" for="register-name">Full Name</label>
+                <input
+                  id="register-name"
+                  name="full_name"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter your full name"
+                />
+              </div>
 
               <div class="form-group">
                 <label class="form-label" for="login-email">Email Address</label>
