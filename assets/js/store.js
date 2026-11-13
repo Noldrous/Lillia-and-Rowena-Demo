@@ -1,6 +1,6 @@
 /**
  * Lillia and Rowena Furniture — Pure Vanilla JavaScript Store & Business Logic Module
- * Works with JSON (/data/store.json) and PSR-4 PHP / Node API endpoints (/api/*).
+ * Works with static JSON (/data/store.json) and PSR-4 PHP views in XAMPP.
  */
 
 export const ADMIN_MESSENGER_PLACEHOLDER_URL = 'https://www.messenger.com/t/100000505712325';
