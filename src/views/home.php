@@ -721,10 +721,11 @@ $sessionPayload = [
                     <div>
                       <label class="block text-xs font-bold text-[#0D1015] mb-1.5">Room Category</label>
                       <select id="prod-category" class="w-full px-4 py-2.5 rounded-xl bg-[#F0F8FF] border border-[#BCE3FF] text-sm">
-                        <option value="living">Living &amp; Lounge</option>
-                        <option value="dining">Dining &amp; Tables</option>
-                        <option value="bedroom">Bedroom Sanctuary</option>
-                        <option value="office">Study &amp; Credenzas</option>
+                        <option value="living">Living Room</option>
+                        <option value="dining">Dining Room</option>
+                        <option value="bedroom">Bedroom</option>
+                        <option value="office">Study/Work Desks</option>
+                        <option value="kitchen">Kitchen</option>
                       </select>
                     </div>
                     <div class="grid grid-cols-2 gap-3">

@@ -6,7 +6,11 @@ import {
   buildAdminMessengerUrl,
   calculateOrderPricing,
   computeVariantPricing,
+  filterCatalogPageItems,
   filterFurnitureItems,
+  findMatchingColorVariant,
+  getColorFilterCounts,
+  getRecommendedBestSellers,
   validateLoginCredentials,
   validateNewFurnitureInput,
   validateVoucherForOrder,
@@ -14,10 +18,45 @@ import {
 
 const storeJsonPath = path.resolve(process.cwd(), 'data/store.json');
 const storeData = JSON.parse(fs.readFileSync(storeJsonPath, 'utf8'));
+const INITIAL_CATEGORIES = storeData.categories;
 const INITIAL_FURNITURE_ITEMS = storeData.products;
 const INITIAL_VOUCHERS = storeData.vouchers;
 
 describe('Pure JavaScript & JSON Store Logic Tests', () => {
+  it('defines the 5 showroom categories: Living Room, Dining Room, Bedroom, Study/Work Desks, and Kitchen', () => {
+    assert.equal(INITIAL_CATEGORIES.length, 5);
+    assert.deepEqual(
+      INITIAL_CATEGORIES.map((c) => c.name),
+      ['Living Room', 'Dining Room', 'Bedroom', 'Study/Work Desks', 'Kitchen']
+    );
+  });
+
+  it('returns 4 Recommended / Best Seller furniture pieces by default', () => {
+    const recommended = getRecommendedBestSellers(INITIAL_FURNITURE_ITEMS, 4);
+    assert.equal(recommended.length, 4);
+    assert.ok(recommended.every((item) => item.isBestSeller === true));
+  });
+
+  it('filters catalog page products by left-sidebar color and price range', () => {
+    const travertineItems = filterCatalogPageItems(INITIAL_FURNITURE_ITEMS, {
+      categoryId: 'all',
+      colorKey: 'travertine',
+    });
+    assert.equal(travertineItems.length, 2);
+    assert.ok(travertineItems.every((item) => findMatchingColorVariant(item, 'travertine') !== null));
+
+    const indigoItems = filterCatalogPageItems(INITIAL_FURNITURE_ITEMS, {
+      categoryId: 'all',
+      colorKey: 'indigo',
+    });
+    assert.equal(indigoItems.length, 1);
+    assert.equal(indigoItems[0].id, 'furn-lv-01');
+
+    const colorCounts = getColorFilterCounts(INITIAL_FURNITURE_ITEMS, 'all');
+    const walnutEntry = colorCounts.find((c) => c.key === 'walnut');
+    assert.ok(walnutEntry && walnutEntry.count > 0);
+  });
+
   it('computes color variant pricing with positive and negative price deltas and discounts', () => {
     const sofa = INITIAL_FURNITURE_ITEMS[0]; // $4850 base, 10% discount
     const baseVariant = computeVariantPricing(sofa, 'Warm Oat Bouclé / Natural Oak');
@@ -82,6 +121,9 @@ describe('Pure JavaScript & JSON Store Logic Tests', () => {
     const matches = filterFurnitureItems(INITIAL_FURNITURE_ITEMS, 'LR-DN-108', 'all');
     assert.equal(matches.length, 1);
     assert.equal(matches[0].sku, 'LR-DN-108');
+
+    const kitchenMatches = filterFurnitureItems(INITIAL_FURNITURE_ITEMS, '', 'kitchen');
+    assert.equal(kitchenMatches.length, 2);
 
     const pricing = calculateOrderPricing([{ unitPrice: 4365, quantity: 1 }], 400);
     assert.equal(pricing.rawSubtotal, 4365);

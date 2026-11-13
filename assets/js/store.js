@@ -137,6 +137,116 @@ export function filterFurnitureItems(items, searchQuery, categoryId) {
 }
 
 /**
+ * Returns the Recommended / Best Seller furniture items (capped to 3-4 items by default).
+ */
+export function getRecommendedBestSellers(items, maxItems = 4) {
+  const list = Array.isArray(items) ? items : [];
+  const cap = Math.max(1, Math.min(4, Number(maxItems || 4)));
+  const bestSellers = list.filter((item) => Boolean(item.isBestSeller));
+  if (bestSellers.length >= 3) {
+    return bestSellers.slice(0, cap);
+  }
+  return list.slice(0, cap);
+}
+
+/**
+ * Curated color filter definitions for the Catalog Page left sidebar.
+ */
+export const CATALOG_COLOR_FILTERS = [
+  { key: 'walnut', label: 'dark walnut', hex: '#5C3A21', keywords: ['walnut'] },
+  { key: 'white-oak', label: 'white oak', hex: '#CBB28D', keywords: ['white oak', 'natural oak'] },
+  { key: 'smoked-oak', label: 'smoked oak', hex: '#9C8265', keywords: ['smoked', 'fumed', 'chestnut'] },
+  { key: 'ebonized', label: 'ebonized black', hex: '#222428', keywords: ['ebonized', 'black'] },
+  { key: 'boucle', label: 'warm oat bouclé', hex: '#E6DEC8', keywords: ['bouclé', 'boucle'] },
+  { key: 'linen', label: 'beige linen', hex: '#DDD3C2', keywords: ['linen'] },
+  { key: 'ash', label: 'natural ash', hex: '#D9C7AE', keywords: ['ash'] },
+  { key: 'travertine', label: 'travertine stone', hex: '#D8CABB', keywords: ['travertine', 'limestone'] },
+  { key: 'cognac', label: 'cognac leather', hex: '#8A4B29', keywords: ['cognac', 'leather'] },
+  { key: 'indigo', label: 'midnight indigo', hex: '#243B55', keywords: ['indigo', 'mohair'] },
+];
+
+/**
+ * Checks if a product has a color variant matching the given `colorKey`,
+ * and returns the first matching color variant object (or null).
+ */
+export function findMatchingColorVariant(item, colorKey) {
+  if (!colorKey || colorKey === 'all') return null;
+  const filterDef = CATALOG_COLOR_FILTERS.find((c) => c.key === colorKey);
+  const keywords = filterDef ? filterDef.keywords : [String(colorKey).toLowerCase()];
+  const variants = Array.isArray(item?.colorVariants) ? item.colorVariants : [];
+
+  for (const variant of variants) {
+    const nameLower = String(variant.name || '').toLowerCase();
+    if (keywords.some((kw) => nameLower.includes(kw))) {
+      return variant;
+    }
+  }
+  return null;
+}
+
+/**
+ * Filters products on the dedicated Catalog page by category, color filter, max price, and search query.
+ */
+export function filterCatalogPageItems(items, options = {}) {
+  const {
+    categoryId = 'all',
+    colorKey = 'all',
+    maxPrice = Infinity,
+    searchQuery = '',
+  } = options;
+
+  const normalizedQuery = String(searchQuery || '').trim().toLowerCase();
+  const numericMaxPrice = Number.isFinite(Number(maxPrice)) ? Number(maxPrice) : Infinity;
+
+  return (items || []).filter((item) => {
+    const matchesCategory = !categoryId || categoryId === 'all' || item.categoryId === categoryId;
+    if (!matchesCategory) return false;
+
+    let effectiveCheckPrice = Number(item.effectivePrice ?? item.price ?? 0);
+    if (colorKey && colorKey !== 'all') {
+      const matchedVariant = findMatchingColorVariant(item, colorKey);
+      if (!matchedVariant) return false;
+      effectiveCheckPrice = computeVariantPricing(item, matchedVariant.name).effectivePrice;
+    }
+
+    if (effectiveCheckPrice > numericMaxPrice) return false;
+
+    if (normalizedQuery) {
+      const searchableText = [
+        item.name,
+        item.sku,
+        item.categoryName,
+        item.description,
+        item.defaultFinish,
+        ...(item.finishes || []),
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (!searchableText.includes(normalizedQuery)) return false;
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Computes product counts for each left-sidebar color filter within the active category and price range.
+ */
+export function getColorFilterCounts(items, categoryId = 'all', maxPrice = Infinity) {
+  return CATALOG_COLOR_FILTERS.map((colorDef) => {
+    const matching = filterCatalogPageItems(items, {
+      categoryId,
+      colorKey: colorDef.key,
+      maxPrice,
+    });
+    return {
+      ...colorDef,
+      count: matching.length,
+    };
+  });
+}
+
+/**
  * Calculates order subtotal, voucher savings, white-glove delivery, deposit, and grand total.
  */
 export function calculateOrderPricing(lineItems, voucherDiscountAmount = 0) {
