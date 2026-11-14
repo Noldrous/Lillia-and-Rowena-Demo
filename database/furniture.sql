@@ -20,14 +20,6 @@ CREATE TABLE Category (
     Description   TEXT
 ) ENGINE=InnoDB;
 
-CREATE TABLE Supplier (
-    SupplierID         INT AUTO_INCREMENT PRIMARY KEY,
-    SupplierName       VARCHAR(150) NOT NULL,
-    ContactPersonName  VARCHAR(100),
-    Phone              VARCHAR(30),
-    Address            VARCHAR(255)
-) ENGINE=InnoDB;
-
 CREATE TABLE Customer (
     CustomerID    INT AUTO_INCREMENT PRIMARY KEY,
     FullName      VARCHAR(150) NOT NULL,
@@ -35,17 +27,6 @@ CREATE TABLE Customer (
     PasswordHash  VARCHAR(255) NOT NULL,
     PhoneNumber   VARCHAR(30),
     Address       VARCHAR(255)
-) ENGINE=InnoDB;
-
-CREATE TABLE Employee (
-    EmployeeID   INT AUTO_INCREMENT PRIMARY KEY,
-    FullName     VARCHAR(150) NOT NULL,
-    Role         VARCHAR(30) NOT NULL
-                 CHECK (Role IN ('Manager','Sales','Carpenter','Driver','Other')),
-    PhoneNumber  VARCHAR(30),
-    HireDate     DATE,
-    Status       VARCHAR(20) NOT NULL DEFAULT 'Active'
-                 CHECK (Status IN ('Active','Inactive','OnLeave'))
 ) ENGINE=InnoDB;
 
 -- ---------- Catalog ----------
@@ -60,13 +41,11 @@ CREATE TABLE Product (
 
 CREATE TABLE Material (
     MaterialID     INT AUTO_INCREMENT PRIMARY KEY,
-    SupplierID     INT NOT NULL,
     MaterialName   VARCHAR(150) NOT NULL,
     MaterialType   VARCHAR(100),
     Unit           VARCHAR(20) NOT NULL,
     UnitCost       DECIMAL(10,2) NOT NULL CHECK (UnitCost >= 0),
-    StockQuantity  DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (StockQuantity >= 0),
-    FOREIGN KEY (SupplierID) REFERENCES Supplier(SupplierID)
+    StockQuantity  DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (StockQuantity >= 0)
 ) ENGINE=InnoDB;
 
 -- ---------- Voucher (issued by an admin to ONE customer for ONE product) ----------
@@ -89,32 +68,15 @@ CREATE TABLE Voucher (
     FOREIGN KEY (AdminID)    REFERENCES Admin(AdminID)
 ) ENGINE=InnoDB;
 
--- ---------- Delivery (batch: one delivery carries many orders) ----------
-
-CREATE TABLE Delivery (
-    DeliveryID       INT AUTO_INCREMENT PRIMARY KEY,
-    EmployeeID       INT,                                         -- driver
-    ReceiverName     VARCHAR(150),
-    DeliveryAddress  VARCHAR(255) NOT NULL,
-    ScheduledDate    DATE,
-    DeliveryStatus   VARCHAR(20) NOT NULL DEFAULT 'Scheduled'
-                     CHECK (DeliveryStatus IN ('Scheduled','InTransit','Delivered','Failed')),
-    FOREIGN KEY (EmployeeID) REFERENCES Employee(EmployeeID)
-) ENGINE=InnoDB;
-
 -- ---------- Orders ----------
 
 CREATE TABLE Customer_Order (
     OrderID     INT AUTO_INCREMENT PRIMARY KEY,
     CustomerID  INT NOT NULL,
-    EmployeeID  INT,                                              -- handler, optional
-    DeliveryID  INT,                                              -- set once scheduled
     OrderDate   DATE NOT NULL DEFAULT (CURRENT_DATE),
     Status      VARCHAR(20) NOT NULL DEFAULT 'Pending'
                 CHECK (Status IN ('Pending','InProduction','Ready','Delivered','Cancelled')),
-    FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID),
-    FOREIGN KEY (EmployeeID) REFERENCES Employee(EmployeeID),
-    FOREIGN KEY (DeliveryID) REFERENCES Delivery(DeliveryID) ON DELETE SET NULL
+    FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Order_Item (
@@ -166,14 +128,12 @@ CREATE TABLE Payment (
 CREATE TABLE Production_Task (
     TaskID       INT AUTO_INCREMENT PRIMARY KEY,
     OrderItemID  INT NOT NULL,
-    EmployeeID   INT,
     StartDate    DATE,
     EndDate      DATE,
     TaskStatus   VARCHAR(20) NOT NULL DEFAULT 'Todo'
                  CHECK (TaskStatus IN ('Todo','InProgress','Done','Blocked')),
     CHECK (EndDate IS NULL OR StartDate IS NULL OR EndDate >= StartDate),
-    FOREIGN KEY (OrderItemID) REFERENCES Order_Item(OrderItemID) ON DELETE CASCADE,
-    FOREIGN KEY (EmployeeID)  REFERENCES Employee(EmployeeID)
+    FOREIGN KEY (OrderItemID) REFERENCES Order_Item(OrderItemID) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ---------- Voucher rules checked when a voucher is attached to an order item ----------
@@ -232,6 +192,55 @@ FOR EACH ROW
 BEGIN
     -- status/expiry are only re-checked when the voucher itself changes
     CALL check_voucher_use(NEW.VoucherID, NEW.OrderID, NOT (NEW.VoucherID <=> OLD.VoucherID));
+END$$
+
+CREATE PROCEDURE sp_record_stock_movement(
+    IN p_material_id   INT,
+    IN p_admin_id      INT,
+    IN p_movement_type VARCHAR(20),
+    IN p_quantity      DECIMAL(12,2),
+    IN p_unit_cost     DECIMAL(10,2),
+    IN p_reason        VARCHAR(150)
+)
+BEGIN
+    DECLARE v_prev_stock DECIMAL(12,2);
+    DECLARE v_new_stock  DECIMAL(12,2);
+
+    IF p_quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Stock movement quantity must be greater than zero';
+    END IF;
+
+    START TRANSACTION;
+
+    SELECT StockQuantity INTO v_prev_stock
+      FROM Material
+     WHERE MaterialID = p_material_id
+       FOR UPDATE;
+
+    IF v_prev_stock IS NULL THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Material not found for stock movement';
+    END IF;
+
+    IF p_movement_type = 'Stock In' THEN
+        SET v_new_stock = v_prev_stock + p_quantity;
+    ELSEIF p_movement_type = 'Stock Out' THEN
+        IF v_prev_stock < p_quantity THEN
+            ROLLBACK;
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock: cannot deduct more than available quantity';
+        END IF;
+        SET v_new_stock = v_prev_stock - p_quantity;
+    ELSE
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid movement type (must be Stock In or Stock Out)';
+    END IF;
+
+    UPDATE Material
+       SET StockQuantity = v_new_stock,
+           UnitCost      = COALESCE(p_unit_cost, UnitCost)
+     WHERE MaterialID = p_material_id;
+
+    COMMIT;
 END$$
 
 DELIMITER ;
