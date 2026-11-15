@@ -24,9 +24,7 @@ $sessionPayload = [
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/style.css" />
     <script>
-      try {
-        localStorage.setItem('lr_session_user', <?= json_encode(json_encode($sessionPayload, JSON_UNESCAPED_SLASHES)) ?>);
-      } catch (e) {}
+      window.__SERVER_SESSION_USER__ = <?= json_encode($sessionPayload, JSON_UNESCAPED_SLASHES) ?>;
     </script>
   </head>
   <body class="bg-[#F4F9FF] text-[#0F172A] antialiased selection:bg-[#0095FF] selection:text-white min-h-screen flex flex-col">

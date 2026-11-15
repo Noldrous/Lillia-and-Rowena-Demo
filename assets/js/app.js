@@ -196,236 +196,124 @@ function usd(amount) {
   return '$' + Math.round(Number(amount || 0)).toLocaleString('en-US');
 }
 
+function syncDatabaseStore(action = 'sync_store', extraPayload = {}) {
+  try {
+    fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        products: state.catalog,
+        materials: state.materials,
+        inventoryTransactions: state.inventoryTransactions,
+        vouchers: state.vouchers,
+        orders: state.orders,
+        customerProfile: state.customerProfile,
+        ...extraPayload,
+      }),
+    }).catch(() => {});
+  } catch (_err) {
+    // Ignore network error in static environments
+  }
+}
+
 function persistProductToStorage(product) {
   if (!product || !product.id) return;
-  try {
-    const editedMap = JSON.parse(localStorage.getItem('lr_edited_products') || '{}');
-    editedMap[product.id] = product;
-    localStorage.setItem('lr_edited_products', JSON.stringify(editedMap));
-
-    const existingCustom = JSON.parse(localStorage.getItem('lr_custom_products') || '[]');
-    if (Array.isArray(existingCustom) && existingCustom.some((p) => p.id === product.id)) {
-      const updatedCustom = existingCustom.map((p) => (p.id === product.id ? product : p));
-      localStorage.setItem('lr_custom_products', JSON.stringify(updatedCustom));
-    }
-  } catch (_err) {
-    // Ignore storage error
-  }
+  syncDatabaseStore('save_product', { product });
 }
 
 function saveMaterialsToStorage() {
-  try {
-    localStorage.setItem('lr_materials', JSON.stringify(state.materials));
-  } catch (_err) {
-    // Ignore storage error
-  }
+  syncDatabaseStore('save_material');
 }
 
 function saveOrdersToStorage() {
-  try {
-    localStorage.setItem('lr_customer_orders', JSON.stringify(state.orders));
-  } catch (_err) {
-    // Ignore storage error
-  }
+  syncDatabaseStore('sync_store');
 }
 
 function saveInventoryTransactionsToStorage() {
-  try {
-    localStorage.setItem('lr_inventory_transactions', JSON.stringify(state.inventoryTransactions));
-  } catch (_err) {
-    // Ignore storage error
-  }
+  syncDatabaseStore('sync_store');
 }
 
 function loadSessionUser() {
-  try {
-    const raw = localStorage.getItem('lr_session_user');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.email && parsed.role) {
-      return parsed;
-    }
-  } catch (_e) {
-    // Ignore storage error
+  if (typeof window !== 'undefined' && window.__SERVER_SESSION_USER__) {
+    return window.__SERVER_SESSION_USER__;
   }
-  return null;
+  return state.sessionUser || null;
+}
+
+function saveSessionUserToServer(sessionUser) {
+  state.sessionUser = sessionUser;
+  syncDatabaseStore('save_session', { sessionUser });
 }
 
 function saveCartToStorage() {
-  try {
-    const serialized = state.cartItems.map((c) => ({
-      productId: c.product.id,
-      finish: c.finish,
-      quantity: c.quantity,
-    }));
-    localStorage.setItem('lr_cart_items', JSON.stringify(serialized));
-  } catch (_e) {
-    // Ignore storage error
-  }
+  const serialized = state.cartItems.map((c) => ({
+    productId: c.product.id,
+    finish: c.finish,
+    quantity: c.quantity,
+  }));
+  syncDatabaseStore('save_cart', { cartItems: serialized });
 }
 
-function loadCartFromStorage() {
-  try {
-    const raw = localStorage.getItem('lr_cart_items');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((entry) => {
-        const product = state.catalog.find((p) => p.id === entry.productId);
-        if (!product) return null;
-        return {
-          product,
-          finish: entry.finish || product.defaultFinish,
-          quantity: Math.max(1, Number(entry.quantity || 1)),
-        };
-      })
-      .filter(Boolean);
-  } catch (_e) {
-    return [];
-  }
+function hydrateCartFromServer(rawCartItems) {
+  if (!Array.isArray(rawCartItems)) return [];
+  return rawCartItems
+    .map((entry) => {
+      const productId = entry?.productId || entry?.product?.id || '';
+      const product = state.catalog.find((p) => p.id === productId);
+      if (!product) return null;
+      return {
+        product,
+        finish: entry.finish || product.defaultFinish,
+        quantity: Math.max(1, Number(entry.quantity || 1)),
+      };
+    })
+    .filter(Boolean);
 }
 
 function loadCustomerProfileFromStorage() {
-  try {
-    const raw = localStorage.getItem('lr_customer_profile');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        state.customerProfile = { ...state.customerProfile, ...parsed };
-      }
-    }
-  } catch (_e) {
-    // Ignore storage error
-  }
+  // Profile is loaded directly from the server datastore in loadData()
 }
 
 function saveCustomerProfileToStorage() {
-  try {
-    localStorage.setItem('lr_customer_profile', JSON.stringify(state.customerProfile));
-  } catch (_e) {
-    // Ignore storage error
-  }
+  syncDatabaseStore('sync_store');
 }
 
 async function loadData() {
-  const res = await fetch('data/store.json');
-  const baseData = await res.json();
+  let baseData = null;
 
   try {
-    const customProductsRaw = localStorage.getItem('lr_custom_products');
-    if (customProductsRaw) {
-      const customProducts = JSON.parse(customProductsRaw);
-      if (Array.isArray(customProducts) && customProducts.length > 0) {
-        const existingIds = new Set(customProducts.map((p) => p.id));
-        const baseRemaining = (baseData.products || []).filter((p) => !existingIds.has(p.id));
-        baseData.products = [...customProducts, ...baseRemaining];
+    const apiRes = await fetch('api.php?action=state', { cache: 'no-store' });
+    if (apiRes.ok) {
+      const parsedApi = await apiRes.json();
+      if (parsedApi && Array.isArray(parsedApi.products)) {
+        baseData = parsedApi;
       }
     }
-
-    const editedMapRaw = localStorage.getItem('lr_edited_products');
-    if (editedMapRaw) {
-      const editedMap = JSON.parse(editedMapRaw);
-      if (editedMap && typeof editedMap === 'object') {
-        baseData.products = (baseData.products || []).map((p) =>
-          editedMap[p.id] ? { ...p, ...editedMap[p.id] } : p
-        );
-      }
-    }
-
-    const deletedIdsRaw = localStorage.getItem('lr_deleted_product_ids');
-    if (deletedIdsRaw) {
-      const deletedIds = JSON.parse(deletedIdsRaw);
-      if (Array.isArray(deletedIds) && deletedIds.length > 0) {
-        const delSet = new Set(deletedIds);
-        baseData.products = (baseData.products || []).filter((p) => !delSet.has(p.id));
-      }
-    }
-
-    const discountMapRaw = localStorage.getItem('lr_product_discounts');
-    if (discountMapRaw) {
-      const discountMap = JSON.parse(discountMapRaw);
-      if (discountMap && typeof discountMap === 'object') {
-        baseData.products = (baseData.products || []).map((p) => {
-          if (Object.prototype.hasOwnProperty.call(discountMap, p.id)) {
-            const pct = Number(discountMap[p.id]) || 0;
-            return {
-              ...p,
-              discountPercent: pct,
-              effectivePrice: Math.round(p.price * (1 - pct / 100)),
-            };
-          }
-          return p;
-        });
-      }
-    }
-
-    // Normalize every product so both Normal Products ('standard') and Customized Products ('customized')
-    // have consistent metadata and remain publicly visible to all customers.
-    baseData.products = (baseData.products || []).map((p) => buildProductRecord(p, p));
-
-    // Load Workshop Raw Materials (Material table) from localStorage or seeded store.json
-    const savedMaterialsRaw = localStorage.getItem('lr_materials');
-    if (savedMaterialsRaw) {
-      const savedMaterials = JSON.parse(savedMaterialsRaw);
-      if (Array.isArray(savedMaterials) && savedMaterials.length > 0) {
-        baseData.materials = savedMaterials.map((m) => buildMaterialRecord(m, m));
-      }
-    } else {
-      baseData.materials = (baseData.materials || []).map((m) => buildMaterialRecord(m, m));
-    }
-
-    // Load Inventory Transactions from localStorage or seeded store.json
-    const savedInvTxRaw = localStorage.getItem('lr_inventory_transactions');
-    if (savedInvTxRaw) {
-      const savedInvTx = JSON.parse(savedInvTxRaw);
-      if (Array.isArray(savedInvTx)) {
-        baseData.inventoryTransactions = savedInvTx;
-      }
-    } else {
-      baseData.inventoryTransactions = Array.isArray(baseData.inventoryTransactions)
-        ? baseData.inventoryTransactions
-        : [];
-    }
-
-    const customVouchersRaw = localStorage.getItem('lr_custom_vouchers');
-    if (customVouchersRaw) {
-      const customVouchers = JSON.parse(customVouchersRaw);
-      if (Array.isArray(customVouchers) && customVouchers.length > 0) {
-        const customCodes = new Set(customVouchers.map((v) => String(v.code || '').toUpperCase()));
-        const remainingSeeded = (baseData.vouchers || []).filter(
-          (v) => !customCodes.has(String(v.code || '').toUpperCase())
-        );
-        baseData.vouchers = [...customVouchers, ...remainingSeeded];
-      }
-    }
-
-    const usedCodesRaw = localStorage.getItem('lr_used_voucher_codes');
-    if (usedCodesRaw) {
-      const usedCodes = JSON.parse(usedCodesRaw);
-      if (Array.isArray(usedCodes) && usedCodes.length > 0) {
-        const usedSet = new Set(usedCodes.map((c) => String(c || '').toUpperCase()));
-        baseData.vouchers = (baseData.vouchers || []).map((v) =>
-          usedSet.has(String(v.code || '').toUpperCase()) ? { ...v, status: 'Used' } : v
-        );
-      }
-    }
-
-    const savedOrdersRaw = localStorage.getItem('lr_customer_orders');
-    if (savedOrdersRaw) {
-      const savedOrders = JSON.parse(savedOrdersRaw);
-      if (Array.isArray(savedOrders) && savedOrders.length > 0) {
-        const existingOrderNums = new Set(savedOrders.map((o) => o.orderNumber));
-        const remainingBaseOrders = (baseData.orders || []).filter(
-          (o) => !existingOrderNums.has(o.orderNumber)
-        );
-        baseData.orders = [...savedOrders, ...remainingBaseOrders];
-      }
-    }
-  } catch (_e) {
-    // Ignore localStorage parse errors
+  } catch (_apiErr) {
+    // Fallback to server data/store.json if api.php is unreachable
   }
 
+  if (!baseData) {
+    const res = await fetch('data/store.json', { cache: 'no-store' });
+    baseData = await res.json();
+  }
+
+  baseData.products = (baseData.products || []).map((p) => buildProductRecord(p, p));
+  baseData.materials = (baseData.materials || []).map((m) => buildMaterialRecord(m, m));
+  baseData.inventoryTransactions = Array.isArray(baseData.inventoryTransactions)
+    ? baseData.inventoryTransactions
+    : [];
+  baseData.vouchers = Array.isArray(baseData.vouchers) ? baseData.vouchers : [];
+  baseData.orders = Array.isArray(baseData.orders) ? baseData.orders : [];
+  if (baseData.customerProfile && typeof baseData.customerProfile === 'object') {
+    state.customerProfile = { ...state.customerProfile, ...baseData.customerProfile };
+  }
+  if (baseData.sessionUser && baseData.sessionUser.email && baseData.sessionUser.role) {
+    state.sessionUser = baseData.sessionUser;
+  } else if (typeof window !== 'undefined' && window.__SERVER_SESSION_USER__) {
+    state.sessionUser = window.__SERVER_SESSION_USER__;
+  }
   return baseData;
 }
 
@@ -434,15 +322,10 @@ async function loadData() {
    ========================================================================== */
 function handleStorefrontLogout(e) {
   if (e) e.preventDefault();
-  try {
-    localStorage.removeItem('lr_session_user');
-    localStorage.removeItem('lr_cart_items');
-  } catch (_err) {
-    // Ignore storage error
-  }
   state.sessionUser = null;
   state.cartItems = [];
   state.appliedVoucher = null;
+  saveSessionUserToServer(null);
   syncAuthNavigationUI();
   renderCartDrawer();
 }
@@ -1534,16 +1417,7 @@ function initMakeOfferModal() {
       }
 
       latestGeneratedProposal = validation.proposal;
-
-      try {
-        const existingOffers = JSON.parse(localStorage.getItem('lr_customer_offers') || '[]');
-        localStorage.setItem(
-          'lr_customer_offers',
-          JSON.stringify([validation.proposal, ...existingOffers.slice(0, 19)])
-        );
-      } catch (_err) {
-        // Ignore storage quota errors
-      }
+      syncDatabaseStore('save_offer', { offer: validation.proposal });
 
       await renderOfferProposalCanvas(validation.proposal);
       if (statusBadge) {
@@ -2086,12 +1960,7 @@ function initDashboardPage() {
       urlRole === 'admin'
         ? { email: 'admin@lilliarowena.com', name: 'Lillia Mercier (Business Owner)', role: 'admin' }
         : { email: 'rowena.vance@vancearchitects.com', name: 'Rowena Vance', role: 'client' };
-    try {
-      localStorage.setItem('lr_session_user', JSON.stringify(activeUser));
-    } catch (_e) {
-      // Ignore storage error
-    }
-    state.sessionUser = activeUser;
+    saveSessionUserToServer(activeUser);
   }
 
   // If still not logged in, redirect to src/index.php (on PHP) or login.html
@@ -2151,10 +2020,19 @@ function initDashboardPage() {
     sidebarInitials.textContent = initials || 'LR';
   }
 
-  const handlePortalLogout = (e) => {
+  const handlePortalLogout = async (e) => {
     e.preventDefault();
-    localStorage.removeItem('lr_session_user');
-    localStorage.removeItem('lr_cart_items');
+    state.sessionUser = null;
+    state.cartItems = [];
+    try {
+      await fetch('api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_session', sessionUser: null }),
+      });
+    } catch (_err) {
+      // Ignore network error
+    }
     window.location.href = window.location.pathname.endsWith('.php')
       ? new URL('logout.php', window.location.href).href
       : 'login.html';
@@ -2222,11 +2100,7 @@ function initDashboardPage() {
       if (state.sessionUser) {
         state.sessionUser.name = nameVal;
         state.sessionUser.email = emailVal;
-        try {
-          localStorage.setItem('lr_session_user', JSON.stringify(state.sessionUser));
-        } catch (_err) {
-          // Ignore storage error
-        }
+        saveSessionUserToServer(state.sessionUser);
       }
       if (welcomeName) welcomeName.textContent = nameVal;
       if (welcomeEmail) welcomeEmail.textContent = emailVal;
@@ -2365,12 +2239,6 @@ function initDashboardPage() {
       }
 
       state.orders.unshift(newOrder);
-      try {
-        const existingOrders = JSON.parse(localStorage.getItem('lr_customer_orders') || '[]');
-        localStorage.setItem('lr_customer_orders', JSON.stringify([newOrder, ...existingOrders]));
-      } catch (_e) {
-        // Ignore storage error
-      }
 
       // Mark single-use voucher as Used
       if (checkoutResult.validatedVoucher) {
@@ -2378,21 +2246,6 @@ function initDashboardPage() {
         state.vouchers = state.vouchers.map((v) =>
           String(v.code || '').toUpperCase() === usedCode ? { ...v, status: 'Used' } : v
         );
-        try {
-          const usedCodes = JSON.parse(localStorage.getItem('lr_used_voucher_codes') || '[]');
-          if (!usedCodes.includes(usedCode)) {
-            localStorage.setItem('lr_used_voucher_codes', JSON.stringify([...usedCodes, usedCode]));
-          }
-          const customVouchers = JSON.parse(localStorage.getItem('lr_custom_vouchers') || '[]');
-          if (Array.isArray(customVouchers) && customVouchers.length > 0) {
-            const updatedCustom = customVouchers.map((v) =>
-              String(v.code || '').toUpperCase() === usedCode ? { ...v, status: 'Used' } : v
-            );
-            localStorage.setItem('lr_custom_vouchers', JSON.stringify(updatedCustom));
-          }
-        } catch (_err) {
-          // Ignore storage error
-        }
       }
 
       state.cartItems = [];
@@ -2400,6 +2253,7 @@ function initDashboardPage() {
       if (clientVoucherInput) clientVoucherInput.value = '';
       if (clientVoucherFeedback) clientVoucherFeedback.classList.add('hidden');
       saveCartToStorage();
+      syncDatabaseStore('sync_store');
       showClientBanner(`Order #${newOrder.orderNumber} placed for ${usd(newOrder.totalAmount)}.`);
       switchClientTab('orders');
       renderDashboardContent();
@@ -2577,32 +2431,7 @@ function initDashboardPage() {
         state.cartItems = res.updatedCartItems;
         state.vouchers = res.updatedVouchers;
         saveCartToStorage();
-
-        try {
-          const delIds = JSON.parse(localStorage.getItem('lr_deleted_product_ids') || '[]');
-          if (!delIds.includes(pid)) {
-            localStorage.setItem('lr_deleted_product_ids', JSON.stringify([...delIds, pid]));
-          }
-          const customProds = JSON.parse(localStorage.getItem('lr_custom_products') || '[]');
-          if (Array.isArray(customProds)) {
-            localStorage.setItem(
-              'lr_custom_products',
-              JSON.stringify(customProds.filter((p) => p.id !== pid))
-            );
-          }
-          const editedMap = JSON.parse(localStorage.getItem('lr_edited_products') || '{}');
-          if (editedMap && typeof editedMap === 'object' && editedMap[pid]) {
-            delete editedMap[pid];
-            localStorage.setItem('lr_edited_products', JSON.stringify(editedMap));
-          }
-          const discountMap = JSON.parse(localStorage.getItem('lr_product_discounts') || '{}');
-          if (discountMap && typeof discountMap === 'object' && Object.prototype.hasOwnProperty.call(discountMap, pid)) {
-            delete discountMap[pid];
-            localStorage.setItem('lr_product_discounts', JSON.stringify(discountMap));
-          }
-        } catch (_err) {
-          // Ignore storage error
-        }
+        syncDatabaseStore('delete_product', { productId: pid, vouchers: state.vouchers });
 
         if (prodEditIdInput && prodEditIdInput.value === pid) {
           resetProductFormForCreate('standard');
@@ -2984,12 +2813,7 @@ function initDashboardPage() {
         persistProductToStorage(savedProduct);
       } else {
         state.catalog.unshift(savedProduct);
-        try {
-          const existing = JSON.parse(localStorage.getItem('lr_custom_products') || '[]');
-          localStorage.setItem('lr_custom_products', JSON.stringify([savedProduct, ...existing]));
-        } catch (_err) {
-          // Ignore storage error
-        }
+        persistProductToStorage(savedProduct);
       }
 
       const typeLabel =
@@ -3126,15 +2950,7 @@ function initDashboardPage() {
         newVoucher,
         ...state.vouchers.filter((v) => String(v.code || '').toUpperCase() !== code),
       ];
-      try {
-        const existing = JSON.parse(localStorage.getItem('lr_custom_vouchers') || '[]');
-        const filteredExisting = Array.isArray(existing)
-          ? existing.filter((v) => String(v.code || '').toUpperCase() !== code)
-          : [];
-        localStorage.setItem('lr_custom_vouchers', JSON.stringify([newVoucher, ...filteredExisting]));
-      } catch (_err) {
-        // Ignore storage error
-      }
+      syncDatabaseStore('sync_store');
       document.getElementById('vch-code').value = '';
       showAdminBanner(
         `Created voucher ${code} (${formatVoucherBenefitLabel(newVoucher)} on "${prod.name}") for ${normalizedEmail}.`
@@ -4617,13 +4433,7 @@ function renderDashboardContent() {
           inStockCount: nextStock,
         };
         state.catalog = state.catalog.map((item) => (item.id === pid ? updatedProduct : item));
-        try {
-          const editedMap = JSON.parse(localStorage.getItem('lr_edited_products') || '{}');
-          editedMap[pid] = updatedProduct;
-          localStorage.setItem('lr_edited_products', JSON.stringify(editedMap));
-        } catch (_err) {
-          // Ignore storage error
-        }
+        persistProductToStorage(updatedProduct);
         showAdminBanner(`Updated "${prod.name}" stock to ${nextStock} units.`);
         renderDashboardContent();
       });
@@ -7068,8 +6878,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.selectedColorByProduct[p.id] = p.colorVariants?.[0]?.name || p.defaultFinish;
   });
 
-  // Cart starts empty by default unless the user explicitly added items!
-  state.cartItems = loadCartFromStorage();
+  state.cartItems = hydrateCartFromServer(data.cartItems);
 
   if (document.getElementById('product-catalog-grid')) {
     initShowroomPage();
@@ -7080,29 +6889,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (document.getElementById('client-portal-view') || document.getElementById('admin-portal-view')) {
     initDashboardPage();
   }
-
-  // Real-time cross-tab synchronization between Admin Dashboard, User Dashboard, Catalog Page, and Home Page
-  window.addEventListener('storage', async () => {
-    const freshData = await loadData();
-    state.catalog = Array.isArray(freshData.products) ? freshData.products : state.catalog;
-    state.materials = Array.isArray(freshData.materials) ? freshData.materials : state.materials;
-    state.inventoryTransactions = Array.isArray(freshData.inventoryTransactions)
-      ? freshData.inventoryTransactions
-      : state.inventoryTransactions;
-    state.vouchers = Array.isArray(freshData.vouchers) ? freshData.vouchers : state.vouchers;
-    state.orders = Array.isArray(freshData.orders) ? freshData.orders : state.orders;
-    state.cartItems = loadCartFromStorage();
-
-    if (document.getElementById('product-catalog-grid')) {
-      renderCatalogGrid();
-    }
-    if (document.getElementById('catalog-page-grid')) {
-      renderCatalogPage();
-    }
-    if (document.getElementById('client-portal-view') || document.getElementById('admin-portal-view')) {
-      renderDashboardContent();
-    }
-  });
 });
 
 

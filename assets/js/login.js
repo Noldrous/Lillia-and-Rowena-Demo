@@ -1,6 +1,7 @@
 /**
  * Part 5: Lillia and Rowena Furniture — Client-Side Login & Registration Controller
  * File: assets/js/login.js
+ * Communicates with server-side PDO endpoint (`api.php`) instead of browser `localStorage`.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -43,12 +44,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentRole = 'Customer';
   let currentMode = 'signin'; // 'signin' | 'register'
+  let serverStoreCache = null;
 
-  function renderActiveSessionBanner() {
+  async function fetchServerState() {
+    try {
+      const res = await fetch('api.php?action=state', { cache: 'no-store' });
+      if (res.ok) {
+        serverStoreCache = await res.json();
+        return serverStoreCache;
+      }
+    } catch (_e) {
+      // Ignore network error
+    }
+    return null;
+  }
+
+  async function renderActiveSessionBanner() {
     if (!activeSessionBanner || !activeSessionUser || !activeSessionActions) return;
     try {
-      const raw = localStorage.getItem('lr_session_user');
-      const session = raw ? JSON.parse(raw) : null;
+      const data = (await fetchServerState()) || serverStoreCache;
+      const session = data?.sessionUser || null;
       if (!session || !session.email || !session.role) {
         activeSessionBanner.style.display = 'none';
         return;
@@ -72,10 +87,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const logoutBtn = document.getElementById('login-page-logout-btn');
       if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-          localStorage.removeItem('lr_session_user');
-          localStorage.removeItem('lr_cart_items');
-          renderActiveSessionBanner();
+        logoutBtn.addEventListener('click', async () => {
+          try {
+            await fetch('api.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'save_session', sessionUser: null }),
+            });
+          } catch (_err) {
+            // Ignore network error
+          }
+          await renderActiveSessionBanner();
         });
       }
     } catch (_e) {
@@ -220,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderActiveSessionBanner();
 
   if (form) {
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       hideError();
       const email = emailInput ? emailInput.value.trim() : '';
       const password = passwordInput ? passwordInput.value : '';
@@ -249,57 +271,65 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
-      let resolvedName =
-        role === 'Admin'
-          ? 'Lillia Mercier (Business Owner)'
-          : isRegister && fullName
-          ? fullName
-          : email.toLowerCase() === 'rowena.vance@vancearchitects.com'
-          ? 'Rowena Vance'
-          : email.split('@')[0];
-
-      try {
-        const registeredRaw = localStorage.getItem('lr_registered_customers');
-        const registeredMap = registeredRaw ? JSON.parse(registeredRaw) : {};
-        if (isRegister && fullName) {
-          registeredMap[email.toLowerCase()] = { name: fullName, email };
-          localStorage.setItem('lr_registered_customers', JSON.stringify(registeredMap));
-          localStorage.setItem(
-            'lr_customer_profile',
-            JSON.stringify({
-              name: fullName,
-              email,
-              phone: '+1 (212) 555-0148',
-              city: 'New York, NY 10013',
-              address: 'Suite 400, 118 Mercer St, SoHo',
-              notes: 'Standard white-glove delivery instructions.',
-            })
-          );
-        } else if (role !== 'Admin' && registeredMap[email.toLowerCase()]?.name) {
-          resolvedName = registeredMap[email.toLowerCase()].name;
-        }
-      } catch (_e) {
-        // Ignore storage error
-      }
-
-      const userObj = {
-        email,
-        role: targetRoleParam,
-        name: resolvedName,
-      };
-      try {
-        localStorage.setItem('lr_session_user', JSON.stringify(userObj));
-      } catch (_e) {
-        // Ignore storage errors
-      }
-
       const formAction = (form.getAttribute('action') || '').toLowerCase();
       if (window.location.pathname.endsWith('.php') || formAction.includes('index.php')) {
         return;
       }
 
       event.preventDefault();
+
+      const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
+      const matchedCustomer = Array.isArray(serverStoreCache?.customers)
+        ? serverStoreCache.customers.find(
+            (c) => String(c.email || '').toLowerCase() === email.toLowerCase()
+          )
+        : null;
+
+      const resolvedName =
+        role === 'Admin'
+          ? 'Lillia Mercier (Business Owner)'
+          : isRegister && fullName
+          ? fullName
+          : matchedCustomer?.fullName
+          ? matchedCustomer.fullName
+          : email.toLowerCase() === 'rowena.vance@vancearchitects.com'
+          ? 'Rowena Vance'
+          : email.split('@')[0];
+
+      const userObj = {
+        email,
+        role: targetRoleParam,
+        name: resolvedName,
+      };
+
+      try {
+        if (isRegister && fullName) {
+          await fetch('api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'register_customer',
+              fullName,
+              email,
+              password,
+              phoneNumber: '+1 (212) 555-0148',
+              address: 'Suite 400, 118 Mercer St, SoHo, New York, NY 10013',
+            }),
+          });
+        } else {
+          await fetch('api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'save_session',
+              sessionUser: userObj,
+            }),
+          });
+        }
+      } catch (_e) {
+        // Ignore network errors
+      }
+
       const redirectParam = (params.get('redirect') || '').toLowerCase();
       if (redirectParam === 'request-design' && targetRoleParam !== 'admin') {
         window.location.href = 'index.html?trigger=request-design';
