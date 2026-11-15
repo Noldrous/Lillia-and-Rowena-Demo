@@ -1,6 +1,7 @@
 import {
   ADMIN_MESSENGER_PLACEHOLDER_URL,
   CATALOG_COLOR_FILTERS,
+  INITIAL_STORE_DATA,
   PRODUCT_TYPES,
   applyAdminOrderUpdate,
   applyMaterialStockMovement,
@@ -218,9 +219,16 @@ function bindStorefrontProductButtons(root = document) {
   });
 }
 
+const API_ENDPOINT =
+  typeof window !== 'undefined' && window.location.pathname.includes('/src/')
+    ? window.location.pathname.includes('/views/')
+      ? '../api.php'
+      : 'api.php'
+    : 'src/api.php';
+
 function syncDatabaseStore(action = 'sync_store', extraPayload = {}) {
   try {
-    fetch('api.php', {
+    fetch(API_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -300,7 +308,7 @@ async function loadData() {
   let baseData = null;
 
   try {
-    const apiRes = await fetch('api.php?action=state', { cache: 'no-store' });
+    const apiRes = await fetch(`${API_ENDPOINT}?action=state`, { cache: 'no-store' });
     if (apiRes.ok) {
       const parsedApi = await apiRes.json();
       if (parsedApi && Array.isArray(parsedApi.products)) {
@@ -308,12 +316,11 @@ async function loadData() {
       }
     }
   } catch (_apiErr) {
-    // Fallback to server data/store.json if api.php is unreachable
+    // Fallback to built-in INITIAL_STORE_DATA if src/api.php is unreachable
   }
 
   if (!baseData) {
-    const res = await fetch('data/store.json', { cache: 'no-store' });
-    baseData = await res.json();
+    baseData = structuredClone(INITIAL_STORE_DATA);
   }
 
   baseData.products = (baseData.products || []).map((p) => buildProductRecord(p, p));

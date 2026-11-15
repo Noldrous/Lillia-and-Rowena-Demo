@@ -1,8 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
+  INITIAL_STORE_DATA,
   PRODUCT_TYPES,
   applyAdminOrderUpdate,
   applyMaterialStockMovement,
@@ -37,14 +36,12 @@ import {
   verifyAndCreateOrder,
 } from './store.js';
 
-const storeJsonPath = path.resolve(process.cwd(), 'data/store.json');
-const storeData = JSON.parse(fs.readFileSync(storeJsonPath, 'utf8'));
-const INITIAL_CATEGORIES = storeData.categories;
-const INITIAL_FURNITURE_ITEMS = storeData.products;
-const INITIAL_VOUCHERS = storeData.vouchers;
-const INITIAL_MATERIALS = storeData.materials || [];
+const INITIAL_CATEGORIES = INITIAL_STORE_DATA.categories;
+const INITIAL_FURNITURE_ITEMS = INITIAL_STORE_DATA.products;
+const INITIAL_VOUCHERS = INITIAL_STORE_DATA.vouchers;
+const INITIAL_MATERIALS = INITIAL_STORE_DATA.materials || [];
 
-describe('Pure JavaScript & JSON Store Logic Tests', () => {
+describe('Pure JavaScript & Server Store Logic Tests', () => {
   it('defines the 5 showroom categories: Living Room, Dining Room, Bedroom, Study/Work Desks, and Kitchen', () => {
     assert.equal(INITIAL_CATEGORIES.length, 5);
     assert.deepEqual(

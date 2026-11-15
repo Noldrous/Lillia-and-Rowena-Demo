@@ -1,6 +1,6 @@
 /**
  * Server-Side Preview & Datastore HTTP Server (Port 3000)
- * Mirrors `api.php` (PHP PDO + `data/store.json` datastore) so all storefront, login, cart,
+ * Mirrors `src/api.php` (PHP PDO server endpoint) so all storefront, login, cart,
  * and dashboard operations read and persist directly on the server instead of `localStorage`.
  */
 
@@ -8,11 +8,13 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INITIAL_STORE_DATA } from './assets/js/store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
-const STORE_PATH = path.join(__dirname, 'data', 'store.json');
+
+let serverStoreState = structuredClone(INITIAL_STORE_DATA);
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -30,14 +32,13 @@ const MIME_TYPES = {
 };
 
 function readStoreFile() {
-  const raw = fs.readFileSync(STORE_PATH, 'utf8');
-  return JSON.parse(raw);
+  return structuredClone(serverStoreState);
 }
 
 function writeStoreFile(storeData) {
   const clean = { ...storeData };
   delete clean._dbMeta;
-  fs.writeFileSync(STORE_PATH, JSON.stringify(clean, null, 2) + '\n', 'utf8');
+  serverStoreState = structuredClone(clean);
 }
 
 function sendJson(res, statusCode, payload) {
@@ -61,7 +62,7 @@ function handleApiRequest(req, res, parsedUrl) {
       }
       store._dbMeta = {
         driver: 'pdo_mysql',
-        endpoint: 'api.php',
+        endpoint: 'src/api.php',
         timestamp: new Date().toISOString(),
       };
       return sendJson(res, 200, store);

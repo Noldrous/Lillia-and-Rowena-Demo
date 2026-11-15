@@ -14,22 +14,21 @@ use PDOStatement;
  * Tables: Admin, Category, Customer, Product, Material, Voucher, Customer_Order,
  *         Order_Item, Order_Item_Material, Customization, Payment, Production_Task.
  *
- * Uses PHP PDO (`pdo_mysql`) as the primary server-side database connection with automatic
- * server-side synchronization to `data/store.json` when MySQL is offline.
+ * Uses PHP PDO (`pdo_mysql`) as the primary server-side database connection, with built-in
+ * seed data so no external `data/store.json` file is needed.
  */
 class Database
 {
     private static ?Database $instance = null;
     private ?PDO $pdo = null;
-    private string $jsonPath;
+    /** @var array<string, mixed>|null */
+    private static ?array $memoryStore = null;
 
     /**
      * @param array<string, mixed> $config
      */
     public function __construct(array $config = [])
     {
-        $this->jsonPath = $config['json_path'] ?? (dirname(__DIR__, 2) . '/data/store.json');
-
         $host = $config['host'] ?? (getenv('DB_HOST') ?: '127.0.0.1');
         $port = $config['port'] ?? (getenv('DB_PORT') ?: '3306');
         $dbname = $config['dbname'] ?? (getenv('DB_NAME') ?: 'lillia_rowena_furniture');
@@ -92,7 +91,7 @@ class Database
     public function query(string $sql, array $params = []): PDOStatement
     {
         if ($this->pdo === null) {
-            throw new DatabaseException('PDO MySQL connection is not active; using server datastore fallback.');
+            throw new DatabaseException('PDO MySQL connection is not active.');
         }
 
         try {
@@ -137,11 +136,11 @@ class Database
     }
 
     /**
-     * Seed the 12 MySQL tables in `lillia_rowena_furniture` from `data/store.json` if empty.
+     * Seed the 12 MySQL tables in `lillia_rowena_furniture` from built-in default dataset if empty.
      */
     public function seedMySqlIfEmpty(): void
     {
-        if ($this->pdo === null || !is_file($this->jsonPath)) {
+        if ($this->pdo === null) {
             return;
         }
 
@@ -151,11 +150,7 @@ class Database
                 return;
             }
 
-            $raw = file_get_contents($this->jsonPath);
-            $store = $raw ? json_decode($raw, true) : null;
-            if (!is_array($store)) {
-                return;
-            }
+            $store = self::getDefaultStore();
 
             // 1. Seed Admin
             $this->query(
@@ -247,20 +242,15 @@ class Database
      * when PDO MySQL is connected.
      *
      * @return array<string, mixed>
-     * @throws DatabaseException
      */
     public function readStore(): array
     {
-        if (!is_file($this->jsonPath)) {
-            throw new DatabaseException('Server datastore file not found at: ' . $this->jsonPath);
-        }
-        $raw = file_get_contents($this->jsonPath);
-        if ($raw === false) {
-            throw new DatabaseException('Unable to read server datastore.');
-        }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            throw new DatabaseException('Corrupted server datastore.');
+        if (isset($_SESSION['lr_server_store']) && is_array($_SESSION['lr_server_store'])) {
+            $decoded = $_SESSION['lr_server_store'];
+        } elseif (self::$memoryStore !== null) {
+            $decoded = self::$memoryStore;
+        } else {
+            $decoded = self::getDefaultStore();
         }
 
         if ($this->pdo !== null) {
@@ -327,20 +317,15 @@ class Database
     }
 
     /**
-     * Write updated state back to server datastore and synchronize all 12 tables to MySQL via PDO when connected.
+     * Write updated state to server session/memory and synchronize all 12 tables to MySQL via PDO when connected.
      *
      * @param array<string, mixed> $data
-     * @throws DatabaseException
      */
     public function writeStore(array $data): void
     {
-        $dir = dirname($this->jsonPath);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
-        }
-        $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($encoded === false || file_put_contents($this->jsonPath, $encoded) === false) {
-            throw new DatabaseException('Failed to persist state to server datastore.');
+        self::$memoryStore = $data;
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['lr_server_store'] = $data;
         }
 
         if ($this->pdo !== null) {
@@ -607,5 +592,905 @@ class Database
         } catch (\Throwable) {
             // Non-fatal if MySQL schema constraints differ during bulk sync
         }
+    }
+
+    /**
+     * Built-in default store dataset corresponding to the 12 MySQL tables in `database/furniture.sql`.
+     *
+     * @return array<string, mixed>
+     */
+    public static function getDefaultStore(): array
+    {
+        return [
+            'messengerConfig' => [
+                'adminMessengerUrl' => 'https://www.messenger.com/t/100000505712325',
+                'businessOwnerName' => 'Lillia and Rowena Furniture',
+            ],
+            'messengerConversations' => [
+                [
+                    'id' => 'msg-thread-101',
+                    'customerName' => 'Rowena Vance',
+                    'customerEmail' => 'rowena.vance@vancearchitects.com',
+                    'topic' => 'Custom 300cm Monolith Walnut Conference & Dining Slab',
+                    'categoryId' => 'dining',
+                    'suggestedName' => 'Rowena Custom 300cm Walnut Monolith Table',
+                    'suggestedSku' => 'LR-CUST-300',
+                    'suggestedPrice' => 5200,
+                    'suggestedDimensions' => '300cm L × 115cm W × 75cm H',
+                    'customizationNotes' => 'Extended 300cm book-matched walnut slab with concealed brass floor-box cable grommets.',
+                    'updatedAt' => '2026-11-12',
+                ],
+                [
+                    'id' => 'msg-thread-102',
+                    'customerName' => 'Julian Mercier',
+                    'customerEmail' => 'j.mercier@mercierstudio.co',
+                    'topic' => 'Bespoke Deep-Seat Bouclé L-Sectional Sofa',
+                    'categoryId' => 'living',
+                    'suggestedName' => 'Mercier Bespoke Bouclé Corner Sectional',
+                    'suggestedSku' => 'LR-CUST-204',
+                    'suggestedPrice' => 5650,
+                    'suggestedDimensions' => '310cm W × 165cm D × 74cm H',
+                    'customizationNotes' => 'Left-return chaise configuration in heavyweight Alabaster Belgian bouclé over a smoked oak plinth.',
+                    'updatedAt' => '2026-11-11',
+                ],
+                [
+                    'id' => 'msg-thread-103',
+                    'customerName' => 'Elena Rostova',
+                    'customerEmail' => 'elena@rostovainteriors.com',
+                    'topic' => 'Floating Fluted Ash Acoustic Media Credenza',
+                    'categoryId' => 'office',
+                    'suggestedName' => 'Rostova Floating Fluted Ash Credenza',
+                    'suggestedSku' => 'LR-CUST-410',
+                    'suggestedPrice' => 3490,
+                    'suggestedDimensions' => '240cm W × 45cm D × 52cm H',
+                    'customizationNotes' => 'Wall-hung French cleat mounting with acoustic linen center doors and concealed soundbar compartment.',
+                    'updatedAt' => '2026-11-10',
+                ],
+                [
+                    'id' => 'msg-thread-104',
+                    'customerName' => 'Marcus Sterling',
+                    'customerEmail' => 'm.sterling@sterlingcapital.io',
+                    'topic' => 'California King Belgian Linen Tall-Headboard Platform Bed',
+                    'categoryId' => 'bedroom',
+                    'suggestedName' => 'Sterling Cal-King Tailored Linen Bed',
+                    'suggestedSku' => 'LR-CUST-512',
+                    'suggestedPrice' => 4280,
+                    'suggestedDimensions' => '228cm L × 200cm W × 105cm H',
+                    'customizationNotes' => 'Extra-tall 105cm acoustic wool headboard with integrated warm-bronze reading sconce cutouts.',
+                    'updatedAt' => '2026-11-09',
+                ],
+            ],
+            'categories' => [
+                [
+                    'id' => 'living',
+                    'name' => 'Living Room',
+                    'code' => 'CAT-01 / LIVING',
+                    'tagline' => 'Sculpted Bouclé Sofas, Solid Oak Lounge Chairs & Travertine Plinths',
+                    'description' => 'Low-slung architectural silhouettes upholstered in heavyweight Belgian linen and nubby wool bouclé, paired with kiln-dried white oak lounge frames and honed Italian travertine surfaces.',
+                    'materialPalette' => ['Kiln-Dried White Oak', 'Heavyweight Wool Bouclé', 'Honed Roman Travertine'],
+                    'leadTimeRange' => '3–6 Weeks',
+                    'pieceCount' => 3,
+                    'startingPrice' => 1680,
+                    'image' => 'assets/images/category_living_lounge.jpg',
+                ],
+                [
+                    'id' => 'dining',
+                    'name' => 'Dining Room',
+                    'code' => 'CAT-02 / DINING',
+                    'tagline' => 'Monolithic Black Walnut Slab Tables & Woven Danish Cord Seating',
+                    'description' => 'Heirloom dining tables milled from FAS-grade American black walnut and European white oak slabs, finished with hand-rubbed organic linseed oil and paired with Danish paper-cord chairs.',
+                    'materialPalette' => ['FAS American Black Walnut', 'Quarter-Sawn White Oak', 'Danish Waxed Paper Cord'],
+                    'leadTimeRange' => '4–8 Weeks',
+                    'pieceCount' => 2,
+                    'startingPrice' => 1290,
+                    'image' => 'assets/images/category_dining_tables.jpg',
+                ],
+                [
+                    'id' => 'bedroom',
+                    'name' => 'Bedroom',
+                    'code' => 'CAT-03 / BEDROOM',
+                    'tagline' => 'Tailored Belgian Linen Platform Beds & Cantilevered Ash Nightstands',
+                    'description' => 'Quiet, grounding sleep architecture featuring Belgian flax linen headboards, solid ash timber platform rails, and cantilevered bedside tables with soft-close dovetail drawers.',
+                    'materialPalette' => ['Belgian Unbleached Flax Linen', 'Solid European Ash', 'Brushed Unlacquered Brass'],
+                    'leadTimeRange' => '3–5 Weeks',
+                    'pieceCount' => 2,
+                    'startingPrice' => 1180,
+                    'image' => 'assets/images/category_bedroom_sanctuary.jpg',
+                ],
+                [
+                    'id' => 'office',
+                    'name' => 'Study/Work Desks',
+                    'code' => 'CAT-04 / STUDY',
+                    'tagline' => 'Fluted Walnut Sideboards, Architect Work Desks & Shelving Systems',
+                    'description' => 'Commanding work desks and custom-milled fluted credenzas engineered with concealed cable channels, solid brass hardware, and book-matched walnut veneer interiors.',
+                    'materialPalette' => ['Fluted Black Walnut', 'Saddle-Stitched Bridle Leather', 'Aged Bronze Hardware'],
+                    'leadTimeRange' => '2–6 Weeks',
+                    'pieceCount' => 2,
+                    'startingPrice' => 2150,
+                    'image' => 'assets/images/category_office_storage.jpg',
+                ],
+                [
+                    'id' => 'kitchen',
+                    'name' => 'Kitchen',
+                    'code' => 'CAT-05 / KITCHEN',
+                    'tagline' => 'Monolithic Walnut Kitchen Islands, Travertine Prep Blocks & Counter Stools',
+                    'description' => 'Architectural kitchen islands, honed Roman travertine prep surfaces, and sculpted solid oak counter stools crafted for open-plan culinary ateliers.',
+                    'materialPalette' => ['Honed Roman Travertine', 'FAS Black Walnut', 'Soap-Finished White Oak'],
+                    'leadTimeRange' => '3–6 Weeks',
+                    'pieceCount' => 2,
+                    'startingPrice' => 1450,
+                    'image' => 'assets/images/category_kitchen_atelier.jpg',
+                ],
+            ],
+            'products' => [
+                [
+                    'id' => 'furn-lv-01',
+                    'sku' => 'LR-LV-014',
+                    'name' => 'Rowena Curved Bouclé Lounge Sofa',
+                    'categoryId' => 'living',
+                    'categoryName' => 'Living Room',
+                    'isBestSeller' => true,
+                    'bestSellerBadge' => 'Best Seller · #1 Living Room',
+                    'price' => 4850,
+                    'discountPercent' => 10,
+                    'effectivePrice' => 4365,
+                    'dimensions' => '245cm W × 104cm D × 74cm H',
+                    'leadTimeWeeks' => 4,
+                    'inStockCount' => 4,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-104',
+                    'defaultFinish' => 'Warm Oat Bouclé / Natural Oak',
+                    'finishes' => [
+                        'Warm Oat Bouclé / Natural Oak',
+                        'Alabaster Heavy Linen / Smoked Oak',
+                        'Raw Umber Wool / American Walnut',
+                        'Midnight Indigo Mohair / Ebonized Oak',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Warm Oat Bouclé / Natural Oak', 'hex' => '#E6DEC8', 'priceDelta' => 0],
+                        ['name' => 'Alabaster Heavy Linen / Smoked Oak', 'hex' => '#F4F1EA', 'priceDelta' => 220],
+                        ['name' => 'Raw Umber Wool / American Walnut', 'hex' => '#6E5239', 'priceDelta' => 380],
+                        ['name' => 'Midnight Indigo Mohair / Ebonized Oak', 'hex' => '#243B55', 'priceDelta' => 520],
+                    ],
+                    'description' => 'A sweeping crescent silhouette engineered for conversational salon layouts. Built over a solid kiln-dried white oak plinth with multi-density natural latex and down-wrapped cushions.',
+                    'craftsmanshipNote' => 'Hand-tufted internal spring suspension with mortise-and-tenon oak base rail.',
+                    'image' => 'assets/images/category_living_lounge.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-dn-01',
+                    'sku' => 'LR-DN-108',
+                    'name' => 'Lillia Monolith Solid Walnut Dining Table',
+                    'categoryId' => 'dining',
+                    'categoryName' => 'Dining Room',
+                    'isBestSeller' => true,
+                    'bestSellerBadge' => 'Best Seller · Flagship Slab',
+                    'price' => 4200,
+                    'discountPercent' => 12,
+                    'effectivePrice' => 3696,
+                    'dimensions' => '240cm L × 105cm W × 75cm H',
+                    'leadTimeWeeks' => 5,
+                    'inStockCount' => 5,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-101',
+                    'defaultFinish' => 'Hand-Rubbed Natural Walnut',
+                    'finishes' => [
+                        'Hand-Rubbed Natural Walnut',
+                        'Quarter-Sawn White Oak',
+                        'Ebonized Ash Timber',
+                        'Book-Matched Burl Walnut Reserve',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Hand-Rubbed Natural Walnut', 'hex' => '#5C3A21', 'priceDelta' => 0],
+                        ['name' => 'Quarter-Sawn White Oak', 'hex' => '#C8AD88', 'priceDelta' => -150],
+                        ['name' => 'Ebonized Ash Timber', 'hex' => '#222428', 'priceDelta' => 240],
+                        ['name' => 'Book-Matched Burl Walnut Reserve', 'hex' => '#472914', 'priceDelta' => 550],
+                    ],
+                    'description' => 'Our flagship dining table featuring a 45mm thick book-matched walnut slab top with a subtle live-inspired chamfered edge and sculptural trestle stretchers.',
+                    'craftsmanshipNote' => 'Reinforced with concealed solid brass butterfly keys and zero-VOC cold-pressed tung oil.',
+                    'image' => 'assets/images/category_dining_tables.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-bd-01',
+                    'sku' => 'LR-BD-204',
+                    'name' => 'Serene Belgian Linen Platform Bed (King)',
+                    'categoryId' => 'bedroom',
+                    'categoryName' => 'Bedroom',
+                    'isBestSeller' => true,
+                    'bestSellerBadge' => 'Recommended · Bedroom Sanctuary',
+                    'price' => 3650,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 3650,
+                    'dimensions' => '218cm L × 206cm W × 98cm H',
+                    'leadTimeWeeks' => 4,
+                    'inStockCount' => 6,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-105',
+                    'defaultFinish' => 'Oatmeal Flax Linen / Ash Base',
+                    'finishes' => [
+                        'Oatmeal Flax Linen / Ash Base',
+                        'Warm Stone Linen / Walnut Base',
+                        'Chalk Bouclé / White Oak Base',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Oatmeal Flax Linen / Ash Base', 'hex' => '#DDD3C2', 'priceDelta' => 0],
+                        ['name' => 'Warm Stone Linen / Walnut Base', 'hex' => '#9E9484', 'priceDelta' => 280],
+                        ['name' => 'Chalk Bouclé / White Oak Base', 'hex' => '#F7F5F0', 'priceDelta' => 350],
+                    ],
+                    'description' => 'Architectural low-profile platform bed with removable tailored Belgian linen upholstery and solid ash European slat support requiring no box spring.',
+                    'craftsmanshipNote' => 'Acoustic wool headboard padding with precision mitered solid timber corner joinery.',
+                    'image' => 'assets/images/category_bedroom_sanctuary.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-of-02',
+                    'sku' => 'LR-OF-315',
+                    'name' => 'Quarter-Sawn Oak Architect Work Desk',
+                    'categoryId' => 'office',
+                    'categoryName' => 'Study/Work Desks',
+                    'isBestSeller' => true,
+                    'bestSellerBadge' => 'Recommended · Architect Desk',
+                    'price' => 2150,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 2150,
+                    'dimensions' => '165cm W × 78cm D × 75cm H',
+                    'leadTimeWeeks' => 3,
+                    'inStockCount' => 7,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-102',
+                    'defaultFinish' => 'Natural White Oak / Brass Pulls',
+                    'finishes' => [
+                        'Natural White Oak / Brass Pulls',
+                        'Smoked Chestnut Oak / Bronze',
+                        'American Black Walnut / Cognac Leather',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Natural White Oak / Brass Pulls', 'hex' => '#CBB28D', 'priceDelta' => 0],
+                        ['name' => 'Smoked Chestnut Oak / Bronze', 'hex' => '#7D593D', 'priceDelta' => 175],
+                        ['name' => 'American Black Walnut / Cognac Leather', 'hex' => '#4E321F', 'priceDelta' => 310],
+                    ],
+                    'description' => 'A serene architectural worktable with dual flush-front stationery drawers, vegetable-tanned leather interior liners, and a hidden rear power trough.',
+                    'craftsmanshipNote' => 'Inlaid full-grain Italian desktop blotter and solid timber leg stretchers.',
+                    'image' => 'assets/images/category_office_storage.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-of-01',
+                    'sku' => 'LR-OF-302',
+                    'name' => 'Mercier Fluted Walnut Sideboard Credenza',
+                    'categoryId' => 'office',
+                    'categoryName' => 'Study/Work Desks',
+                    'isBestSeller' => false,
+                    'price' => 3890,
+                    'discountPercent' => 15,
+                    'effectivePrice' => 3307,
+                    'dimensions' => '210cm W × 48cm D × 76cm H',
+                    'leadTimeWeeks' => 4,
+                    'inStockCount' => 4,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-101',
+                    'defaultFinish' => 'Natural Walnut / Aged Brass',
+                    'finishes' => [
+                        'Natural Walnut / Aged Brass',
+                        'Smoked White Oak / Bronze',
+                        'Ebonized Oak / Brushed Steel',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Natural Walnut / Aged Brass', 'hex' => '#63412C', 'priceDelta' => 0],
+                        ['name' => 'Smoked White Oak / Bronze', 'hex' => '#9C8265', 'priceDelta' => -120],
+                        ['name' => 'Ebonized Oak / Brushed Steel', 'hex' => '#28292D', 'priceDelta' => 260],
+                    ],
+                    'description' => 'Rhythmic half-round solid walnut reeds across four seamless cabinet doors conceal adjustable shelving, velvet-lined flatware trays, and media ventilation.',
+                    'craftsmanshipNote' => 'CNC-indexed and hand-sanded solid walnut fluting with Blum soft-close architectural hinges.',
+                    'image' => 'assets/images/category_office_storage.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-lv-02',
+                    'sku' => 'LR-LV-029',
+                    'name' => 'Cavana Sculpted White Oak Lounge Chair',
+                    'categoryId' => 'living',
+                    'categoryName' => 'Living Room',
+                    'isBestSeller' => false,
+                    'price' => 1680,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 1680,
+                    'dimensions' => '76cm W × 82cm D × 73cm H',
+                    'leadTimeWeeks' => 2,
+                    'inStockCount' => 9,
+                    'minStockLevel' => 3,
+                    'primaryMaterialId' => 'mat-102',
+                    'defaultFinish' => 'Soap-Finished White Oak / Cream Bouclé',
+                    'finishes' => [
+                        'Soap-Finished White Oak / Cream Bouclé',
+                        'Fumed Dark Oak / Cognac Leather',
+                        'Oiled Black Walnut / Sand Linen',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Soap-Finished White Oak / Cream Bouclé', 'hex' => '#DECBB1', 'priceDelta' => 0],
+                        ['name' => 'Fumed Dark Oak / Cognac Leather', 'hex' => '#8A4B29', 'priceDelta' => 160],
+                        ['name' => 'Oiled Black Walnut / Sand Linen', 'hex' => '#5E3F28', 'priceDelta' => 290],
+                    ],
+                    'description' => 'Steam-bent armrests flow seamlessly into tapered rear legs via precision finger-jointed transitions. Equally suited as a reading chair or architectural pair.',
+                    'craftsmanshipNote' => 'Hand-shaved spokeshave arm profiles with full-grain vegetable-tanned saddle straps.',
+                    'image' => 'assets/images/hero_living_room_atelier.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-lv-03',
+                    'sku' => 'LR-LV-042',
+                    'name' => 'Verona Honed Travertine Plinth Table',
+                    'categoryId' => 'living',
+                    'categoryName' => 'Living Room',
+                    'isBestSeller' => false,
+                    'price' => 2350,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 2350,
+                    'dimensions' => '135cm L × 85cm W × 34cm H',
+                    'leadTimeWeeks' => 3,
+                    'inStockCount' => 3,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-106',
+                    'defaultFinish' => 'Unfilled Matte Roman Travertine',
+                    'finishes' => [
+                        'Unfilled Matte Roman Travertine',
+                        'Honed Warm Limestone',
+                        'Silver Vein Titanium Travertine',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Unfilled Matte Roman Travertine', 'hex' => '#D8CABB', 'priceDelta' => 0],
+                        ['name' => 'Honed Warm Limestone', 'hex' => '#E5DDD0', 'priceDelta' => 190],
+                        ['name' => 'Silver Vein Titanium Travertine', 'hex' => '#9BA0A4', 'priceDelta' => 360],
+                    ],
+                    'description' => 'Cut from monolithic blocks of porous Roman travertine with a softly bullnosed organic top resting on two offset architectural column cylinders.',
+                    'craftsmanshipNote' => 'Breathable penetrating stone sealer applied in-shop for stain resistance.',
+                    'image' => 'assets/images/category_living_lounge.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-dn-02',
+                    'sku' => 'LR-DN-115',
+                    'name' => 'Solenne Woven Cord Dining Chair (Set of 2)',
+                    'categoryId' => 'dining',
+                    'categoryName' => 'Dining Room',
+                    'isBestSeller' => false,
+                    'price' => 1290,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 1290,
+                    'dimensions' => '54cm W × 52cm D × 77cm H',
+                    'leadTimeWeeks' => 2,
+                    'inStockCount' => 14,
+                    'minStockLevel' => 4,
+                    'primaryMaterialId' => 'mat-108',
+                    'defaultFinish' => 'Oiled Walnut / Natural Cord',
+                    'finishes' => [
+                        'Oiled Walnut / Natural Cord',
+                        'White Oak / Natural Cord',
+                        'Walnut / Black Danish Cord',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Oiled Walnut / Natural Cord', 'hex' => '#6E4B32', 'priceDelta' => 0],
+                        ['name' => 'White Oak / Natural Cord', 'hex' => '#D2BC9A', 'priceDelta' => -80],
+                        ['name' => 'Walnut / Black Danish Cord', 'hex' => '#2A2624', 'priceDelta' => 140],
+                    ],
+                    'description' => 'Hand-woven over four hours using 130 meters of wax-coated Danish paper cord per seat. Designed to tuck flush beneath the Lillia Monolith Dining Table.',
+                    'craftsmanshipNote' => 'Continuous steam-bent backrest rail with wedged mortise joinery.',
+                    'image' => 'assets/images/category_dining_tables.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-bd-02',
+                    'sku' => 'LR-BD-219',
+                    'name' => 'Cantilevered Ash Bedside Nightstand (Pair)',
+                    'categoryId' => 'bedroom',
+                    'categoryName' => 'Bedroom',
+                    'isBestSeller' => false,
+                    'price' => 1180,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 1180,
+                    'dimensions' => '56cm W × 42cm D × 46cm H',
+                    'leadTimeWeeks' => 2,
+                    'inStockCount' => 8,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-103',
+                    'defaultFinish' => 'Natural Matte Ash',
+                    'finishes' => [
+                        'Natural Matte Ash',
+                        'Smoked White Oak',
+                        'Oiled Black Walnut',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Natural Matte Ash', 'hex' => '#D9C7AE', 'priceDelta' => 0],
+                        ['name' => 'Smoked White Oak', 'hex' => '#9E8468', 'priceDelta' => 120],
+                        ['name' => 'Oiled Black Walnut', 'hex' => '#543824', 'priceDelta' => 210],
+                    ],
+                    'description' => 'Wall-mounted or plinth-supported floating bedside cases with mitered waterfall grain wrap, aromatic Spanish cedar drawer bottoms, and concealed rear cord pass-throughs.',
+                    'craftsmanshipNote' => 'Hand-cut half-blind dovetail drawer boxes with solid brass knurled pulls.',
+                    'image' => 'assets/images/category_bedroom_sanctuary.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-kt-01',
+                    'sku' => 'LR-KT-401',
+                    'name' => 'Valen Travertine & Walnut Kitchen Island',
+                    'categoryId' => 'kitchen',
+                    'categoryName' => 'Kitchen',
+                    'isBestSeller' => false,
+                    'price' => 3850,
+                    'discountPercent' => 10,
+                    'effectivePrice' => 3465,
+                    'dimensions' => '220cm L × 95cm W × 90cm H',
+                    'leadTimeWeeks' => 5,
+                    'inStockCount' => 3,
+                    'minStockLevel' => 2,
+                    'primaryMaterialId' => 'mat-106',
+                    'defaultFinish' => 'Honed Travertine / Natural Walnut',
+                    'finishes' => [
+                        'Honed Travertine / Natural Walnut',
+                        'Warm Limestone / Quarter-Sawn Oak',
+                        'Titanium Travertine / Ebonized Ash',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Honed Travertine / Natural Walnut', 'hex' => '#5C3A21', 'priceDelta' => 0],
+                        ['name' => 'Warm Limestone / Quarter-Sawn Oak', 'hex' => '#C8AD88', 'priceDelta' => -120],
+                        ['name' => 'Titanium Travertine / Ebonized Ash', 'hex' => '#28292D', 'priceDelta' => 290],
+                    ],
+                    'description' => 'An architectural culinary island crowned with a 50mm honed Roman travertine slab over fluted American black walnut cabinetry and soft-close cutlery drawers.',
+                    'craftsmanshipNote' => 'Integrated overhang for four counter stools with concealed brass power receptacles.',
+                    'image' => 'assets/images/category_kitchen_atelier.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+                [
+                    'id' => 'furn-kt-02',
+                    'sku' => 'LR-KT-412',
+                    'name' => 'Soren Sculpted Oak Counter Stools (Set of 2)',
+                    'categoryId' => 'kitchen',
+                    'categoryName' => 'Kitchen',
+                    'isBestSeller' => false,
+                    'price' => 1450,
+                    'discountPercent' => 0,
+                    'effectivePrice' => 1450,
+                    'dimensions' => '44cm W × 42cm D × 66cm H',
+                    'leadTimeWeeks' => 2,
+                    'inStockCount' => 10,
+                    'minStockLevel' => 3,
+                    'primaryMaterialId' => 'mat-102',
+                    'defaultFinish' => 'Soap-Finished White Oak',
+                    'finishes' => [
+                        'Soap-Finished White Oak',
+                        'Hand-Rubbed Black Walnut',
+                        'Ebonized Ash / Brass Footrest',
+                    ],
+                    'colorVariants' => [
+                        ['name' => 'Soap-Finished White Oak', 'hex' => '#DECBB1', 'priceDelta' => 0],
+                        ['name' => 'Hand-Rubbed Black Walnut', 'hex' => '#5E3F28', 'priceDelta' => 160],
+                        ['name' => 'Ebonized Ash / Brass Footrest', 'hex' => '#222428', 'priceDelta' => 210],
+                    ],
+                    'description' => 'CNC-carved and hand-sanded solid timber saddle seats perched on tapered cylindrical legs with a solid brushed brass footrest.',
+                    'craftsmanshipNote' => 'Mortise-and-wedged-tenon joinery built for daily kitchen island seating.',
+                    'image' => 'assets/images/category_kitchen_atelier.jpg',
+                    'isCustomClientDesign' => false,
+                    'customClientEmail' => null,
+                ],
+            ],
+            'materials' => [
+                [
+                    'id' => 'mat-101',
+                    'code' => 'MAT-WAL-01',
+                    'name' => 'FAS American Black Walnut Slabs',
+                    'materialType' => 'Solid Timber',
+                    'unit' => 'bd ft',
+                    'unitCost' => 28,
+                    'stockQuantity' => 180,
+                    'minStockLevel' => 45,
+                    'usedIn' => 'Dining tables, fluted credenzas, custom monolith slabs',
+                ],
+                [
+                    'id' => 'mat-102',
+                    'code' => 'MAT-OAK-02',
+                    'name' => 'Quarter-Sawn European White Oak',
+                    'materialType' => 'Solid Timber',
+                    'unit' => 'bd ft',
+                    'unitCost' => 22,
+                    'stockQuantity' => 145,
+                    'minStockLevel' => 40,
+                    'usedIn' => 'Lounge chair frames, writing desks, sofa plinths',
+                ],
+                [
+                    'id' => 'mat-103',
+                    'code' => 'MAT-ASH-03',
+                    'name' => 'Kiln-Dried European Ash Timber',
+                    'materialType' => 'Solid Timber',
+                    'unit' => 'bd ft',
+                    'unitCost' => 19,
+                    'stockQuantity' => 28,
+                    'minStockLevel' => 35,
+                    'usedIn' => 'Cantilevered nightstands, platform bed slat rails',
+                ],
+                [
+                    'id' => 'mat-104',
+                    'code' => 'MAT-BCL-04',
+                    'name' => 'Heavyweight Belgian Wool Bouclé',
+                    'materialType' => 'Upholstery Textile',
+                    'unit' => 'sq m',
+                    'unitCost' => 68,
+                    'stockQuantity' => 84,
+                    'minStockLevel' => 20,
+                    'usedIn' => 'Rowena curved lounge sofas, lounge chair cushions',
+                ],
+                [
+                    'id' => 'mat-105',
+                    'code' => 'MAT-LIN-05',
+                    'name' => 'Unbleached Belgian Flax Linen',
+                    'materialType' => 'Upholstery Textile',
+                    'unit' => 'sq m',
+                    'unitCost' => 54,
+                    'stockQuantity' => 62,
+                    'minStockLevel' => 18,
+                    'usedIn' => 'Serene platform bed headboards & tailored upholstery',
+                ],
+                [
+                    'id' => 'mat-106',
+                    'code' => 'MAT-TRV-06',
+                    'name' => 'Honed Roman Travertine Blocks',
+                    'materialType' => 'Architectural Stone',
+                    'unit' => 'slabs',
+                    'unitCost' => 420,
+                    'stockQuantity' => 6,
+                    'minStockLevel' => 3,
+                    'usedIn' => 'Verona honed travertine plinth coffee tables',
+                ],
+                [
+                    'id' => 'mat-107',
+                    'code' => 'MAT-BRS-07',
+                    'name' => 'Solid Aged Brass Hardware & Butterfly Keys',
+                    'materialType' => 'Hardware & Joinery',
+                    'unit' => 'sets',
+                    'unitCost' => 95,
+                    'stockQuantity' => 32,
+                    'minStockLevel' => 10,
+                    'usedIn' => 'Credenza hinges, knurled drawer pulls, slab butterfly keys',
+                ],
+                [
+                    'id' => 'mat-108',
+                    'code' => 'MAT-CRD-08',
+                    'name' => 'Danish Waxed Paper Cord & Cold-Pressed Linseed Oil',
+                    'materialType' => 'Cord & Finishes',
+                    'unit' => 'rolls',
+                    'unitCost' => 42,
+                    'stockQuantity' => 24,
+                    'minStockLevel' => 8,
+                    'usedIn' => 'Solenne woven cord chairs & zero-VOC timber finishing',
+                ],
+            ],
+            'vouchers' => [
+                [
+                    'id' => 'vch-101',
+                    'code' => 'VCH-ROWENA-SOFA400',
+                    'customerEmail' => 'rowena.vance@vancearchitects.com',
+                    'customerName' => 'Rowena Vance',
+                    'furnitureId' => 'furn-lv-01',
+                    'furnitureSku' => 'LR-LV-014',
+                    'furnitureName' => 'Rowena Curved Bouclé Lounge Sofa',
+                    'discountAmount' => 400,
+                    'status' => 'Active',
+                    'issuedByAdmin' => 'Lillia Mercier',
+                    'createdAt' => '2026-11-10',
+                    'expiryDate' => '2026-12-31',
+                ],
+                [
+                    'id' => 'vch-102',
+                    'code' => 'VCH-ROWENA-WALNUT350',
+                    'customerEmail' => 'rowena.vance@vancearchitects.com',
+                    'customerName' => 'Rowena Vance',
+                    'furnitureId' => 'furn-dn-01',
+                    'furnitureSku' => 'LR-DN-108',
+                    'furnitureName' => 'Lillia Monolith Solid Walnut Dining Table',
+                    'discountAmount' => 350,
+                    'status' => 'Active',
+                    'issuedByAdmin' => 'Lillia Mercier',
+                    'createdAt' => '2026-11-11',
+                    'expiryDate' => '2026-12-31',
+                ],
+                [
+                    'id' => 'vch-103',
+                    'code' => 'VCH-JULIAN-BED250',
+                    'customerEmail' => 'j.mercier@mercierstudio.co',
+                    'customerName' => 'Julian Mercier',
+                    'furnitureId' => 'furn-bd-01',
+                    'furnitureSku' => 'LR-BD-204',
+                    'furnitureName' => 'Serene Belgian Linen Platform Bed (King)',
+                    'discountAmount' => 250,
+                    'status' => 'Active',
+                    'issuedByAdmin' => 'Lillia Mercier',
+                    'createdAt' => '2026-11-09',
+                    'expiryDate' => '2026-12-15',
+                ],
+            ],
+            'orders' => [
+                [
+                    'id' => 'ord-101',
+                    'orderNumber' => 'ORD-2026-8841',
+                    'clientName' => 'Rowena Vance',
+                    'clientEmail' => 'rowena.vance@vancearchitects.com',
+                    'clientCompany' => 'Vance & Associates Spatial Design',
+                    'furnitureId' => 'furn-dn-01',
+                    'furnitureName' => 'Lillia Monolith Solid Walnut Dining Table',
+                    'sku' => 'LR-DN-108',
+                    'categoryName' => 'Dining & Tables',
+                    'itemType' => 'Custom',
+                    'selectedFinish' => 'Hand-Rubbed Natural Walnut',
+                    'customDimensions' => '260cm L × 110cm W × 75cm H',
+                    'materialId' => 'mat-101',
+                    'materialName' => 'FAS American Black Walnut Slabs',
+                    'materialQtyUsed' => 48,
+                    'materialUnit' => 'bd ft',
+                    'quantity' => 1,
+                    'unitPrice' => 3696,
+                    'extraCost' => 0,
+                    'totalAmount' => 3696,
+                    'depositPaid' => 1848,
+                    'status' => 'In Joinery & Millwork',
+                    'sqlStatus' => 'InProduction',
+                    'taskStatus' => 'InProgress',
+                    'deliveryStatus' => 'Scheduled',
+                    'driverName' => 'Devon Vance',
+                    'paymentStatus' => '50% Deposit Paid',
+                    'orderDate' => '2026-10-18',
+                    'estimatedDelivery' => '2026-11-24',
+                    'deliveryAddress' => 'Suite 400, 118 Mercer St, SoHo, NY',
+                    'assignedCraftsperson' => 'Mateo Cruz',
+                    'notes' => 'Book-matched walnut slab approved by client via slab photography.',
+                    'appliedVoucherCode' => null,
+                    'voucherDiscountAmount' => 0,
+                ],
+                [
+                    'id' => 'ord-102',
+                    'orderNumber' => 'ORD-2026-8834',
+                    'clientName' => 'Rowena Vance',
+                    'clientEmail' => 'rowena.vance@vancearchitects.com',
+                    'clientCompany' => 'Vance & Associates Spatial Design',
+                    'furnitureId' => 'furn-lv-01',
+                    'furnitureName' => 'Rowena Curved Bouclé Lounge Sofa',
+                    'sku' => 'LR-LV-014',
+                    'categoryName' => 'Living & Lounge',
+                    'itemType' => 'Standard',
+                    'selectedFinish' => 'Warm Oat Bouclé / Natural Oak',
+                    'customDimensions' => '245cm W × 104cm D × 74cm H',
+                    'materialId' => 'mat-104',
+                    'materialName' => 'Heavyweight Belgian Wool Bouclé',
+                    'materialQtyUsed' => 14,
+                    'materialUnit' => 'sq m',
+                    'quantity' => 1,
+                    'unitPrice' => 4365,
+                    'extraCost' => 0,
+                    'totalAmount' => 4365,
+                    'depositPaid' => 4365,
+                    'status' => 'Quality Inspection · Ready for Dispatch',
+                    'sqlStatus' => 'Ready',
+                    'taskStatus' => 'Done',
+                    'deliveryStatus' => 'Scheduled',
+                    'driverName' => 'Devon Vance',
+                    'paymentStatus' => 'Paid in Full',
+                    'orderDate' => '2026-10-04',
+                    'estimatedDelivery' => '2026-11-15',
+                    'deliveryAddress' => 'Suite 400, 118 Mercer St, SoHo, NY',
+                    'assignedCraftsperson' => 'Clara Lindqvist',
+                    'notes' => 'White-glove freight elevator reservation confirmed for 9:00 AM.',
+                    'appliedVoucherCode' => null,
+                    'voucherDiscountAmount' => 0,
+                ],
+                [
+                    'id' => 'ord-103',
+                    'orderNumber' => 'ORD-2026-8829',
+                    'clientName' => 'Julian Mercier',
+                    'clientEmail' => 'j.mercier@mercierstudio.co',
+                    'clientCompany' => 'Mercier Residential Studio',
+                    'furnitureId' => 'furn-of-01',
+                    'furnitureName' => 'Mercier Fluted Walnut Sideboard Credenza',
+                    'sku' => 'LR-OF-302',
+                    'categoryName' => 'Study & Credenzas',
+                    'itemType' => 'Standard',
+                    'selectedFinish' => 'Natural Walnut / Aged Brass',
+                    'customDimensions' => '210cm W × 48cm D × 76cm H',
+                    'materialId' => 'mat-101',
+                    'materialName' => 'FAS American Black Walnut Slabs',
+                    'materialQtyUsed' => 64,
+                    'materialUnit' => 'bd ft',
+                    'quantity' => 2,
+                    'unitPrice' => 3307,
+                    'extraCost' => 0,
+                    'totalAmount' => 6614,
+                    'depositPaid' => 3307,
+                    'status' => 'Hand-Rubbed Finishing & Upholstery',
+                    'sqlStatus' => 'InProduction',
+                    'taskStatus' => 'InProgress',
+                    'deliveryStatus' => 'Scheduled',
+                    'driverName' => 'Devon Vance',
+                    'paymentStatus' => '50% Deposit Paid',
+                    'orderDate' => '2026-10-11',
+                    'estimatedDelivery' => '2026-11-19',
+                    'deliveryAddress' => '742 Evergreen Terrace, Pacific Heights, SF',
+                    'assignedCraftsperson' => 'Soren Henriksen',
+                    'notes' => 'Matched grain sequence across both credenzas for gallery corridor.',
+                    'appliedVoucherCode' => null,
+                    'voucherDiscountAmount' => 0,
+                ],
+                [
+                    'id' => 'ord-104',
+                    'orderNumber' => 'ORD-2026-8815',
+                    'clientName' => 'Elena Rostova',
+                    'clientEmail' => 'elena@rostovainteriors.com',
+                    'clientCompany' => 'Rostova Architectural Interiors',
+                    'furnitureId' => 'furn-bd-01',
+                    'furnitureName' => 'Serene Belgian Linen Platform Bed (King)',
+                    'sku' => 'LR-BD-204',
+                    'categoryName' => 'Bedroom Sanctuary',
+                    'itemType' => 'Standard',
+                    'selectedFinish' => 'Oatmeal Flax Linen / Ash Base',
+                    'customDimensions' => '218cm L × 206cm W × 98cm H',
+                    'materialId' => 'mat-105',
+                    'materialName' => 'Unbleached Belgian Flax Linen',
+                    'materialQtyUsed' => 16,
+                    'materialUnit' => 'sq m',
+                    'quantity' => 1,
+                    'unitPrice' => 3650,
+                    'extraCost' => 0,
+                    'totalAmount' => 3650,
+                    'depositPaid' => 3650,
+                    'status' => 'Dispatched · White-Glove Transit',
+                    'sqlStatus' => 'Delivered',
+                    'taskStatus' => 'Done',
+                    'deliveryStatus' => 'InTransit',
+                    'driverName' => 'Devon Vance',
+                    'paymentStatus' => 'Paid in Full',
+                    'orderDate' => '2026-09-26',
+                    'estimatedDelivery' => '2026-11-12',
+                    'deliveryAddress' => '29A Kensington Park Rd, Notting Hill',
+                    'assignedCraftsperson' => 'Mateo Cruz',
+                    'notes' => 'In transit with White-Glove Carrier #WG-209.',
+                    'appliedVoucherCode' => null,
+                    'voucherDiscountAmount' => 0,
+                ],
+                [
+                    'id' => 'ord-105',
+                    'orderNumber' => 'ORD-2026-8850',
+                    'clientName' => 'Marcus Sterling',
+                    'clientEmail' => 'm.sterling@sterlingcapital.io',
+                    'clientCompany' => 'Sterling Private Residence',
+                    'furnitureId' => 'furn-lv-02',
+                    'furnitureName' => 'Cavana Sculpted White Oak Lounge Chair',
+                    'sku' => 'LR-LV-029',
+                    'categoryName' => 'Living & Lounge',
+                    'itemType' => 'Standard',
+                    'selectedFinish' => 'Fumed Dark Oak / Cognac Leather',
+                    'customDimensions' => '76cm W × 82cm D × 73cm H',
+                    'materialId' => 'mat-102',
+                    'materialName' => 'Quarter-Sawn European White Oak',
+                    'materialQtyUsed' => 24,
+                    'materialUnit' => 'bd ft',
+                    'quantity' => 2,
+                    'unitPrice' => 1840,
+                    'extraCost' => 0,
+                    'totalAmount' => 3680,
+                    'depositPaid' => 0,
+                    'status' => 'Timber Selection & Kiln Verification',
+                    'sqlStatus' => 'Pending',
+                    'taskStatus' => 'Todo',
+                    'deliveryStatus' => 'Scheduled',
+                    'driverName' => 'Devon Vance',
+                    'paymentStatus' => 'Awaiting Deposit',
+                    'orderDate' => '2026-11-08',
+                    'estimatedDelivery' => '2026-11-29',
+                    'deliveryAddress' => '880 Lake Shore Drive, Apt 32B, Chicago',
+                    'assignedCraftsperson' => 'Clara Lindqvist',
+                    'notes' => 'Fumed Dark Oak +$160 color tier selected.',
+                    'appliedVoucherCode' => null,
+                    'voucherDiscountAmount' => 0,
+                ],
+            ],
+            'workshopLogs' => [
+                [
+                    'id' => 'log-01',
+                    'timestamp' => '2026-11-11 08:40',
+                    'station' => 'Kiln & Timber Vault',
+                    'craftsperson' => 'Mateo Cruz',
+                    'orderNumber' => 'ORD-2026-8841',
+                    'note' => 'FAS Black Walnut Slab #W-904 moisture verified at 7.2% MC; butterfly keys inlaid.',
+                    'qcPassed' => true,
+                ],
+                [
+                    'id' => 'log-02',
+                    'timestamp' => '2026-11-11 11:15',
+                    'station' => 'Upholstery Bench 02',
+                    'craftsperson' => 'Clara Lindqvist',
+                    'orderNumber' => 'ORD-2026-8834',
+                    'note' => 'Belgian bouclé seam tension and crescent backrest curvature passed 12-point inspection.',
+                    'qcPassed' => true,
+                ],
+                [
+                    'id' => 'log-03',
+                    'timestamp' => '2026-11-10 16:50',
+                    'station' => 'Oil & Wax Finishing Room',
+                    'craftsperson' => 'Soren Henriksen',
+                    'orderNumber' => 'ORD-2026-8829',
+                    'note' => 'Third coat of cold-pressed organic linseed oil hand-buffed on fluted walnut doors.',
+                    'qcPassed' => true,
+                ],
+                [
+                    'id' => 'log-04',
+                    'timestamp' => '2026-11-09 14:20',
+                    'station' => 'White-Glove Crating Dock',
+                    'craftsperson' => 'Devon Vance',
+                    'orderNumber' => 'ORD-2026-8815',
+                    'note' => 'Custom felt-lined timber crate sealed with shock-telemetry sensor attached.',
+                    'qcPassed' => true,
+                ],
+            ],
+            'inventoryTransactions' => [
+                [
+                    'id' => 'inv-tx-101',
+                    'materialId' => 'mat-101',
+                    'materialName' => 'FAS American Black Walnut Slabs',
+                    'materialCode' => 'MAT-WAL-01',
+                    'materialType' => 'Solid Timber',
+                    'unit' => 'bd ft',
+                    'transactionType' => 'Stock In',
+                    'quantity' => 60,
+                    'previousStock' => 120,
+                    'newStock' => 180,
+                    'purchaseCost' => 1680,
+                    'unitCost' => 28,
+                    'reason' => 'Workshop Raw Material Restock',
+                    'dateTime' => '2026-11-11 09:30',
+                    'adminName' => 'Lillia Mercier (Business Owner)',
+                ],
+                [
+                    'id' => 'inv-tx-102',
+                    'materialId' => 'mat-104',
+                    'materialName' => 'Heavyweight Belgian Wool Bouclé',
+                    'materialCode' => 'MAT-BCL-04',
+                    'materialType' => 'Upholstery Textile',
+                    'unit' => 'sq m',
+                    'transactionType' => 'Stock In',
+                    'quantity' => 30,
+                    'previousStock' => 54,
+                    'newStock' => 84,
+                    'purchaseCost' => 2040,
+                    'unitCost' => 68,
+                    'reason' => 'Workshop Raw Material Restock',
+                    'dateTime' => '2026-11-10 14:15',
+                    'adminName' => 'Lillia Mercier (Business Owner)',
+                ],
+                [
+                    'id' => 'inv-tx-103',
+                    'materialId' => 'mat-101',
+                    'materialName' => 'FAS American Black Walnut Slabs',
+                    'materialCode' => 'MAT-WAL-01',
+                    'materialType' => 'Solid Timber',
+                    'unit' => 'bd ft',
+                    'transactionType' => 'Stock Out',
+                    'quantity' => 48,
+                    'previousStock' => 228,
+                    'newStock' => 180,
+                    'purchaseCost' => null,
+                    'unitCost' => 28,
+                    'reason' => 'Allocated to Workshop Production (Order #ORD-2026-8841)',
+                    'dateTime' => '2026-11-09 16:40',
+                    'adminName' => 'Mateo Cruz · Workshop Millwork',
+                ],
+            ],
+        ];
     }
 }

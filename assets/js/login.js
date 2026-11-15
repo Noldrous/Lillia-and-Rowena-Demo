@@ -45,10 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRole = 'Customer';
   let currentMode = 'signin'; // 'signin' | 'register'
   let serverStoreCache = null;
+  const API_ENDPOINT = window.location.pathname.includes('/src/') ? 'api.php' : 'src/api.php';
 
   async function fetchServerState() {
     try {
-      const res = await fetch('api.php?action=state', { cache: 'no-store' });
+      const res = await fetch(`${API_ENDPOINT}?action=state`, { cache: 'no-store' });
       if (res.ok) {
         serverStoreCache = await res.json();
         return serverStoreCache;
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
           try {
-            await fetch('api.php', {
+            await fetch(API_ENDPOINT, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'save_session', sessionUser: null }),
@@ -304,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         if (isRegister && fullName) {
-          await fetch('api.php', {
+          await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -317,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }),
           });
         } else {
-          await fetch('api.php', {
+          await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
