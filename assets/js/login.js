@@ -75,14 +75,14 @@ document.addEventListener('DOMContentLoaded', () => {
       activeSessionUser.textContent = `${displayName} (${isAdmin ? 'Admin' : 'Customer'})`;
       activeSessionActions.innerHTML = isAdmin
         ? `
-          <a href="dashboard.html?role=admin" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; font-size: 0.75rem; font-weight: 700; text-decoration: none;">Admin Dashboard →</a>
-          <a href="index.html" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FFFFFF; border: 1px solid #CBD5E1; color: #0F172A; font-size: 0.75rem; font-weight: 700; text-decoration: none;">Back to Showroom</a>
-          <button type="button" id="login-page-logout-btn" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Log Out</button>
+    <a href="dashboard.html?role=admin" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; font-size: 0.75rem; font-weight: 700; text-decoration: none;">Admin Dashboard →</a>
+    <a href="index.html" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FFFFFF; border: 1px solid #CBD5E1; color: #0F172A; font-size: 0.75rem; font-weight: 700; text-decoration: none;">Back to Showroom</a>
+    <button type="button" id="login-page-logout-btn" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Log Out</button>
         `
         : `
-          <a href="dashboard.html?role=client&tab=home" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; font-size: 0.75rem; font-weight: 700; text-decoration: none;">My Account →</a>
-          <a href="dashboard.html?role=client&tab=orders" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FFFFFF; border: 1px solid #CBD5E1; color: #0F172A; font-size: 0.75rem; font-weight: 700; text-decoration: none;">My Orders</a>
-          <button type="button" id="login-page-logout-btn" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Log Out</button>
+    <a href="dashboard.html?role=client&tab=home" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #0095FF; color: #FFF; font-size: 0.75rem; font-weight: 700; text-decoration: none;">My Account →</a>
+    <a href="dashboard.html?role=client&tab=orders" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FFFFFF; border: 1px solid #CBD5E1; color: #0F172A; font-size: 0.75rem; font-weight: 700; text-decoration: none;">My Orders</a>
+    <button type="button" id="login-page-logout-btn" style="padding: 0.45rem 0.85rem; border-radius: 0.5rem; background: #FEE2E2; border: 1px solid #FECACA; color: #DC2626; font-size: 0.75rem; font-weight: 700; cursor: pointer;">Log Out</button>
         `;
 
       const logoutBtn = document.getElementById('login-page-logout-btn');

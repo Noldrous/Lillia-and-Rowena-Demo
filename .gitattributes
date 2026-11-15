@@ -9,3 +9,6 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+
+server.mjs linguist-vendored
+assets/js/store.test.js linguist-vendored

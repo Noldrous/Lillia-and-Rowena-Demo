@@ -1,21 +1,13 @@
-/**
- * Lillia and Rowena Furniture — Lightweight DOM Controller
- * Handles in-place Hero Tab switching, color-variant pricing, empty-default cart,
- * strict role-based dashboard routing (Customer vs Admin), and the redesigned User Dashboard.
- */
-
 import {
   ADMIN_MESSENGER_PLACEHOLDER_URL,
   CATALOG_COLOR_FILTERS,
   PRODUCT_TYPES,
   applyAdminOrderUpdate,
   applyMaterialStockMovement,
-  applyStockMovement,
   buildMaterialRecord,
   buildProductRecord,
   buildRequestDesignMessengerUrl,
   calculateOrderPricing,
-  computeInventoryMetrics,
   computeMaterialInventoryMetrics,
   computeVariantPricing,
   createCustomOrderRequest,
@@ -139,7 +131,7 @@ const state = {
   catalogPageSearchQuery: '',
   cartItems: [],
   appliedVoucher: null,
-  sessionUser: null, // null when logged out, { email, name, role: 'client' | 'admin' } when logged in
+  sessionUser: null,
   activeClientTab: 'home',
   clientCustomOrderOpen: false,
   clientCustomOrderInput: {
@@ -196,6 +188,36 @@ function usd(amount) {
   return '$' + Math.round(Number(amount || 0)).toLocaleString('en-US');
 }
 
+function bindLiveSearchInput(inputId, stateKey, onRender) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', (e) => {
+    state[stateKey] = e.target.value;
+    const pos = e.target.selectionStart || 0;
+    onRender();
+    const nextInput = document.getElementById(inputId);
+    if (nextInput) {
+      nextInput.focus();
+      nextInput.setSelectionRange(pos, pos);
+    }
+  });
+}
+
+function bindStorefrontProductButtons(root = document) {
+  root.querySelectorAll('[data-view-product]').forEach((btn) => {
+    btn.onclick = () => {
+      const pid = btn.getAttribute('data-view-product');
+      if (pid) openProductDetailModal(pid);
+    };
+  });
+  root.querySelectorAll('[data-add-cart]').forEach((btn) => {
+    btn.onclick = () => {
+      const pid = btn.getAttribute('data-add-cart');
+      if (pid) addProductToCartFromStorefront(pid);
+    };
+  });
+}
+
 function syncDatabaseStore(action = 'sync_store', extraPayload = {}) {
   try {
     fetch('api.php', {
@@ -218,8 +240,7 @@ function syncDatabaseStore(action = 'sync_store', extraPayload = {}) {
 }
 
 function persistProductToStorage(product) {
-  if (!product || !product.id) return;
-  syncDatabaseStore('save_product', { product });
+  if (product && product.id) syncDatabaseStore('save_product', { product });
 }
 
 function saveMaterialsToStorage() {
@@ -269,10 +290,6 @@ function hydrateCartFromServer(rawCartItems) {
       };
     })
     .filter(Boolean);
-}
-
-function loadCustomerProfileFromStorage() {
-  // Profile is loaded directly from the server datastore in loadData()
 }
 
 function saveCustomerProfileToStorage() {
@@ -349,7 +366,6 @@ function syncAuthNavigationUI() {
   const cartCheckoutLink = document.getElementById('cart-checkout-link');
   const topBarStatus = document.getElementById('top-bar-user-status');
 
-  // 1. Header Navigation Visibility
   if (guestNav) {
     guestNav.classList.toggle('hidden', authNav.isAuthenticated);
     guestNav.classList.toggle('flex', !authNav.isAuthenticated);
@@ -364,33 +380,23 @@ function syncAuthNavigationUI() {
   }
 
   const profilePillEl = document.getElementById('nav-profile-pill');
-  if (profileNameEl && authNav.userDisplayName) {
-    profileNameEl.textContent = authNav.userDisplayName;
-  }
-  if (profileInitialsEl && authNav.userInitials) {
-    profileInitialsEl.textContent = authNav.userInitials;
-  }
+  if (profileNameEl && authNav.userDisplayName) profileNameEl.textContent = authNav.userDisplayName;
+  if (profileInitialsEl && authNav.userInitials) profileInitialsEl.textContent = authNav.userInitials;
   if (profilePillEl && authNav.userDisplayName) {
     profilePillEl.title = `My Account (${authNav.userDisplayName})`;
     profilePillEl.setAttribute('aria-label', `My Account (${authNav.userDisplayName})`);
   }
 
-  // 2. Footer Account Links Visibility
   if (guestFooter) guestFooter.classList.toggle('hidden', authNav.isAuthenticated);
   if (custFooter) custFooter.classList.toggle('hidden', !authNav.showCustomerAccountNav);
   if (adminFooter) adminFooter.classList.toggle('hidden', !authNav.showAdminNav);
+  if (bannerVouchersLink) bannerVouchersLink.classList.toggle('hidden', !authNav.showCustomerAccountNav);
 
-  // 3. Banner, Hero & Cart Auth Links
-  if (bannerVouchersLink) {
-    bannerVouchersLink.classList.toggle('hidden', !authNav.showCustomerAccountNav);
-  }
   if (heroTrackLink) {
     heroTrackLink.href = authNav.heroOrderLink.href;
     heroTrackLink.textContent = authNav.heroOrderLink.label;
   }
-  if (cartUserEmailEl) {
-    cartUserEmailEl.textContent = authNav.cartVoucherHint;
-  }
+  if (cartUserEmailEl) cartUserEmailEl.textContent = authNav.cartVoucherHint;
   if (cartCheckoutLink) {
     cartCheckoutLink.href = authNav.cartCheckoutCta.href;
     cartCheckoutLink.textContent = authNav.cartCheckoutCta.label;
@@ -405,19 +411,14 @@ function syncAuthNavigationUI() {
     }
   }
 
-  // 4. Bind All Logout Buttons
-  ['nav-logout-btn', 'nav-admin-logout-btn', 'footer-logout-btn', 'footer-admin-logout-btn'].forEach((btnId) => {
-    const btn = document.getElementById(btnId);
-    if (btn) {
-      btn.onclick = handleStorefrontLogout;
+  ['nav-logout-btn', 'nav-admin-logout-btn', 'footer-logout-btn', 'footer-admin-logout-btn'].forEach(
+    (btnId) => {
+      const btn = document.getElementById(btnId);
+      if (btn) btn.onclick = handleStorefrontLogout;
     }
-  });
+  );
 }
 
-/**
- * Locks background page scrolling whenever the Cart Drawer, Product Details modal,
- * or Make Offer modal is open, and restores it when all overlays are closed.
- */
 function syncBodyScrollLock() {
   const cartDrawer = document.getElementById('cart-drawer');
   const productModal = document.getElementById('product-detail-modal');
@@ -431,11 +432,6 @@ function syncBodyScrollLock() {
   document.body.style.overflow = isAnyOverlayOpen ? 'hidden' : '';
 }
 
-/**
- * Handles clicking "Request a Design":
- * - If not logged in, redirects to login.html?redirect=request-design
- * - If logged in, redirects directly to the Admin's Messenger conversation with custom design inquiry.
- */
 function handleRequestDesignClick(e) {
   if (e) e.preventDefault();
   const resolved = buildRequestDesignMessengerUrl(state.sessionUser);
@@ -468,9 +464,7 @@ function bindStorefrontModalListeners() {
     productModal.classList.remove('flex');
     syncBodyScrollLock();
   };
-  if (closeProductModalBtn) {
-    closeProductModalBtn.onclick = closeProductModal;
-  }
+  if (closeProductModalBtn) closeProductModalBtn.onclick = closeProductModal;
   if (productModal) {
     productModal.onclick = (e) => {
       if (e.target === productModal) closeProductModal();
@@ -485,12 +479,79 @@ function bindStorefrontModalListeners() {
   initMakeOfferModal();
 }
 
+function bindCartDrawerAndVoucher() {
+  const cartDrawer = document.getElementById('cart-drawer');
+  const openCartBtn = document.getElementById('open-cart-btn');
+  const closeCartBtn = document.getElementById('close-cart-btn');
+  const closeDrawer = () => {
+    if (!cartDrawer) return;
+    cartDrawer.classList.add('hidden');
+    cartDrawer.classList.remove('flex');
+    syncBodyScrollLock();
+  };
+  if (openCartBtn && cartDrawer) {
+    openCartBtn.addEventListener('click', () => {
+      cartDrawer.classList.remove('hidden');
+      cartDrawer.classList.add('flex');
+      syncBodyScrollLock();
+      renderCartDrawer();
+    });
+  }
+  if (closeCartBtn && cartDrawer) {
+    closeCartBtn.addEventListener('click', closeDrawer);
+  }
+  if (cartDrawer) {
+    cartDrawer.addEventListener('click', (e) => {
+      if (e.target === cartDrawer) closeDrawer();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !cartDrawer.classList.contains('hidden')) {
+        closeDrawer();
+      }
+    });
+  }
+
+  const applyVoucherBtn = document.getElementById('apply-voucher-btn');
+  if (applyVoucherBtn) {
+    applyVoucherBtn.addEventListener('click', () => {
+      const codeInput = document.getElementById('voucher-code-input');
+      const feedback = document.getElementById('voucher-feedback');
+      const code = codeInput ? codeInput.value : '';
+      const activeEmail = state.sessionUser
+        ? state.sessionUser.email
+        : 'rowena.vance@vancearchitects.com';
+      const check = validateVoucherForOrder(
+        state.vouchers,
+        code,
+        activeEmail,
+        state.cartItems,
+        state.catalog
+      );
+
+      if (feedback) {
+        feedback.classList.remove('hidden', 'text-emerald-700', 'text-rose-600');
+        if (check.valid) {
+          state.appliedVoucher = check.voucher;
+          const targetProdName =
+            check.voucher.furnitureName || check.voucher.productName || 'selected product';
+          feedback.textContent = `✓ Voucher ${check.voucher.code} (${formatVoucherBenefitLabel(check.voucher)}) applied to "${targetProdName}" (-${usd(check.discountAmount)})!`;
+          feedback.classList.add('text-emerald-700');
+        } else {
+          state.appliedVoucher = null;
+          feedback.textContent = `✕ ${check.errorMessage}`;
+          feedback.classList.add('text-rose-600');
+        }
+      }
+      renderCartDrawer();
+    });
+  }
+}
+
 function initShowroomPage() {
   syncAuthNavigationUI();
   bindRequestDesignTriggers();
   bindStorefrontModalListeners();
 
-  // Hero Tab Switching (Changes Hero Section Content In-Place!)
   const heroTabButtons = document.querySelectorAll('[data-hero-tab]');
   heroTabButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -525,38 +586,18 @@ function initShowroomPage() {
         heroImg.alt = data.cardTitle;
       }
 
-      const primaryCta = document.getElementById('hero-primary-cta');
-      if (primaryCta) {
-        primaryCta.setAttribute('data-filter-target', data.filterTarget);
-        primaryCta.setAttribute('href', `catalog.html?category=${encodeURIComponent(data.filterTarget)}`);
-      }
-      const cardCta = document.getElementById('hero-card-cta');
-      if (cardCta) {
-        cardCta.setAttribute('data-filter-target', data.filterTarget);
-        cardCta.setAttribute('href', `catalog.html?category=${encodeURIComponent(data.filterTarget)}`);
-      }
+      ['hero-primary-cta', 'hero-card-cta'].forEach((ctaId) => {
+        const cta = document.getElementById(ctaId);
+        if (cta) {
+          cta.setAttribute('data-filter-target', data.filterTarget);
+          cta.setAttribute('href', `catalog.html?category=${encodeURIComponent(data.filterTarget)}`);
+        }
+      });
     });
   });
 
-  const showRecommendedBtn = document.getElementById('catalog-show-recommended-btn');
-  if (showRecommendedBtn) {
-    showRecommendedBtn.addEventListener('click', () => {
-      state.searchQuery = '';
-      const topSearch = document.getElementById('top-nav-search');
-      const topClear = document.getElementById('top-nav-search-clear');
-      if (topSearch) topSearch.value = '';
-      if (topClear) {
-        topClear.classList.add('hidden');
-        topClear.classList.remove('flex');
-      }
-      setActiveCategoryFilter('recommended');
-    });
-  }
-
-  // Top Nav Search Input + Clear Button (On Homepage: typing updates input; pressing Enter opens catalog.html)
   const topSearch = document.getElementById('top-nav-search');
   const topClear = document.getElementById('top-nav-search-clear');
-
   const syncClearButtons = (val) => {
     const hasQuery = Boolean(String(val || '').trim());
     if (topClear) {
@@ -565,10 +606,18 @@ function initShowroomPage() {
     }
   };
 
-  if (topSearch) {
-    topSearch.addEventListener('input', (e) => {
-      syncClearButtons(e.target.value);
+  const showRecommendedBtn = document.getElementById('catalog-show-recommended-btn');
+  if (showRecommendedBtn) {
+    showRecommendedBtn.addEventListener('click', () => {
+      state.searchQuery = '';
+      if (topSearch) topSearch.value = '';
+      syncClearButtons('');
+      setActiveCategoryFilter('recommended');
     });
+  }
+
+  if (topSearch) {
+    topSearch.addEventListener('input', (e) => syncClearButtons(e.target.value));
     topSearch.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -589,73 +638,8 @@ function initShowroomPage() {
     });
   }
 
-  // Cart Drawer Toggle (Open, Close Button, Backdrop Click, Escape Key)
-  const cartDrawer = document.getElementById('cart-drawer');
-  const openCartBtn = document.getElementById('open-cart-btn');
-  const closeCartBtn = document.getElementById('close-cart-btn');
-  const closeDrawer = () => {
-    if (!cartDrawer) return;
-    cartDrawer.classList.add('hidden');
-    cartDrawer.classList.remove('flex');
-    syncBodyScrollLock();
-  };
-  if (openCartBtn && cartDrawer) {
-    openCartBtn.addEventListener('click', () => {
-      cartDrawer.classList.remove('hidden');
-      cartDrawer.classList.add('flex');
-      syncBodyScrollLock();
-      renderCartDrawer();
-    });
-  }
-  if (closeCartBtn && cartDrawer) {
-    closeCartBtn.addEventListener('click', closeDrawer);
-  }
-  if (cartDrawer) {
-    cartDrawer.addEventListener('click', (e) => {
-      if (e.target === cartDrawer) closeDrawer();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !cartDrawer.classList.contains('hidden')) {
-        closeDrawer();
-      }
-    });
-  }
+  bindCartDrawerAndVoucher();
 
-  // Apply Single-Product Voucher in Cart
-  const applyVoucherBtn = document.getElementById('apply-voucher-btn');
-  if (applyVoucherBtn) {
-    applyVoucherBtn.addEventListener('click', () => {
-      const codeInput = document.getElementById('voucher-code-input');
-      const feedback = document.getElementById('voucher-feedback');
-      const code = codeInput ? codeInput.value : '';
-      const activeEmail = state.sessionUser ? state.sessionUser.email : 'rowena.vance@vancearchitects.com';
-      const check = validateVoucherForOrder(
-        state.vouchers,
-        code,
-        activeEmail,
-        state.cartItems,
-        state.catalog
-      );
-
-      if (feedback) {
-        feedback.classList.remove('hidden', 'text-emerald-700', 'text-rose-600');
-        if (check.valid) {
-          state.appliedVoucher = check.voucher;
-          const targetProdName =
-            check.voucher.furnitureName || check.voucher.productName || 'selected product';
-          feedback.textContent = `✓ Voucher ${check.voucher.code} (${formatVoucherBenefitLabel(check.voucher)}) applied to "${targetProdName}" (-${usd(check.discountAmount)})!`;
-          feedback.classList.add('text-emerald-700');
-        } else {
-          state.appliedVoucher = null;
-          feedback.textContent = `✕ ${check.errorMessage}`;
-          feedback.classList.add('text-rose-600');
-        }
-      }
-      renderCartDrawer();
-    });
-  }
-
-  // If user returned from login with ?trigger=request-design, open Messenger custom design flow
   const urlParams = new URLSearchParams(window.location.search);
   if ((urlParams.get('trigger') || '').toLowerCase() === 'request-design' && state.sessionUser) {
     window.history.replaceState({}, '', window.location.pathname);
@@ -685,37 +669,29 @@ function renderRoomCollections() {
       const isSelected = state.selectedCategory === cat.id;
       const catHref = `catalog.html?category=${encodeURIComponent(cat.id)}`;
       return `
-        <article class="group rounded-2xl bg-white border ${
+    <article class="group rounded-2xl bg-white border ${
           isSelected ? 'border-[#0095FF] ring-2' : 'border-[#BCE3FF] hover:border-[#0095FF]'
         } overflow-hidden shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between">
-          <a href="${esc(catHref)}" class="block">
-            <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
-              <img src="${esc(cat.image)}" alt="${esc(cat.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
-              <div class="absolute bottom-3 left-3 right-3 text-white">
-                <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From ${usd(cat.startingPrice)} · ${items.length} Pieces</p>
-                <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">${esc(cat.name)}</h3>
-              </div>
-            </div>
-            <div class="p-4 space-y-2">
-              <p class="text-xs text-[#475569] line-clamp-2">${esc(cat.tagline)}</p>
-            </div>
-          </a>
-          <div class="px-4 pb-4">
-            <a
-              href="${esc(catHref)}"
-              data-testid="category-card-link-${esc(cat.id)}"
-              class="w-full py-2.5 px-3.5 rounded-xl ${
-                isSelected
-                  ? 'bg-[#0095FF] text-white'
-                  : 'bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white'
-              } text-xs font-semibold transition-colors flex items-center justify-between"
-            >
-              <span>Explore ${esc(cat.name)}</span>
-              <span>→</span>
-            </a>
-          </div>
-        </article>
+    <a href="${esc(catHref)}" class="block">
+    <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+    <img src="${esc(cat.image)}" alt="${esc(cat.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+    <div class="absolute bottom-3 left-3 right-3 text-white">
+    <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From ${usd(cat.startingPrice)} · ${items.length} Pieces</p>
+    <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">${esc(cat.name)}</h3>
+    </div>
+    </div>
+    <div class="p-4 space-y-2">
+    <p class="text-xs text-[#475569] line-clamp-2">${esc(cat.tagline)}</p>
+    </div>
+    </a>
+    <div class="px-4 pb-4">
+    <a href="${esc(catHref)}" data-testid="category-card-link-${esc(cat.id)}" class="w-full py-2.5 px-3.5 rounded-xl ${ isSelected ? 'bg-[#0095FF] text-white' : 'bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white' } text-xs font-semibold transition-colors flex items-center justify-between">
+    <span>Explore ${esc(cat.name)}</span>
+    <span>→</span>
+    </a>
+    </div>
+    </article>
       `;
     })
     .join('');
@@ -787,113 +763,87 @@ function openProductDetailModal(productId) {
 
   body.innerHTML = `
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 items-start">
-      <div class="md:col-span-6 space-y-3">
-        <div class="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-          <img
-            src="${esc(display.image)}"
-            alt="${esc(display.name)}"
-            class="w-full h-full object-cover"
-          />
-        </div>
-        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1">
-          <span>Dimensions: <strong class="text-[#0D1015]">${esc(display.dimensions)}</strong></span>
-          <span>Delivery: <strong class="text-[#0D1015]">Ships in ${display.leadTimeWeeks} ${display.leadTimeWeeks === 1 ? 'week' : 'weeks'}</strong></span>
-        </div>
-      </div>
+    <div class="md:col-span-6 space-y-3">
+    <div class="aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+    <img src="${esc(display.image)}" alt="${esc(display.name)}" class="w-full h-full object-cover" />
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1">
+    <span>Dimensions: <strong class="text-[#0D1015]">${esc(display.dimensions)}</strong></span>
+    <span>Delivery: <strong class="text-[#0D1015]">Ships in ${display.leadTimeWeeks} ${display.leadTimeWeeks === 1 ? 'week' : 'weeks'}</strong></span>
+    </div>
+    </div>
 
-      <div class="md:col-span-6 space-y-5">
-        <div class="space-y-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusBadgeClass}">
+    <div class="md:col-span-6 space-y-5">
+    <div class="space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+    <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusBadgeClass}">
               ${esc(display.availabilityLabel)}
-            </span>
-            <span class="text-xs text-slate-500">${esc(display.availabilityDetail)}</span>
-          </div>
+    </span>
+    <span class="text-xs text-slate-500">${esc(display.availabilityDetail)}</span>
+    </div>
 
-          <h2 id="product-modal-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015] leading-snug">
+    <h2 id="product-modal-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015] leading-snug">
             ${esc(display.name)}
-          </h2>
+    </h2>
 
-          <div class="flex items-baseline gap-2.5 pt-1">
-            <span class="font-mono-tech text-2xl sm:text-3xl font-bold text-[#0095FF]">
+    <div class="flex items-baseline gap-2.5 pt-1">
+    <span class="font-mono-tech text-2xl sm:text-3xl font-bold text-[#0095FF]">
               ${usd(display.effectivePrice)}
-            </span>
+    </span>
             ${
               display.hasDiscount
                 ? `<span class="font-mono-tech text-sm text-slate-400 line-through">${usd(display.variantBasePrice)}</span>
-                   <span class="text-xs font-semibold text-emerald-700">Save ${display.discountPercent}%</span>`
+    <span class="text-xs font-semibold text-emerald-700">Save ${display.discountPercent}%</span>`
                 : ''
             }
-          </div>
-        </div>
+    </div>
+    </div>
 
-        <p class="text-sm text-slate-600 leading-relaxed">
+    <p class="text-sm text-slate-600 leading-relaxed">
           ${esc(display.description)}
-        </p>
+    </p>
 
         ${
           display.craftsmanshipNote
             ? `<div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                 <strong class="text-[#0D1015]">Materials &amp; Care:</strong> ${esc(display.craftsmanshipNote)}
-               </div>`
+    <strong class="text-[#0D1015]">Materials &amp; Care:</strong> ${esc(display.craftsmanshipNote)}
+    </div>`
             : ''
         }
 
-        <div class="space-y-2">
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(display.selectedFinish)}</span></span>
-            <span class="text-slate-500">
+    <div class="space-y-2">
+    <div class="flex items-center justify-between text-xs">
+    <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(display.selectedFinish)}</span></span>
+    <span class="text-slate-500">
               ${display.priceDelta === 0 ? 'Included' : display.priceDelta > 0 ? `+${usd(display.priceDelta)}` : `-${usd(Math.abs(display.priceDelta))}`}
-            </span>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
+    </span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
             ${display.colorVariants
               .map((v) => {
                 const isSel = v.name === display.selectedFinish;
                 return `
-                  <button
-                    type="button"
-                    data-modal-color-name="${esc(v.name)}"
-                    class="px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-2 cursor-pointer transition-all ${
-                      isSel
-                        ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                        : 'bg-white text-[#0D1015] border-slate-200 hover:border-[#0095FF]'
-                    }"
-                  >
-                    <span class="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                    <span>${esc(v.shortLabel)}</span>
-                  </button>
+    <button type="button" data-modal-color-name="${esc(v.name)}" class="px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-2 cursor-pointer transition-all ${ isSel ? 'bg-[#0D1015] text-white border-[#0D1015]' : 'bg-white text-[#0D1015] border-slate-200 hover:border-[#0095FF]' }">
+    <span class="w-3.5 h-3.5 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+    <span>${esc(v.shortLabel)}</span>
+    </button>
                 `;
               })
               .join('')}
-          </div>
-        </div>
+    </div>
+    </div>
 
-        <div class="pt-2 space-y-2.5">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              id="modal-add-to-cart-btn"
-              ${display.isOutOfStock ? 'disabled' : ''}
-              class="py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
-                display.isOutOfStock
-                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                  : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer shadow-xs'
-              }"
-            >
+    <div class="pt-2 space-y-2.5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <button type="button" id="modal-add-to-cart-btn" ${display.isOutOfStock ? 'disabled' : ''} class="py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${ display.isOutOfStock ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer shadow-xs' }">
               ${display.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-            </button>
-            <button
-              type="button"
-              id="modal-make-offer-btn"
-              data-testid="modal-make-offer-btn"
-              class="py-3 px-4 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer text-center"
-            >
+    </button>
+    <button type="button" id="modal-make-offer-btn" data-testid="modal-make-offer-btn" class="py-3 px-4 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer text-center">
               Make Offer
-            </button>
-          </div>
-        </div>
-      </div>
+    </button>
+    </div>
+    </div>
+    </div>
     </div>
   `;
 
@@ -1541,21 +1491,17 @@ function renderCatalogGrid() {
 
   if (displayed.length === 0) {
     grid.innerHTML = `
-      <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
-        <p class="font-serif-display text-xl font-bold text-[#0D1015]">No matching furniture pieces found</p>
-        <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
+    <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
+    <p class="font-serif-display text-xl font-bold text-[#0D1015]">No matching furniture pieces found</p>
+    <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
           No catalog items match "${esc(state.searchQuery || state.selectedCategory)}". Return to our Recommended &amp; Best Sellers showcase below.
-        </p>
-        <div class="pt-1">
-          <button
-            type="button"
-            id="catalog-reset-filters-btn"
-            class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
-          >
+    </p>
+    <div class="pt-1">
+    <button type="button" id="catalog-reset-filters-btn" class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors">
             Show Recommended &amp; Best Sellers (4)
-          </button>
-        </div>
-      </div>
+    </button>
+    </div>
+    </div>
     `;
     const resetBtn = document.getElementById('catalog-reset-filters-btn');
     if (resetBtn) {
@@ -1590,133 +1536,94 @@ function renderCatalogGrid() {
         : 'bg-white/95 text-[#0D1015] border border-slate-200/80';
 
       return `
-        <article class="group rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
-          <div>
-            <a
-              href="${esc(productPageUrl)}"
-              data-testid="home-product-card-link-${esc(item.id)}"
-              class="block aspect-[4/3] relative overflow-hidden bg-slate-100"
-            >
-              <img
-                src="${esc(display.image)}"
-                alt="${esc(display.name)}"
-                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              <div class="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-1.5">
-                <div class="flex flex-wrap gap-1.5">
+    <article class="group rounded-2xl bg-white border border-[#BCE3FF] hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
+    <div>
+    <a href="${esc(productPageUrl)}" data-testid="home-product-card-link-${esc(item.id)}" class="block aspect-[4/3] relative overflow-hidden bg-slate-100">
+    <img src="${esc(display.image)}" alt="${esc(display.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    <div class="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-1.5">
+    <div class="flex flex-wrap gap-1.5">
                   ${
                     item.isBestSeller
                       ? `<span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">${esc(item.bestSellerBadge || 'Best Seller')}</span>`
                       : ''
                   }
-                  <span data-testid="shop-stock-badge-${esc(item.id)}" class="px-2.5 py-1 rounded-md text-[11px] font-semibold shadow-2xs ${stockBadgeClass}">
+    <span data-testid="shop-stock-badge-${esc(item.id)}" class="px-2.5 py-1 rounded-md text-[11px] font-semibold shadow-2xs ${stockBadgeClass}">
                     ${esc(display.availabilityLabel)}
-                  </span>
-                </div>
+    </span>
+    </div>
                 ${
                   display.hasDiscount
                     ? `<span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-mono-tech text-[11px] font-bold">Save ${display.discountPercent}%</span>`
                     : ''
                 }
-              </div>
-              <div class="absolute bottom-3 left-3">
-                <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[11px] font-semibold">
+    </div>
+    <div class="absolute bottom-3 left-3">
+    <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[11px] font-semibold">
                   ${esc(item.sku)} · ${esc(display.categoryName)}
-                </span>
-              </div>
-            </a>
+    </span>
+    </div>
+    </a>
 
-            <div class="p-5 space-y-3">
-              <div class="flex items-start justify-between gap-3">
-                <a
-                  href="${esc(productPageUrl)}"
-                  class="font-serif-display text-lg font-bold text-[#0D1015] hover:text-[#0095FF] leading-snug transition-colors"
-                >
+    <div class="p-5 space-y-3">
+    <div class="flex items-start justify-between gap-3">
+    <a href="${esc(productPageUrl)}" class="font-serif-display text-lg font-bold text-[#0D1015] hover:text-[#0095FF] leading-snug transition-colors">
                   ${esc(display.name)}
-                </a>
-                <div class="text-right shrink-0">
+    </a>
+    <div class="text-right shrink-0">
                   ${
                     display.hasDiscount
                       ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(display.variantBasePrice)}</p>`
                       : ''
                   }
-                  <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(display.effectivePrice)}</p>
-                </div>
-              </div>
+    <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(display.effectivePrice)}</p>
+    </div>
+    </div>
 
-              <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">${esc(display.description)}</p>
+    <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">${esc(display.description)}</p>
 
-              <!-- Finish / Color Options -->
-              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="font-medium text-slate-700">Finish: <strong class="text-[#0D1015]">${esc(display.selectedFinish)}</strong></span>
-                  <span class="text-slate-500 font-medium">
+    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2">
+    <div class="flex items-center justify-between text-[11px]">
+    <span class="font-medium text-slate-700">Finish: <strong class="text-[#0D1015]">${esc(display.selectedFinish)}</strong></span>
+    <span class="text-slate-500 font-medium">
                     ${display.priceDelta === 0 ? 'Included' : display.priceDelta > 0 ? `+${usd(display.priceDelta)}` : `-${usd(Math.abs(display.priceDelta))}`}
-                  </span>
-                </div>
-                <div class="flex flex-wrap items-center gap-1.5">
+    </span>
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5">
                   ${display.colorVariants
                     .map((v) => {
                       const isSel = v.name === display.selectedFinish;
                       return `
-                        <button
-                          type="button"
-                          data-color-product="${esc(item.id)}"
-                          data-color-name="${esc(v.name)}"
-                          class="px-2.5 py-1 rounded-lg text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
-                            isSel
-                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-[#0095FF]'
-                          }"
-                        >
-                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                          <span class="truncate max-w-[115px]">${esc(v.shortLabel)}</span>
-                        </button>
+    <button type="button" data-color-product="${esc(item.id)}" data-color-name="${esc(v.name)}" class="px-2.5 py-1 rounded-lg text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${ isSel ? 'bg-[#0D1015] text-white border-[#0D1015]' : 'bg-white text-slate-700 border-slate-200 hover:border-[#0095FF]' }">
+    <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+    <span class="truncate max-w-[115px]">${esc(v.shortLabel)}</span>
+    </button>
                       `;
                     })
                     .join('')}
-                </div>
-              </div>
+    </div>
+    </div>
 
-              <div class="pt-1 flex items-center justify-between text-[11px] text-[#64748B] font-mono-tech">
-                <span>${esc(display.dimensions)}</span>
-                <span>${esc(display.availabilityDetail)}</span>
-              </div>
-            </div>
-          </div>
+    <div class="pt-1 flex items-center justify-between text-[11px] text-[#64748B] font-mono-tech">
+    <span>${esc(display.dimensions)}</span>
+    <span>${esc(display.availabilityDetail)}</span>
+    </div>
+    </div>
+    </div>
 
-          <div class="px-5 pb-5 pt-2 space-y-2">
-            <a
-              href="${esc(productPageUrl)}"
-              data-testid="home-product-open-catalog-${esc(item.id)}"
-              class="block w-full py-2.5 px-3 rounded-xl bg-[#0D1015] hover:bg-[#0095FF] text-white text-xs font-semibold transition-colors text-center"
-            >
+    <div class="px-5 pb-5 pt-2 space-y-2">
+    <a href="${esc(productPageUrl)}" data-testid="home-product-open-catalog-${esc(item.id)}" class="block w-full py-2.5 px-3 rounded-xl bg-[#0D1015] hover:bg-[#0095FF] text-white text-xs font-semibold transition-colors text-center">
               View in Catalog &amp; Filter by Color →
-            </a>
-            <div class="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                data-add-cart="${esc(item.id)}"
-                ${display.isOutOfStock ? 'disabled' : ''}
-                class="py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
-                  display.isOutOfStock
-                    ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                    : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer'
-                }"
-              >
+    </a>
+    <div class="grid grid-cols-2 gap-2">
+    <button type="button" data-add-cart="${esc(item.id)}" ${display.isOutOfStock ? 'disabled' : ''} class="py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${ display.isOutOfStock ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer' }">
                 ${display.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-              </button>
-              <button
-                type="button"
-                data-view-product="${esc(item.id)}"
-                aria-label="View details for ${esc(display.name)}"
-                class="py-2.5 px-3 rounded-xl bg-[#D8EEFF] hover:bg-[#BCE3FF] text-[#0D1015] text-xs font-semibold transition-colors cursor-pointer"
-              >
+    </button>
+    <button type="button" data-view-product="${esc(item.id)}" aria-label="View details for ${esc(display.name)}" class="py-2.5 px-3 rounded-xl bg-[#D8EEFF] hover:bg-[#BCE3FF] text-[#0D1015] text-xs font-semibold transition-colors cursor-pointer">
                 View Details
-              </button>
-            </div>
-          </div>
-        </article>
+    </button>
+    </div>
+    </div>
+    </article>
       `;
     })
     .join('');
@@ -1733,21 +1640,7 @@ function renderCatalogGrid() {
     });
   });
 
-  // Bind View Details buttons (opens Product Detail Modal with Make Offer button)
-  grid.querySelectorAll('[data-view-product]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-view-product');
-      if (pid) openProductDetailModal(pid);
-    });
-  });
-
-  // Bind Add to Cart buttons (enforce available stock limit)
-  grid.querySelectorAll('[data-add-cart]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-add-cart');
-      if (pid) addProductToCartFromStorefront(pid);
-    });
-  });
+  bindStorefrontProductButtons(grid);
 }
 
 function renderCartDrawer(stockWarningMessage = '') {
@@ -1777,12 +1670,12 @@ function renderCartDrawer(stockWarningMessage = '') {
   if (state.cartItems.length === 0) {
     state.appliedVoucher = null;
     list.innerHTML = `
-      <div class="p-8 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
-        <p class="font-serif-display text-lg font-bold text-[#0D1015]">Your cart is currently empty</p>
-        <p class="text-xs text-[#475569]">
+    <div class="p-8 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
+    <p class="font-serif-display text-lg font-bold text-[#0D1015]">Your cart is currently empty</p>
+    <p class="text-xs text-[#475569]">
           Select a furniture piece and color finish from the showroom to add it to your cart.
-        </p>
-      </div>
+    </p>
+    </div>
     `;
     if (voucherSection) voucherSection.classList.add('hidden');
     if (footerTotals) footerTotals.classList.add('hidden');
@@ -1841,12 +1734,12 @@ function renderCartDrawer(stockWarningMessage = '') {
         };
         const thumb = (latestProd.image || 'assets/images/category_living_lounge.jpg').replace(/^\//, '');
         return `
-        <div class="p-3.5 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] flex items-center justify-between gap-3">
-          <div class="flex items-center gap-3 min-w-0">
-            <img src="${esc(thumb)}" alt="${esc(latestProd.name)}" class="w-14 h-14 rounded-xl object-cover border border-[#BCE3FF] shrink-0" />
-            <div class="min-w-0 space-y-1">
-              <p class="font-serif-display text-sm font-bold text-[#0D1015] truncate">${esc(latestProd.name)}</p>
-              <p class="font-mono-tech text-[11px] text-[#0077CC] truncate">${esc(pricing.colorName)} · ${usd(pricing.effectivePrice)} ea · ${maxStock} in stock</p>
+    <div class="p-3.5 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+    <img src="${esc(thumb)}" alt="${esc(latestProd.name)}" class="w-14 h-14 rounded-xl object-cover border border-[#BCE3FF] shrink-0" />
+    <div class="min-w-0 space-y-1">
+    <p class="font-serif-display text-sm font-bold text-[#0D1015] truncate">${esc(latestProd.name)}</p>
+    <p class="font-mono-tech text-[11px] text-[#0077CC] truncate">${esc(pricing.colorName)} · ${usd(pricing.effectivePrice)} ea · ${maxStock} in stock</p>
               ${
                 state.appliedVoucher
                   ? breakdown.isVoucherEligible && breakdown.lineDiscount > 0
@@ -1854,41 +1747,29 @@ function renderCartDrawer(stockWarningMessage = '') {
                     : `<p class="text-[11px] font-medium text-[#64748B]">No discount</p>`
                   : ''
               }
-              <div class="flex items-center gap-2.5 pt-0.5">
-                <div class="inline-flex items-center rounded-lg border border-[#BCE3FF] bg-white">
-                  <button
-                    type="button"
-                    data-drawer-qty-idx="${idx}"
-                    data-drawer-delta="-1"
-                    aria-label="Decrease quantity"
-                    class="px-2.5 py-0.5 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-l-lg cursor-pointer"
-                  >
+    <div class="flex items-center gap-2.5 pt-0.5">
+    <div class="inline-flex items-center rounded-lg border border-[#BCE3FF] bg-white">
+    <button type="button" data-drawer-qty-idx="${idx}" data-drawer-delta="-1" aria-label="Decrease quantity" class="px-2.5 py-0.5 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-l-lg cursor-pointer">
                     −
-                  </button>
-                  <span class="px-2.5 py-0.5 font-mono-tech text-xs font-bold text-[#0D1015]">${line.quantity}</span>
-                  <button
-                    type="button"
-                    data-drawer-qty-idx="${idx}"
-                    data-drawer-delta="1"
-                    aria-label="Increase quantity"
-                    class="px-2.5 py-0.5 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-r-lg cursor-pointer"
-                  >
+    </button>
+    <span class="px-2.5 py-0.5 font-mono-tech text-xs font-bold text-[#0D1015]">${line.quantity}</span>
+    <button type="button" data-drawer-qty-idx="${idx}" data-drawer-delta="1" aria-label="Increase quantity" class="px-2.5 py-0.5 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-r-lg cursor-pointer">
                     +
-                  </button>
-                </div>
-                <button type="button" data-remove-cart="${idx}" class="text-[11px] text-rose-600 font-semibold hover:underline cursor-pointer">Remove</button>
-              </div>
-            </div>
-          </div>
-          <div class="text-right shrink-0">
+    </button>
+    </div>
+    <button type="button" data-remove-cart="${idx}" class="text-[11px] text-rose-600 font-semibold hover:underline cursor-pointer">Remove</button>
+    </div>
+    </div>
+    </div>
+    <div class="text-right shrink-0">
             ${
               breakdown.isVoucherEligible && breakdown.lineDiscount > 0
                 ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(breakdown.rawLineTotal)}</p>
-                   <p class="font-mono-tech text-sm font-bold text-emerald-700">${usd(breakdown.finalLineTotal)}</p>`
+    <p class="font-mono-tech text-sm font-bold text-emerald-700">${usd(breakdown.finalLineTotal)}</p>`
                 : `<p class="font-mono-tech text-sm font-bold text-[#0D1015]">${usd(breakdown.rawLineTotal)}</p>`
             }
-          </div>
-        </div>
+    </div>
+    </div>
       `;
       })
       .join('');
@@ -1988,7 +1869,6 @@ function initDashboardPage() {
   const logoutBtn = document.getElementById('portal-logout-btn');
   const adminLogoutBtn = document.getElementById('admin-logout-btn');
 
-  loadCustomerProfileFromStorage();
   if (activeUser.name) state.customerProfile.name = activeUser.name;
   if (activeUser.email) state.customerProfile.email = activeUser.email;
 
@@ -3007,11 +2887,15 @@ function showAdminBanner(msg) {
 
 function renderDashboardContent() {
   const userEmail = state.sessionUser?.email || 'rowena.vance@vancearchitects.com';
+  const clientViewEl = document.getElementById('client-portal-view');
+  const adminViewEl = document.getElementById('admin-portal-view');
+  const shouldRenderClient = !clientViewEl || !clientViewEl.classList.contains('hidden');
+  const shouldRenderAdmin = !adminViewEl || !adminViewEl.classList.contains('hidden');
 
-  // Filter customer's own orders & vouchers (or show seeded ones if demo customer)
-  const myOrders = state.orders.filter(
-    (o) => o.clientEmail.toLowerCase() === userEmail.toLowerCase()
-  );
+  if (shouldRenderClient) {
+    const myOrders = state.orders.filter(
+      (o) => o.clientEmail.toLowerCase() === userEmail.toLowerCase()
+    );
   const displayOrders = myOrders.length > 0 ? myOrders : state.orders.slice(0, 2);
 
   const myVouchers = state.vouchers.filter(
@@ -3042,34 +2926,34 @@ function renderDashboardContent() {
     const matched = state.catalog.find((p) => p.id === latest.furnitureId) || state.catalog[0];
     const imgUrl = (matched ? matched.image : 'assets/images/category_dining_tables.jpg').replace(/^\//, '');
     homeOrderPreview.innerHTML = `
-      <div class="pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3.5">
-          <img src="${esc(imgUrl)}" alt="${esc(latest.furnitureName)}" class="w-16 h-16 rounded-xl object-cover border border-[#BCE3FF] shrink-0" />
-          <div>
-            <p class="font-mono-tech text-xs text-[#0077CC] font-bold">${esc(latest.status)} · #${esc(latest.orderNumber)}</p>
-            <h3 class="font-serif-display text-base font-bold text-[#0D1015] mt-0.5">${esc(latest.furnitureName)}</h3>
-            <p class="text-xs text-[#475569]">
+    <div class="pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+    <img src="${esc(imgUrl)}" alt="${esc(latest.furnitureName)}" class="w-16 h-16 rounded-xl object-cover border border-[#BCE3FF] shrink-0" />
+    <div>
+    <p class="font-mono-tech text-xs text-[#0077CC] font-bold">${esc(latest.status)} · #${esc(latest.orderNumber)}</p>
+    <h3 class="font-serif-display text-base font-bold text-[#0D1015] mt-0.5">${esc(latest.furnitureName)}</h3>
+    <p class="text-xs text-[#475569]">
               Finish: <strong class="text-[#0D1015]">${esc(latest.selectedFinish)}</strong> · Size: ${esc(latest.customDimensions || 'Standard Dimensions')}
-            </p>
-            <p class="text-[11px] text-[#64748B] mt-0.5">
+    </p>
+    <p class="text-[11px] text-[#64748B] mt-0.5">
               Workshop Material: <strong class="text-[#0D1015]">${esc(latest.materialName || 'FAS Hardwood')}</strong> · Est. Lead Time: <strong class="text-[#0077CC]">${esc(latest.estimatedDelivery)}</strong>
-            </p>
-          </div>
-        </div>
-        <p class="font-mono-tech text-lg font-bold text-[#0095FF] shrink-0">${usd(latest.totalAmount)}</p>
-      </div>
+    </p>
+    </div>
+    </div>
+    <p class="font-mono-tech text-lg font-bold text-[#0095FF] shrink-0">${usd(latest.totalAmount)}</p>
+    </div>
     `;
   }
 
   const homeAddrPreview = document.getElementById('client-home-address-preview');
   if (homeAddrPreview) {
     homeAddrPreview.innerHTML = `
-      <div class="pt-4 border-t border-[#E2E8F0] space-y-1.5">
-        <p class="font-serif-display text-sm font-bold text-[#0D1015]">${esc(state.customerProfile.name)}</p>
-        <p class="font-mono-tech text-xs text-[#0077CC]">${esc(state.customerProfile.phone)}</p>
-        <p class="text-xs text-[#0D1015]">${esc(state.customerProfile.address)}, ${esc(state.customerProfile.city)}</p>
-        <p class="text-[11px] text-[#64748B] pt-1">${esc(state.customerProfile.notes)}</p>
-      </div>
+    <div class="pt-4 border-t border-[#E2E8F0] space-y-1.5">
+    <p class="font-serif-display text-sm font-bold text-[#0D1015]">${esc(state.customerProfile.name)}</p>
+    <p class="font-mono-tech text-xs text-[#0077CC]">${esc(state.customerProfile.phone)}</p>
+    <p class="text-xs text-[#0D1015]">${esc(state.customerProfile.address)}, ${esc(state.customerProfile.city)}</p>
+    <p class="text-[11px] text-[#64748B] pt-1">${esc(state.customerProfile.notes)}</p>
+    </div>
     `;
   }
 
@@ -3083,57 +2967,42 @@ function renderDashboardContent() {
         const st = getProductStockStatus(prod);
         const isDiscounted = Number(prod.discountPercent || 0) > 0;
         return `
-          <div class="p-4 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] flex flex-col justify-between gap-3">
-            <div class="flex items-start gap-3.5">
-              <img
-                src="${esc(imgUrl)}"
-                alt="${esc(prod.name)}"
-                class="w-16 h-16 rounded-xl object-cover border border-[#BCE3FF] shrink-0"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-1">
-                  <span class="font-mono-tech text-[11px] font-bold text-[#0077CC]">${esc(prod.sku)}</span>
-                  <span class="text-[11px] font-mono-tech font-semibold ${
+    <div class="p-4 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] flex flex-col justify-between gap-3">
+    <div class="flex items-start gap-3.5">
+    <img src="${esc(imgUrl)}" alt="${esc(prod.name)}" class="w-16 h-16 rounded-xl object-cover border border-[#BCE3FF] shrink-0" />
+    <div class="min-w-0 flex-1">
+    <div class="flex items-center justify-between gap-1">
+    <span class="font-mono-tech text-[11px] font-bold text-[#0077CC]">${esc(prod.sku)}</span>
+    <span class="text-[11px] font-mono-tech font-semibold ${
                     st.statusKey === 'out_of_stock'
                       ? 'text-rose-700'
                       : st.statusKey === 'low_stock'
                       ? 'text-amber-700'
                       : 'text-emerald-700'
                   }">${st.availableStock} in stock</span>
-                </div>
-                <h3 class="font-serif-display text-sm font-bold text-[#0D1015] truncate mt-0.5">${esc(prod.name)}</h3>
-                <p class="text-[11px] text-[#64748B] truncate">${esc(prod.dimensions || 'Standard Dimensions')}</p>
-                <div class="flex items-baseline gap-2 mt-1">
-                  <span class="font-mono-tech text-sm font-bold text-[#0095FF]">${usd(prod.effectivePrice)}</span>
+    </div>
+    <h3 class="font-serif-display text-sm font-bold text-[#0D1015] truncate mt-0.5">${esc(prod.name)}</h3>
+    <p class="text-[11px] text-[#64748B] truncate">${esc(prod.dimensions || 'Standard Dimensions')}</p>
+    <div class="flex items-baseline gap-2 mt-1">
+    <span class="font-mono-tech text-sm font-bold text-[#0095FF]">${usd(prod.effectivePrice)}</span>
                   ${
                     isDiscounted
                       ? `<span class="font-mono-tech text-[11px] text-slate-400 line-through">${usd(prod.price)}</span>
-                         <span class="text-[10px] font-bold text-emerald-700">${prod.discountPercent}% OFF</span>`
+    <span class="text-[10px] font-bold text-emerald-700">${prod.discountPercent}% OFF</span>`
                       : ''
                   }
-                </div>
-              </div>
-            </div>
-            <div class="flex items-center gap-2 pt-2 border-t border-[#E2E8F0]">
-              <button
-                type="button"
-                data-client-quick-add="${esc(prod.id)}"
-                ${st.availableStock <= 0 ? 'disabled' : ''}
-                class="flex-1 px-3 py-1.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer ${
-                  st.availableStock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
-                }"
-              >
+    </div>
+    </div>
+    </div>
+    <div class="flex items-center gap-2 pt-2 border-t border-[#E2E8F0]">
+    <button type="button" data-client-quick-add="${esc(prod.id)}" ${st.availableStock <= 0 ? 'disabled' : ''} class="flex-1 px-3 py-1.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer ${ st.availableStock <= 0 ? 'opacity-50 cursor-not-allowed' : '' }">
                 ${st.availableStock <= 0 ? 'Out of Stock' : '+ Add to Cart'}
-              </button>
-              <button
-                type="button"
-                data-client-customize-prod="${esc(prod.id)}"
-                class="px-3 py-1.5 rounded-xl border border-[#BCE3FF] bg-white hover:bg-[#EBF6FF] text-[#0077CC] text-xs font-semibold transition-colors cursor-pointer"
-              >
+    </button>
+    <button type="button" data-client-customize-prod="${esc(prod.id)}" class="px-3 py-1.5 rounded-xl border border-[#BCE3FF] bg-white hover:bg-[#EBF6FF] text-[#0077CC] text-xs font-semibold transition-colors cursor-pointer">
                 Customize
-              </button>
-            </div>
-          </div>
+    </button>
+    </div>
+    </div>
         `;
       })
       .join('');
@@ -3212,121 +3081,82 @@ function renderDashboardContent() {
       const estimatedTotal = basePrice + extraCost;
 
       customOrderCardEl.innerHTML = `
-        <form id="client-custom-commission-form" novalidate class="space-y-5">
-          <div class="pb-4 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0077CC] font-bold">Bespoke Workshop Commission (SQL Customization + Order_Item_Material)</p>
-              <h3 class="font-serif-display text-lg font-bold text-[#0D1015] mt-0.5">Commission a Custom-Built Piece from Workshop Materials</h3>
-              <p class="text-xs text-[#64748B]">Select a base piece, choose a workshop raw material supplied by our partners, and specify custom dimensions.</p>
-            </div>
-            <div class="sm:text-right">
-              <p class="text-[11px] text-[#64748B]">Estimated Commission Total</p>
-              <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(estimatedTotal)}</p>
-              <p class="text-[11px] text-[#475569]">Base ${usd(basePrice)} + Material &amp; Joinery +${usd(extraCost)}</p>
-            </div>
-          </div>
+    <form id="client-custom-commission-form" novalidate class="space-y-5">
+    <div class="pb-4 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <div>
+    <p class="font-mono-tech text-xs uppercase tracking-widest text-[#0077CC] font-bold">Bespoke Workshop Commission (SQL Customization + Order_Item_Material)</p>
+    <h3 class="font-serif-display text-lg font-bold text-[#0D1015] mt-0.5">Commission a Custom-Built Piece from Workshop Materials</h3>
+    <p class="text-xs text-[#64748B]">Select a base piece, choose a workshop raw material supplied by our partners, and specify custom dimensions.</p>
+    </div>
+    <div class="sm:text-right">
+    <p class="text-[11px] text-[#64748B]">Estimated Commission Total</p>
+    <p class="font-mono-tech text-xl font-bold text-[#0095FF]">${usd(estimatedTotal)}</p>
+    <p class="text-[11px] text-[#475569]">Base ${usd(basePrice)} + Material &amp; Joinery +${usd(extraCost)}</p>
+    </div>
+    </div>
 
-          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label for="cust-ord-product" class="block text-xs font-semibold text-[#0D1015] mb-1">Base Catalog Design</label>
-              <select id="cust-ord-product" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs font-semibold text-[#0D1015]">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div>
+    <label for="cust-ord-product" class="block text-xs font-semibold text-[#0D1015] mb-1">Base Catalog Design</label>
+    <select id="cust-ord-product" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs font-semibold text-[#0D1015]">
                 ${state.catalog
                   .map(
                     (p) =>
                       `<option value="${esc(p.id)}" ${p.id === selectedBaseProd?.id ? 'selected' : ''}>${esc(p.name)} (${usd(p.effectivePrice)})</option>`
                   )
                   .join('')}
-              </select>
-            </div>
+    </select>
+    </div>
 
-            <div>
-              <label for="cust-ord-material" class="block text-xs font-semibold text-[#0D1015] mb-1">Workshop Raw Material (Available Stock)</label>
-              <select id="cust-ord-material" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs font-semibold text-[#0D1015]">
+    <div>
+    <label for="cust-ord-material" class="block text-xs font-semibold text-[#0D1015] mb-1">Workshop Raw Material (Available Stock)</label>
+    <select id="cust-ord-material" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs font-semibold text-[#0D1015]">
                 ${state.materials
                   .map(
                     (m) =>
                       `<option value="${esc(m.id)}" ${m.id === selectedMat?.id ? 'selected' : ''} ${Number(m.stockQuantity) <= 0 ? 'disabled' : ''}>${esc(m.name)} (${m.stockQuantity} ${esc(m.unit)} avail)</option>`
                   )
                   .join('')}
-              </select>
-            </div>
+    </select>
+    </div>
 
-            <div>
-              <label for="cust-ord-finish" class="block text-xs font-semibold text-[#0D1015] mb-1">Color / Oil Finish</label>
-              <input
-                id="cust-ord-finish"
-                type="text"
-                value="${esc(state.clientCustomOrderInput.colorFinish || 'Hand-Rubbed Tung Oil')}"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs text-[#0D1015]"
-              />
-            </div>
+    <div>
+    <label for="cust-ord-finish" class="block text-xs font-semibold text-[#0D1015] mb-1">Color / Oil Finish</label>
+    <input id="cust-ord-finish" type="text" value="${esc(state.clientCustomOrderInput.colorFinish || 'Hand-Rubbed Tung Oil')}" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs text-[#0D1015]" />
+    </div>
 
-            <div>
-              <label for="cust-ord-length" class="block text-xs font-semibold text-[#0D1015] mb-1">Length (cm)</label>
-              <input
-                id="cust-ord-length"
-                type="number"
-                min="30"
-                max="500"
-                value="${esc(state.clientCustomOrderInput.lengthCm || '260')}"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]"
-              />
-            </div>
+    <div>
+    <label for="cust-ord-length" class="block text-xs font-semibold text-[#0D1015] mb-1">Length (cm)</label>
+    <input id="cust-ord-length" type="number" min="30" max="500" value="${esc(state.clientCustomOrderInput.lengthCm || '260')}" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]" />
+    </div>
 
-            <div>
-              <label for="cust-ord-width" class="block text-xs font-semibold text-[#0D1015] mb-1">Width (cm)</label>
-              <input
-                id="cust-ord-width"
-                type="number"
-                min="30"
-                max="300"
-                value="${esc(state.clientCustomOrderInput.widthCm || '105')}"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]"
-              />
-            </div>
+    <div>
+    <label for="cust-ord-width" class="block text-xs font-semibold text-[#0D1015] mb-1">Width (cm)</label>
+    <input id="cust-ord-width" type="number" min="30" max="300" value="${esc(state.clientCustomOrderInput.widthCm || '105')}" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]" />
+    </div>
 
-            <div>
-              <label for="cust-ord-height" class="block text-xs font-semibold text-[#0D1015] mb-1">Height (cm)</label>
-              <input
-                id="cust-ord-height"
-                type="number"
-                min="25"
-                max="250"
-                value="${esc(state.clientCustomOrderInput.heightCm || '76')}"
-                class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]"
-              />
-            </div>
-          </div>
+    <div>
+    <label for="cust-ord-height" class="block text-xs font-semibold text-[#0D1015] mb-1">Height (cm)</label>
+    <input id="cust-ord-height" type="number" min="25" max="250" value="${esc(state.clientCustomOrderInput.heightCm || '76')}" class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] font-mono-tech text-xs text-[#0D1015]" />
+    </div>
+    </div>
 
-          <div>
-            <label for="cust-ord-notes" class="block text-xs font-semibold text-[#0D1015] mb-1">Joinery &amp; Architectural Notes</label>
-            <input
-              id="cust-ord-notes"
-              type="text"
-              value="${esc(state.clientCustomOrderInput.notes || '')}"
-              placeholder="e.g. Chamfered underside profile, concealed cable brass grommet, book-matched grain..."
-              class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs text-[#0D1015]"
-            />
-          </div>
+    <div>
+    <label for="cust-ord-notes" class="block text-xs font-semibold text-[#0D1015] mb-1">Joinery &amp; Architectural Notes</label>
+    <input id="cust-ord-notes" type="text" value="${esc(state.clientCustomOrderInput.notes || '')}" placeholder="e.g. Chamfered underside profile, concealed cable brass grommet, book-matched grain..." class="w-full px-3.5 py-2.5 rounded-xl border border-[#BCE3FF] bg-[#F8FBFF] text-xs text-[#0D1015]" />
+    </div>
 
-          <p id="client-custom-commission-error" class="hidden text-xs font-semibold text-rose-700"></p>
+    <p id="client-custom-commission-error" class="hidden text-xs font-semibold text-rose-700"></p>
 
-          <div class="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              id="client-cancel-custom-commission-btn"
-              class="px-4 py-2 rounded-xl border border-[#BCE3FF] text-xs font-semibold text-[#475569] hover:bg-[#F8FBFF] cursor-pointer"
-            >
+    <div class="flex items-center justify-end gap-3 pt-2">
+    <button type="button" id="client-cancel-custom-commission-btn" class="px-4 py-2 rounded-xl border border-[#BCE3FF] text-xs font-semibold text-[#475569] hover:bg-[#F8FBFF] cursor-pointer">
               Cancel
-            </button>
-            <button
-              type="submit"
-              class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            >
+    </button>
+    <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer">
               Submit Custom Commission (${usd(estimatedTotal)})
-            </button>
-          </div>
-        </form>
+    </button>
+    </div>
+    </form>
       `;
 
       const prodSelEl = document.getElementById('cust-ord-product');
@@ -3444,120 +3274,101 @@ function renderDashboardContent() {
         const canCancel = friendlyStep === 1 && !/Cancelled/i.test(ord.status);
 
         return `
-          <article class="bg-white rounded-3xl border border-[#BCE3FF] p-6 sm:p-7 shadow-2xs space-y-6">
-            <div class="flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
-              <div class="flex items-center gap-4">
-                <img
-                  src="${esc(imgUrl)}"
-                  alt="${esc(ord.furnitureName)}"
-                  class="w-20 h-20 rounded-2xl object-cover border border-[#BCE3FF] shrink-0"
-                />
-                <div>
-                  <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="font-semibold text-[#0077CC]">${esc(ord.status)}</span>
-                    <span aria-hidden="true">·</span>
-                    <span class="font-mono-tech text-[#64748B]">Order #${esc(ord.orderNumber)}</span>
+    <article class="bg-white rounded-3xl border border-[#BCE3FF] p-6 sm:p-7 shadow-2xs space-y-6">
+    <div class="flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
+    <div class="flex items-center gap-4">
+    <img src="${esc(imgUrl)}" alt="${esc(ord.furnitureName)}" class="w-20 h-20 rounded-2xl object-cover border border-[#BCE3FF] shrink-0" />
+    <div>
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+    <span class="font-semibold text-[#0077CC]">${esc(ord.status)}</span>
+    <span aria-hidden="true">·</span>
+    <span class="font-mono-tech text-[#64748B]">Order #${esc(ord.orderNumber)}</span>
                     ${
                       ord.itemType === 'Custom'
                         ? `<span class="px-2 py-0.5 rounded bg-[#EBF6FF] text-[#0077CC] font-mono-tech text-[11px] font-bold">Custom Commission</span>`
                         : ''
                     }
-                  </div>
-                  <h3 class="font-serif-display text-xl font-bold text-[#0D1015] mt-1">
+    </div>
+    <h3 class="font-serif-display text-xl font-bold text-[#0D1015] mt-1">
                     ${esc(ord.furnitureName)}
-                  </h3>
-                  <p class="text-xs text-[#475569] mt-0.5">
+    </h3>
+    <p class="text-xs text-[#475569] mt-0.5">
                     Color Finish: <span class="font-semibold text-[#0D1015]">${esc(ord.selectedFinish)}</span> · Size: ${esc(ord.customDimensions)}
-                  </p>
-                  <p class="text-xs text-[#475569] mt-0.5">
+    </p>
+    <p class="text-xs text-[#475569] mt-0.5">
                     Workshop Material: <span class="font-semibold text-[#0D1015]">${esc(ord.materialName || 'FAS American Black Walnut Slabs')}</span> (${ord.materialQtyUsed || 1} ${esc(ord.materialUnit || 'units')})
-                  </p>
-                </div>
-              </div>
+    </p>
+    </div>
+    </div>
 
-              <div class="sm:text-right shrink-0">
-                <p class="text-xs text-[#64748B]">${balanceDue > 0 ? `Paid ${usd(paidAmt)} · Balance Due ${usd(balanceDue)}` : 'Paid in Full'}</p>
-                <p class="font-mono-tech text-2xl font-bold text-[#0095FF]">${usd(totalAmt)}</p>
-                <p class="text-[11px] text-[#475569] mt-0.5">Est. Delivery: <span class="font-semibold text-[#0D1015]">${esc(ord.estimatedDelivery)}</span></p>
-              </div>
-            </div>
+    <div class="sm:text-right shrink-0">
+    <p class="text-xs text-[#64748B]">${balanceDue > 0 ? `Paid ${usd(paidAmt)} · Balance Due ${usd(balanceDue)}` : 'Paid in Full'}</p>
+    <p class="font-mono-tech text-2xl font-bold text-[#0095FF]">${usd(totalAmt)}</p>
+    <p class="text-[11px] text-[#475569] mt-0.5">Est. Delivery: <span class="font-semibold text-[#0D1015]">${esc(ord.estimatedDelivery)}</span></p>
+    </div>
+    </div>
 
-            <!-- Order Summary Details Synced from Admin -->
-            <div class="grid sm:grid-cols-2 gap-3 text-xs">
-              <div class="p-3 rounded-xl bg-[#F8FBFF] border border-[#E2E8F0]">
-                <p class="text-[#64748B]">Workshop Material &amp; Spec</p>
-                <p class="font-semibold text-[#0D1015] mt-0.5">${esc(ord.materialName || 'FAS American Black Walnut Slabs')} (${ord.materialQtyUsed || 1} ${esc(ord.materialUnit || 'units')})</p>
-              </div>
-              <div class="p-3 rounded-xl bg-[#F8FBFF] border border-[#E2E8F0]">
-                <p class="text-[#64748B]">Payment Status</p>
-                <p class="font-semibold ${balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'} mt-0.5">
+    <div class="grid sm:grid-cols-2 gap-3 text-xs">
+    <div class="p-3 rounded-xl bg-[#F8FBFF] border border-[#E2E8F0]">
+    <p class="text-[#64748B]">Workshop Material &amp; Spec</p>
+    <p class="font-semibold text-[#0D1015] mt-0.5">${esc(ord.materialName || 'FAS American Black Walnut Slabs')} (${ord.materialQtyUsed || 1} ${esc(ord.materialUnit || 'units')})</p>
+    </div>
+    <div class="p-3 rounded-xl bg-[#F8FBFF] border border-[#E2E8F0]">
+    <p class="text-[#64748B]">Payment Status</p>
+    <p class="font-semibold ${balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'} mt-0.5">
                   ${balanceDue > 0 ? `50% Deposit Paid (${usd(balanceDue)} remaining)` : '100% Settled · Verified'}
-                </p>
-              </div>
-            </div>
+    </p>
+    </div>
+    </div>
 
-            <!-- Simple Customer-Friendly Progress Bar -->
-            <div class="p-4 rounded-2xl bg-[#F8FBFF] border border-[#E2E8F0] space-y-3">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-semibold text-[#0D1015]">Workshop &amp; Delivery Progress</span>
-                <span class="font-mono-tech font-bold text-[#0095FF]">${pct}% Complete</span>
-              </div>
-              <div class="w-full h-2.5 rounded-full bg-[#E2E8F0] overflow-hidden">
-                <div class="h-full rounded-full bg-[#0095FF] transition-all" style="width: ${pct}%"></div>
-              </div>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+    <div class="p-4 rounded-2xl bg-[#F8FBFF] border border-[#E2E8F0] space-y-3">
+    <div class="flex items-center justify-between text-xs">
+    <span class="font-semibold text-[#0D1015]">Workshop &amp; Delivery Progress</span>
+    <span class="font-mono-tech font-bold text-[#0095FF]">${pct}% Complete</span>
+    </div>
+    <div class="w-full h-2.5 rounded-full bg-[#E2E8F0] overflow-hidden">
+    <div class="h-full rounded-full bg-[#0095FF] transition-all" style="width: ${pct}%"></div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                 ${FRIENDLY_CUSTOMER_STEPS.map((label, idx) => {
                   const active = idx + 1 <= friendlyStep;
                   return `
-                    <div class="flex items-center gap-1.5 text-[11px] ${active ? 'text-[#0D1015] font-bold' : 'text-[#94A3B8]'}">
-                      <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+    <div class="flex items-center gap-1.5 text-[11px] ${active ? 'text-[#0D1015] font-bold' : 'text-[#94A3B8]'}">
+    <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
                         active ? 'bg-[#0095FF] text-white' : 'bg-[#E2E8F0] text-[#64748B]'
                       }">
                         ${active ? '✓' : idx + 1}
-                      </span>
-                      <span>${esc(label)}</span>
-                    </div>
+    </span>
+    <span>${esc(label)}</span>
+    </div>
                   `;
                 }).join('')}
-              </div>
-            </div>
+    </div>
+    </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-[#475569]">
-              <span>Delivery Address: <strong class="text-[#0D1015]">${esc(state.customerProfile.address)}, ${esc(state.customerProfile.city)}</strong></span>
-              <div class="flex flex-wrap items-center gap-2.5">
+    <div class="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-[#475569]">
+    <span>Delivery Address: <strong class="text-[#0D1015]">${esc(state.customerProfile.address)}, ${esc(state.customerProfile.city)}</strong></span>
+    <div class="flex flex-wrap items-center gap-2.5">
                 ${
                   balanceDue > 0
-                    ? `<button
-                        type="button"
-                        data-client-pay-order="${esc(ord.orderNumber)}"
-                        class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-                      >
+                    ? `<button type="button" data-client-pay-order="${esc(ord.orderNumber)}" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors cursor-pointer">
                         Pay Remaining Balance (${usd(balanceDue)})
-                      </button>`
+    </button>`
                     : ''
                 }
                 ${
                   canCancel
-                    ? `<button
-                        type="button"
-                        data-client-cancel-order="${esc(ord.orderNumber)}"
-                        class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors cursor-pointer"
-                      >
+                    ? `<button type="button" data-client-cancel-order="${esc(ord.orderNumber)}" class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors cursor-pointer">
                         Cancel Order
-                      </button>`
+    </button>`
                     : ''
                 }
-                <a
-                  href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="font-semibold text-[#0095FF] hover:underline"
-                >
+    <a href="${ADMIN_MESSENGER_PLACEHOLDER_URL}" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#0095FF] hover:underline">
                   Ask Owner About This Order on Messenger ↗
-                </a>
-              </div>
-            </div>
-          </article>
+    </a>
+    </div>
+    </div>
+    </article>
         `;
       })
       .join('');
@@ -3619,17 +3430,17 @@ function renderDashboardContent() {
     txTbody.innerHTML = transactions
       .map(
         (tx) => `
-          <tr>
-            <td class="font-mono-tech text-xs font-bold text-[#0D1015] whitespace-nowrap">${esc(tx.txId)}</td>
-            <td class="font-mono-tech text-xs text-[#475569] whitespace-nowrap">${esc(tx.date)}</td>
-            <td class="admin-col-primary">
-              <p class="admin-table-title">${esc(tx.piece)}</p>
-              <p class="admin-table-sub">Order #${esc(tx.orderNumber)} · ${esc(tx.finish)}</p>
-            </td>
-            <td class="text-xs text-[#475569] whitespace-nowrap">${esc(tx.method)}</td>
-            <td class="text-xs font-semibold ${tx.status.includes('Full') ? 'text-emerald-700' : 'text-amber-700'} whitespace-nowrap">${esc(tx.status)}</td>
-            <td class="text-right font-mono-tech font-bold text-[#0D1015] whitespace-nowrap">${usd(tx.amount)}</td>
-          </tr>
+    <tr>
+    <td class="font-mono-tech text-xs font-bold text-[#0D1015] whitespace-nowrap">${esc(tx.txId)}</td>
+    <td class="font-mono-tech text-xs text-[#475569] whitespace-nowrap">${esc(tx.date)}</td>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(tx.piece)}</p>
+    <p class="admin-table-sub">Order #${esc(tx.orderNumber)} · ${esc(tx.finish)}</p>
+    </td>
+    <td class="text-xs text-[#475569] whitespace-nowrap">${esc(tx.method)}</td>
+    <td class="text-xs font-semibold ${tx.status.includes('Full') ? 'text-emerald-700' : 'text-amber-700'} whitespace-nowrap">${esc(tx.status)}</td>
+    <td class="text-right font-mono-tech font-bold text-[#0D1015] whitespace-nowrap">${usd(tx.amount)}</td>
+    </tr>
         `
       )
       .join('');
@@ -3698,20 +3509,16 @@ function renderDashboardContent() {
             isVoucherEligible: false,
           };
           return `
-            <article class="bg-white rounded-3xl border border-[#BCE3FF] p-5 shadow-2xs flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div class="flex items-center gap-4 min-w-0">
-                <img
-                  src="${esc(imgUrl)}"
-                  alt="${esc(item.name)}"
-                  class="w-20 h-20 rounded-2xl object-cover border border-[#BCE3FF] shrink-0"
-                />
-                <div class="min-w-0 space-y-1">
-                  <div class="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
-                    <span class="font-mono-tech font-bold text-[#0095FF]">${esc(item.sku)}</span>
-                    <span>· ${esc(item.categoryName)}</span>
-                  </div>
-                  <h3 class="font-serif-display text-lg font-bold text-[#0D1015] truncate">${esc(item.name)}</h3>
-                  <p class="text-xs text-[#475569]">Finish: <span class="font-semibold text-[#0D1015]">${esc(entry.finish)}</span> · ${usd(pricing.effectivePrice)} each</p>
+    <article class="bg-white rounded-3xl border border-[#BCE3FF] p-5 shadow-2xs flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div class="flex items-center gap-4 min-w-0">
+    <img src="${esc(imgUrl)}" alt="${esc(item.name)}" class="w-20 h-20 rounded-2xl object-cover border border-[#BCE3FF] shrink-0" />
+    <div class="min-w-0 space-y-1">
+    <div class="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
+    <span class="font-mono-tech font-bold text-[#0095FF]">${esc(item.sku)}</span>
+    <span>· ${esc(item.categoryName)}</span>
+    </div>
+    <h3 class="font-serif-display text-lg font-bold text-[#0D1015] truncate">${esc(item.name)}</h3>
+    <p class="text-xs text-[#475569]">Finish: <span class="font-semibold text-[#0D1015]">${esc(entry.finish)}</span> · ${usd(pricing.effectivePrice)} each</p>
                   ${
                     state.appliedVoucher
                       ? breakdown.isVoucherEligible && breakdown.lineDiscount > 0
@@ -3719,55 +3526,34 @@ function renderDashboardContent() {
                         : `<p class="text-xs font-medium text-[#64748B] pt-0.5">Voucher: No discount (Original price retained)</p>`
                       : ''
                   }
-                  <div class="flex flex-wrap items-center gap-3 pt-1">
-                    <div class="inline-flex items-center rounded-xl border border-[#BCE3FF] bg-[#F8FBFF]">
-                      <button
-                        type="button"
-                        data-client-cart-qty-idx="${idx}"
-                        data-client-cart-delta="-1"
-                        aria-label="Decrease quantity"
-                        class="px-3 py-1 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-l-xl cursor-pointer"
-                      >
+    <div class="flex flex-wrap items-center gap-3 pt-1">
+    <div class="inline-flex items-center rounded-xl border border-[#BCE3FF] bg-[#F8FBFF]">
+    <button type="button" data-client-cart-qty-idx="${idx}" data-client-cart-delta="-1" aria-label="Decrease quantity" class="px-3 py-1 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-l-xl cursor-pointer">
                         −
-                      </button>
-                      <span class="px-3 py-1 font-mono-tech text-xs font-bold text-[#0D1015]">${entry.quantity}</span>
-                      <button
-                        type="button"
-                        data-client-cart-qty-idx="${idx}"
-                        data-client-cart-delta="1"
-                        aria-label="Increase quantity"
-                        class="px-3 py-1 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-r-xl cursor-pointer"
-                      >
+    </button>
+    <span class="px-3 py-1 font-mono-tech text-xs font-bold text-[#0D1015]">${entry.quantity}</span>
+    <button type="button" data-client-cart-qty-idx="${idx}" data-client-cart-delta="1" aria-label="Increase quantity" class="px-3 py-1 text-xs font-bold text-[#0D1015] hover:bg-[#EBF6FF] rounded-r-xl cursor-pointer">
                         +
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      data-client-cart-remove="${idx}"
-                      class="text-xs font-semibold text-rose-700 hover:underline cursor-pointer"
-                    >
+    </button>
+    </div>
+    <button type="button" data-client-cart-remove="${idx}" class="text-xs font-semibold text-rose-700 hover:underline cursor-pointer">
                       Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="sm:text-right shrink-0">
+    </button>
+    </div>
+    </div>
+    </div>
+    <div class="sm:text-right shrink-0">
                 ${
                   breakdown.isVoucherEligible && breakdown.lineDiscount > 0
                     ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(breakdown.rawLineTotal)}</p>
-                       <p class="font-mono-tech text-lg font-bold text-emerald-700">${usd(breakdown.finalLineTotal)}</p>`
+    <p class="font-mono-tech text-lg font-bold text-emerald-700">${usd(breakdown.finalLineTotal)}</p>`
                     : `<p class="font-mono-tech text-lg font-bold text-[#0D1015]">${usd(breakdown.rawLineTotal)}</p>`
                 }
-                <a
-                  href="${ADMIN_MESSENGER_PLACEHOLDER_URL}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-xs font-semibold text-[#0095FF] hover:underline"
-                >
+    <a href="${ADMIN_MESSENGER_PLACEHOLDER_URL}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-[#0095FF] hover:underline">
                   Make Offer ↗
-                </a>
-              </div>
-            </article>
+    </a>
+    </div>
+    </article>
           `;
         })
         .join('');
@@ -3840,44 +3626,35 @@ function renderDashboardContent() {
     friendlyVouchersEl.innerHTML = displayVouchers
       .map(
         (v) => `
-          <div class="p-5 rounded-3xl border border-[#BCE3FF] bg-white space-y-4 shadow-2xs">
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <p class="font-mono-tech text-xs font-bold text-[#0095FF]">
+    <div class="p-5 rounded-3xl border border-[#BCE3FF] bg-white space-y-4 shadow-2xs">
+    <div class="flex items-start justify-between gap-2">
+    <div>
+    <p class="font-mono-tech text-xs font-bold text-[#0095FF]">
                   SAVE ${esc(formatVoucherBenefitLabel(v))} ON SELECTED ITEM
-                </p>
-                <p class="font-serif-display text-base font-bold text-[#0D1015] mt-1">
+    </p>
+    <p class="font-serif-display text-base font-bold text-[#0D1015] mt-1">
                   ${esc(v.furnitureName || v.productName)}
-                </p>
-              </div>
-              <span class="font-mono-tech text-xs font-bold text-emerald-700">
+    </p>
+    </div>
+    <span class="font-mono-tech text-xs font-bold text-emerald-700">
                 ${esc(v.status)}
-              </span>
-            </div>
+    </span>
+    </div>
 
-            <div class="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#F8FBFF] border border-[#BCE3FF]">
-              <code class="font-mono-tech text-xs font-bold text-[#0D1015]">${esc(v.code)}</code>
-              <button
-                type="button"
-                data-copy-voucher="${esc(v.code)}"
-                class="px-3 py-1.5 rounded-lg bg-[#EBF6FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
+    <div class="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#F8FBFF] border border-[#BCE3FF]">
+    <code class="font-mono-tech text-xs font-bold text-[#0D1015]">${esc(v.code)}</code>
+    <button type="button" data-copy-voucher="${esc(v.code)}" class="px-3 py-1.5 rounded-lg bg-[#EBF6FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white text-xs font-semibold transition-colors cursor-pointer">
                 Copy Code
-              </button>
-            </div>
+    </button>
+    </div>
 
-            <div class="flex items-center justify-between text-xs text-[#64748B]">
-              <span>Expires ${esc(v.expiryDate)}</span>
-              <button
-                type="button"
-                data-use-voucher-product="${esc(v.furnitureId || v.productId)}"
-                data-use-voucher-code="${esc(v.code)}"
-                class="font-semibold text-[#0095FF] hover:underline cursor-pointer"
-              >
+    <div class="flex items-center justify-between text-xs text-[#64748B]">
+    <span>Expires ${esc(v.expiryDate)}</span>
+    <button type="button" data-use-voucher-product="${esc(v.furnitureId || v.productId)}" data-use-voucher-code="${esc(v.code)}" class="font-semibold text-[#0095FF] hover:underline cursor-pointer">
                 Add Product to Cart →
-              </button>
-            </div>
-          </div>
+    </button>
+    </div>
+    </div>
         `
       )
       .join('');
@@ -3927,10 +3704,12 @@ function renderDashboardContent() {
         }
         const cartTabBtn = document.querySelector('[data-client-tab="cart"]');
         if (cartTabBtn) cartTabBtn.click();
-        renderDashboardContent();
       });
     });
   }
+  } // end if (shouldRenderClient)
+
+  if (!shouldRenderAdmin) return;
 
   // 5. Admin Dashboard Statistics, Sidebar Counts & Overview Sections
   const adminStatCatalog = document.getElementById('admin-stat-catalog');
@@ -3982,15 +3761,15 @@ function renderDashboardContent() {
             ? Math.round(matches.reduce((s, i) => s + Number(i.effectivePrice || i.price || 0), 0) / matches.length)
             : 0;
         return `
-          <div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="font-semibold text-slate-800">${esc(cat.label)}</span>
-              <span class="font-mono-tech text-slate-500">${matches.length} items · Avg ${usd(avgPrice)}</span>
-            </div>
-            <div class="admin-progress-track">
-              <div class="admin-progress-fill-blue" style="width: ${matches.length > 0 ? Math.max(8, pct) : 0}%"></div>
-            </div>
-          </div>
+    <div>
+    <div class="flex items-center justify-between text-xs">
+    <span class="font-semibold text-slate-800">${esc(cat.label)}</span>
+    <span class="font-mono-tech text-slate-500">${matches.length} items · Avg ${usd(avgPrice)}</span>
+    </div>
+    <div class="admin-progress-track">
+    <div class="admin-progress-fill-blue" style="width: ${matches.length > 0 ? Math.max(8, pct) : 0}%"></div>
+    </div>
+    </div>
         `;
       })
       .join('');
@@ -4021,15 +3800,15 @@ function renderDashboardContent() {
       .map((st) => {
         const pct = Math.round((st.count / totalOrds) * 100);
         return `
-          <div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="font-semibold text-slate-800">${esc(st.label)}</span>
-              <span class="font-mono-tech text-slate-500">${st.count} ${st.count === 1 ? 'order' : 'orders'} (${pct}%)</span>
-            </div>
-            <div class="admin-progress-track">
-              <div class="admin-progress-fill-slate" style="width: ${st.count > 0 ? Math.max(10, pct) : 0}%"></div>
-            </div>
-          </div>
+    <div>
+    <div class="flex items-center justify-between text-xs">
+    <span class="font-semibold text-slate-800">${esc(st.label)}</span>
+    <span class="font-mono-tech text-slate-500">${st.count} ${st.count === 1 ? 'order' : 'orders'} (${pct}%)</span>
+    </div>
+    <div class="admin-progress-track">
+    <div class="admin-progress-fill-slate" style="width: ${st.count > 0 ? Math.max(10, pct) : 0}%"></div>
+    </div>
+    </div>
         `;
       })
       .join('');
@@ -4040,66 +3819,66 @@ function renderDashboardContent() {
   if (recentOrdersEl) {
     const recentList = state.orders.slice(0, 4);
     recentOrdersEl.innerHTML = `
-      <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 class="text-base font-bold text-slate-900">Recent Customer Orders</h2>
-          <p class="text-xs text-slate-500 mt-0.5">Latest orders placed by customers</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="button" data-admin-jump="add-product" class="admin-btn admin-btn-sm admin-btn-secondary">
+    <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+    <h2 class="text-base font-bold text-slate-900">Recent Customer Orders</h2>
+    <p class="text-xs text-slate-500 mt-0.5">Latest orders placed by customers</p>
+    </div>
+    <div class="flex items-center gap-2">
+    <button type="button" data-admin-jump="add-product" class="admin-btn admin-btn-sm admin-btn-secondary">
             + Add Product
-          </button>
-          <button type="button" data-admin-jump="orders" class="admin-btn admin-btn-sm admin-btn-primary">
+    </button>
+    <button type="button" data-admin-jump="orders" class="admin-btn admin-btn-sm admin-btn-primary">
             View All Orders
-          </button>
-        </div>
-      </div>
+    </button>
+    </div>
+    </div>
       ${
         recentList.length === 0
           ? `<div class="admin-empty-state"><p class="text-sm font-semibold text-slate-700">No customer orders yet</p><p class="text-xs text-slate-500 mt-1">New orders will appear here automatically.</p></div>`
           : `
-        <div class="overflow-x-auto">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th class="admin-col-primary">Product</th>
-                <th>Stage</th>
-                <th class="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th>Order</th>
+    <th>Customer</th>
+    <th class="admin-col-primary">Product</th>
+    <th>Stage</th>
+    <th class="text-right">Total</th>
+    </tr>
+    </thead>
+    <tbody>
               ${recentList
                 .map(
                   (o) => `
-                <tr>
-                  <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">#${esc(o.orderNumber)}</td>
-                  <td class="whitespace-nowrap">
-                    <p class="admin-table-title">${esc(o.clientName)}</p>
-                    <p class="admin-table-sub">${esc(o.clientEmail)}</p>
-                  </td>
-                  <td class="admin-col-primary">
-                    <p class="admin-table-title">${esc(o.furnitureName)}</p>
-                    <p class="admin-table-sub">${esc(o.selectedFinish)}</p>
-                  </td>
-                  <td class="whitespace-nowrap">
-                    <span class="admin-status-dot ${
+    <tr>
+    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">#${esc(o.orderNumber)}</td>
+    <td class="whitespace-nowrap">
+    <p class="admin-table-title">${esc(o.clientName)}</p>
+    <p class="admin-table-sub">${esc(o.clientEmail)}</p>
+    </td>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(o.furnitureName)}</p>
+    <p class="admin-table-sub">${esc(o.selectedFinish)}</p>
+    </td>
+    <td class="whitespace-nowrap">
+    <span class="admin-status-dot ${
                       /Dispatched|Delivered/i.test(o.status)
                         ? 'text-emerald-700'
                         : /Quality/i.test(o.status)
                         ? 'text-amber-700'
                         : 'text-[#0284C7]'
                     }">${esc(o.status.split('·')[0].trim())}</span>
-                  </td>
-                  <td class="text-right font-mono-tech font-bold text-slate-900 whitespace-nowrap">${usd(o.totalAmount)}</td>
-                </tr>
+    </td>
+    <td class="text-right font-mono-tech font-bold text-slate-900 whitespace-nowrap">${usd(o.totalAmount)}</td>
+    </tr>
               `
                 )
                 .join('')}
-            </tbody>
-          </table>
-        </div>
+    </tbody>
+    </table>
+    </div>
       `
       }
     `;
@@ -4147,99 +3926,84 @@ function renderDashboardContent() {
     const isFormOpen = !document.getElementById('admin-product-form')?.classList.contains('hidden');
 
     adminCatalogEl.innerHTML = `
-      <!-- Compact Product Summary Strip -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div class="admin-kpi-card py-3 px-4">
-          <p class="admin-kpi-label">Total Products</p>
-          <p id="prod-kpi-total" class="text-xl font-bold text-slate-900 mt-0.5">${totalCatalogCount}</p>
-        </div>
-        <div class="admin-kpi-card py-3 px-4">
-          <p class="admin-kpi-label">Ready in Stock</p>
-          <p class="text-xl font-bold text-emerald-700 mt-0.5">${inStockCatalogCount}</p>
-        </div>
-        <div class="admin-kpi-card py-3 px-4">
-          <p class="admin-kpi-label">Low / Out of Stock</p>
-          <p class="text-xl font-bold ${lowOrOutCatalogCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${lowOrOutCatalogCount}</p>
-        </div>
-        <div class="admin-kpi-card py-3 px-4">
-          <p class="admin-kpi-label">On Sale / Discount</p>
-          <p class="text-xl font-bold text-[#0284C7] mt-0.5">${discountedCatalogCount}</p>
-        </div>
-      </div>
 
-      <div class="admin-card overflow-hidden">
-        <!-- Streamlined Filter & Action Bar -->
-        <div class="admin-toolbar py-3 px-4">
-          <div class="admin-toolbar-filters">
-            <input
-              id="admin-catalog-search"
-              type="search"
-              value="${esc(state.adminProductSearch)}"
-              placeholder="Search name, SKU, or category..."
-              aria-label="Search products"
-              class="admin-input admin-search-input"
-            />
-            <select
-              id="admin-catalog-category"
-              aria-label="Filter products by category"
-              class="admin-select admin-filter-select"
-            >
-              <option value="all" ${catFilter === 'all' ? 'selected' : ''}>All Categories (${state.catalog.length})</option>
-              <option value="living" ${catFilter === 'living' ? 'selected' : ''}>Living Room</option>
-              <option value="dining" ${catFilter === 'dining' ? 'selected' : ''}>Dining Room</option>
-              <option value="bedroom" ${catFilter === 'bedroom' ? 'selected' : ''}>Bedroom</option>
-              <option value="office" ${catFilter === 'office' ? 'selected' : ''}>Study/Work Desks</option>
-              <option value="kitchen" ${catFilter === 'kitchen' ? 'selected' : ''}>Kitchen</option>
-            </select>
-            <select
-              id="admin-catalog-type"
-              aria-label="Filter products by type"
-              class="admin-select admin-filter-select"
-            >
-              <option value="all" ${typeFilter === 'all' ? 'selected' : ''}>All Types</option>
-              <option value="standard" ${typeFilter === 'standard' ? 'selected' : ''}>Standard Catalog</option>
-              <option value="customized" ${typeFilter === 'customized' ? 'selected' : ''}>Custom / Bespoke</option>
-            </select>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+    <div class="admin-kpi-card py-3 px-4">
+    <p class="admin-kpi-label">Total Products</p>
+    <p id="prod-kpi-total" class="text-xl font-bold text-slate-900 mt-0.5">${totalCatalogCount}</p>
+    </div>
+    <div class="admin-kpi-card py-3 px-4">
+    <p class="admin-kpi-label">Ready in Stock</p>
+    <p class="text-xl font-bold text-emerald-700 mt-0.5">${inStockCatalogCount}</p>
+    </div>
+    <div class="admin-kpi-card py-3 px-4">
+    <p class="admin-kpi-label">Low / Out of Stock</p>
+    <p class="text-xl font-bold ${lowOrOutCatalogCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${lowOrOutCatalogCount}</p>
+    </div>
+    <div class="admin-kpi-card py-3 px-4">
+    <p class="admin-kpi-label">On Sale / Discount</p>
+    <p class="text-xl font-bold text-[#0284C7] mt-0.5">${discountedCatalogCount}</p>
+    </div>
+    </div>
+
+    <div class="admin-card overflow-hidden">
+
+    <div class="admin-toolbar py-3 px-4">
+    <div class="admin-toolbar-filters">
+    <input id="admin-catalog-search" type="search" value="${esc(state.adminProductSearch)}" placeholder="Search name, SKU, or category..." aria-label="Search products" class="admin-input admin-search-input" />
+    <select id="admin-catalog-category" aria-label="Filter products by category" class="admin-select admin-filter-select">
+    <option value="all" ${catFilter === 'all' ? 'selected' : ''}>All Categories (${state.catalog.length})</option>
+    <option value="living" ${catFilter === 'living' ? 'selected' : ''}>Living Room</option>
+    <option value="dining" ${catFilter === 'dining' ? 'selected' : ''}>Dining Room</option>
+    <option value="bedroom" ${catFilter === 'bedroom' ? 'selected' : ''}>Bedroom</option>
+    <option value="office" ${catFilter === 'office' ? 'selected' : ''}>Study/Work Desks</option>
+    <option value="kitchen" ${catFilter === 'kitchen' ? 'selected' : ''}>Kitchen</option>
+    </select>
+    <select id="admin-catalog-type" aria-label="Filter products by type" class="admin-select admin-filter-select">
+    <option value="all" ${typeFilter === 'all' ? 'selected' : ''}>All Types</option>
+    <option value="standard" ${typeFilter === 'standard' ? 'selected' : ''}>Standard Catalog</option>
+    <option value="customized" ${typeFilter === 'customized' ? 'selected' : ''}>Custom / Bespoke</option>
+    </select>
             ${
               query || catFilter !== 'all' || typeFilter !== 'all'
                 ? `<button type="button" id="admin-reset-product-filters" class="admin-btn admin-btn-sm admin-btn-secondary">Clear</button>`
                 : ''
             }
-          </div>
-          <div class="flex items-center gap-2.5">
-            <span class="text-xs font-medium text-slate-500 hidden md:inline">${filteredProducts.length} of ${state.catalog.length} shown</span>
-            <button type="button" id="admin-toggle-add-product-btn" class="admin-btn admin-btn-sm ${isFormOpen ? 'admin-btn-secondary' : 'admin-btn-primary'}">
+    </div>
+    <div class="flex items-center gap-2.5">
+    <span class="text-xs font-medium text-slate-500 hidden md:inline">${filteredProducts.length} of ${state.catalog.length} shown</span>
+    <button type="button" id="admin-toggle-add-product-btn" class="admin-btn admin-btn-sm ${isFormOpen ? 'admin-btn-secondary' : 'admin-btn-primary'}">
               ${isFormOpen ? 'Close Product Form' : '+ Add Product'}
-            </button>
-          </div>
-        </div>
+    </button>
+    </div>
+    </div>
 
         ${
           filteredProducts.length === 0
             ? `
-          <div class="admin-empty-state space-y-3">
-            <p class="text-base font-bold text-slate-900">No matching products found</p>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search or selecting a different product category.</p>
-            <div>
-              <button type="button" id="admin-reset-product-filters-empty" class="admin-btn admin-btn-sm admin-btn-secondary">
+    <div class="admin-empty-state space-y-3">
+    <p class="text-base font-bold text-slate-900">No matching products found</p>
+    <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search or selecting a different product category.</p>
+    <div>
+    <button type="button" id="admin-reset-product-filters-empty" class="admin-btn admin-btn-sm admin-btn-secondary">
                 Reset Filters
-              </button>
-            </div>
-          </div>
+    </button>
+    </div>
+    </div>
         `
             : `
-          <div class="overflow-x-auto">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th class="admin-col-primary">Product</th>
-                  <th>Category</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th class="admin-col-primary">Product</th>
+    <th>Category</th>
+    <th>Price</th>
+    <th>Stock</th>
+    <th class="text-right">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
                 ${filteredProducts
                   .map((p) => {
                     const variants = p.colorVariants || [];
@@ -4254,26 +4018,22 @@ function renderDashboardContent() {
                         ? 'bg-amber-50 text-amber-800 border-amber-200'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200';
                     return `
-                  <tr data-product-row="${esc(p.id)}">
-                    <td class="admin-col-primary">
-                      <div class="flex items-center gap-3.5">
-                        <img
-                          src="${esc(imgUrl)}"
-                          alt="${esc(p.name)}"
-                          class="admin-thumb"
-                        />
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <p class="admin-table-title">${esc(p.name)}</p>
+    <tr data-product-row="${esc(p.id)}">
+    <td class="admin-col-primary">
+    <div class="flex items-center gap-3.5">
+    <img src="${esc(imgUrl)}" alt="${esc(p.name)}" class="admin-thumb" />
+    <div class="min-w-0">
+    <div class="flex items-center gap-2">
+    <p class="admin-table-title">${esc(p.name)}</p>
                             ${
                               isCustomized
                                 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-[#0284C7] border border-sky-200 shrink-0">Custom</span>`
                                 : ''
                             }
-                          </div>
-                          <div class="flex items-center gap-2 mt-0.5">
-                            <span class="admin-table-sub font-mono-tech">${esc(p.sku)} · ${esc(p.dimensions || 'Standard')}</span>
-                            <span class="inline-flex items-center gap-1 shrink-0">
+    </div>
+    <div class="flex items-center gap-2 mt-0.5">
+    <span class="admin-table-sub font-mono-tech">${esc(p.sku)} · ${esc(p.dimensions || 'Standard')}</span>
+    <span class="inline-flex items-center gap-1 shrink-0">
                               ${variants
                                 .slice(0, 3)
                                 .map(
@@ -4281,99 +4041,62 @@ function renderDashboardContent() {
                                     `<span title="${esc(v.name)}" class="admin-swatch-dot" style="width:9px;height:9px;background-color:${esc(v.hex || '#5C3A21')}"></span>`
                                 )
                                 .join('')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="text-xs font-medium text-slate-600 whitespace-nowrap">
+    </span>
+    </div>
+    </div>
+    </div>
+    </td>
+    <td class="text-xs font-medium text-slate-600 whitespace-nowrap">
                       ${esc(p.categoryName)}
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <div class="flex items-center gap-1.5">
-                        <span class="font-mono-tech text-sm font-bold text-slate-900">${usd(p.effectivePrice)}</span>
+    </td>
+    <td class="whitespace-nowrap">
+    <div class="flex items-center gap-1.5">
+    <span class="font-mono-tech text-sm font-bold text-slate-900">${usd(p.effectivePrice)}</span>
                         ${
                           p.discountPercent > 0
                             ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">-${p.discountPercent}%</span>`
                             : ''
                         }
-                      </div>
+    </div>
                       ${
                         p.discountPercent > 0
                           ? `<p class="text-[11px] line-through text-slate-400 font-mono-tech">${usd(p.price)}</p>`
                           : ''
                       }
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <div class="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          aria-label="Stock for ${esc(p.name)}"
-                          data-prod-inline-stock="${esc(p.id)}"
-                          value="${stockInfo.availableStock}"
-                          class="admin-input font-mono-tech text-xs font-bold"
-                          style="width: 64px; padding: 0.25rem 0.45rem;"
-                        />
-                        <button
-                          type="button"
-                          data-prod-inline-save="${esc(p.id)}"
-                          title="Save stock quantity"
-                          class="admin-btn admin-btn-sm admin-btn-secondary"
-                          style="padding: 0.25rem 0.5rem;"
-                        >
+    </td>
+    <td class="whitespace-nowrap">
+    <div class="flex items-center gap-1.5">
+    <input type="number" min="0" step="1" aria-label="Stock for ${esc(p.name)}" data-prod-inline-stock="${esc(p.id)}" value="${stockInfo.availableStock}" class="admin-input font-mono-tech text-xs font-bold" style="width: 64px; padding: 0.25rem 0.45rem;" />
+    <button type="button" data-prod-inline-save="${esc(p.id)}" title="Save stock quantity" class="admin-btn admin-btn-sm admin-btn-secondary" style="padding: 0.25rem 0.5rem;">
                           Save
-                        </button>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${stockPillClass}">
+    </button>
+    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${stockPillClass}">
                           ${esc(stockInfo.statusLabel)}
-                        </span>
-                      </div>
-                    </td>
-                    <td class="text-right whitespace-nowrap">
-                      <div class="inline-flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          data-edit-product="${esc(p.id)}"
-                          aria-label="Edit ${esc(p.name)}"
-                          class="admin-btn admin-btn-sm admin-btn-secondary"
-                        >
+    </span>
+    </div>
+    </td>
+    <td class="text-right whitespace-nowrap">
+    <div class="inline-flex items-center justify-end gap-1.5">
+    <button type="button" data-edit-product="${esc(p.id)}" aria-label="Edit ${esc(p.name)}" class="admin-btn admin-btn-sm admin-btn-secondary">
                           Edit
-                        </button>
-                        <button
-                          type="button"
-                          data-delete-product="${esc(p.id)}"
-                          aria-label="Remove ${esc(p.name)}"
-                          class="admin-btn admin-btn-sm admin-btn-danger-ghost"
-                        >
+    </button>
+    <button type="button" data-delete-product="${esc(p.id)}" aria-label="Remove ${esc(p.name)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
                           Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>`;
+    </button>
+    </div>
+    </td>
+    </tr>`;
                   })
                   .join('')}
-              </tbody>
-            </table>
-          </div>
+    </tbody>
+    </table>
+    </div>
         `
         }
-      </div>
+    </div>
     `;
 
-    const searchInput = document.getElementById('admin-catalog-search');
-    if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
-        state.adminProductSearch = e.target.value;
-        const pos = e.target.selectionStart || 0;
-        renderDashboardContent();
-        const nextInput = document.getElementById('admin-catalog-search');
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.setSelectionRange(pos, pos);
-        }
-      });
-    }
+    bindLiveSearchInput('admin-catalog-search', 'adminProductSearch', renderDashboardContent);
 
     const catSelect = document.getElementById('admin-catalog-category');
     if (catSelect) {
@@ -4494,16 +4217,6 @@ function renderDashboardContent() {
       return t || 'Workshop Material';
     };
 
-    const friendlyUnitName = (unitStr) => {
-      const u = String(unitStr || '').trim();
-      if (u === 'bd ft') return 'board feet (bd ft)';
-      if (u === 'sq m') return 'square meters (sq m)';
-      if (u === 'slabs') return 'stone slabs';
-      if (u === 'sets') return 'hardware sets';
-      if (u === 'rolls') return 'spools / rolls';
-      return u;
-    };
-
     const filteredMaterials = state.materials.filter((m) => {
       const st = getMaterialStockStatus(m);
       const matchesSearch =
@@ -4547,48 +4260,47 @@ function renderDashboardContent() {
     );
 
     adminInventoryEl.innerHTML = `
-      <!-- 1. Simple, Plain-English Summary Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="admin-kpi-card py-3.5 px-4">
-          <p class="admin-kpi-label">Materials Tracked</p>
-          <p id="inv-kpi-total-products" class="text-xl font-bold font-mono-tech text-slate-900 mt-0.5">${metrics.totalMaterials} Materials</p>
-          <p class="text-xs text-slate-500 mt-0.5">Wood, fabric, stone &amp; hardware</p>
-        </div>
-        <div class="admin-kpi-card py-3.5 px-4">
-          <p class="admin-kpi-label">Plenty in Stock</p>
-          <p id="inv-kpi-total-stock" class="text-xl font-bold font-mono-tech text-emerald-700 mt-0.5">${healthyCount} Ready</p>
-          <p class="text-xs text-slate-500 mt-0.5">${metrics.totalStockQuantity} total units on hand</p>
-        </div>
-        <div class="admin-kpi-card py-3.5 px-4">
-          <p class="admin-kpi-label">Running Low</p>
-          <p id="inv-kpi-low-stock" class="text-xl font-bold font-mono-tech ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${metrics.lowStockCount} Low</p>
-          <p class="text-xs text-slate-500 mt-0.5">${metrics.lowStockCount > 0 ? 'Getting close to running out' : 'Nothing is running low'}</p>
-        </div>
-        <div class="admin-kpi-card py-3.5 px-4">
-          <p class="admin-kpi-label">Out of Stock</p>
-          <p id="inv-kpi-out-of-stock" class="text-xl font-bold font-mono-tech ${metrics.outOfStockCount > 0 ? 'text-rose-700' : 'text-slate-900'} mt-0.5">${metrics.outOfStockCount} Empty</p>
-          <p class="text-xs text-slate-500 mt-0.5">${metrics.outOfStockCount > 0 ? 'Needs restocking right away' : 'Zero empty materials'}</p>
-        </div>
-      </div>
 
-      <!-- 2. Friendly Low-Stock Reminder Bar (Only shown when items need attention) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="admin-kpi-card py-3.5 px-4">
+    <p class="admin-kpi-label">Materials Tracked</p>
+    <p id="inv-kpi-total-products" class="text-xl font-bold font-mono-tech text-slate-900 mt-0.5">${metrics.totalMaterials} Materials</p>
+    <p class="text-xs text-slate-500 mt-0.5">Wood, fabric, stone &amp; hardware</p>
+    </div>
+    <div class="admin-kpi-card py-3.5 px-4">
+    <p class="admin-kpi-label">Plenty in Stock</p>
+    <p id="inv-kpi-total-stock" class="text-xl font-bold font-mono-tech text-emerald-700 mt-0.5">${healthyCount} Ready</p>
+    <p class="text-xs text-slate-500 mt-0.5">${metrics.totalStockQuantity} total units on hand</p>
+    </div>
+    <div class="admin-kpi-card py-3.5 px-4">
+    <p class="admin-kpi-label">Running Low</p>
+    <p id="inv-kpi-low-stock" class="text-xl font-bold font-mono-tech ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${metrics.lowStockCount} Low</p>
+    <p class="text-xs text-slate-500 mt-0.5">${metrics.lowStockCount > 0 ? 'Getting close to running out' : 'Nothing is running low'}</p>
+    </div>
+    <div class="admin-kpi-card py-3.5 px-4">
+    <p class="admin-kpi-label">Out of Stock</p>
+    <p id="inv-kpi-out-of-stock" class="text-xl font-bold font-mono-tech ${metrics.outOfStockCount > 0 ? 'text-rose-700' : 'text-slate-900'} mt-0.5">${metrics.outOfStockCount} Empty</p>
+    <p class="text-xs text-slate-500 mt-0.5">${metrics.outOfStockCount > 0 ? 'Needs restocking right away' : 'Zero empty materials'}</p>
+    </div>
+    </div>
+
       ${
         needsRestockCount > 0
           ? `
-        <div class="p-4 rounded-xl border ${
+    <div class="p-4 rounded-xl border ${
           metrics.outOfStockCount > 0
             ? 'bg-rose-50/80 border-rose-200 text-rose-950'
             : 'bg-amber-50/80 border-amber-200 text-amber-950'
         } flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div class="space-y-0.5">
-            <p class="font-bold text-sm">
+    <div class="space-y-0.5">
+    <p class="font-bold text-sm">
               ${
                 metrics.outOfStockCount > 0
                   ? `${metrics.outOfStockCount} material is out of stock and ${metrics.lowStockCount} running low`
                   : `Heads up: ${metrics.lowStockCount} material${metrics.lowStockCount === 1 ? ' is' : 's are'} running low on stock`
               }
-            </p>
-            <p class="text-slate-700">
+    </p>
+    <p class="text-slate-700">
               ${[
                 ...metrics.outOfStockItems.map((i) => `${i.name} (0 ${i.unit} left)`),
                 ...metrics.lowStockItems.map((i) => `${i.name} (only ${i.stockQuantity} ${i.unit} left — warning set at ${i.minStockLevel ?? 10})`),
@@ -4596,218 +4308,140 @@ function renderDashboardContent() {
                 .slice(0, 3)
                 .map((txt) => esc(txt))
                 .join(' · ')}
-            </p>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              id="admin-alert-filter-low-btn"
-              class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap"
-            >
+    </p>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+    <button type="button" id="admin-alert-filter-low-btn" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap">
               ${stockFilter === 'needs_restock' || stockFilter === 'low_stock' ? 'Show All Materials' : 'View Low Stock Only'}
-            </button>
-            <button
-              type="button"
-              id="admin-alert-restock-first-btn"
-              class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap"
-            >
+    </button>
+    <button type="button" id="admin-alert-restock-first-btn" class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap">
               + Add Stock Now
-            </button>
-          </div>
-        </div>
+    </button>
+    </div>
+    </div>
       `
           : ''
       }
 
-      <!-- 3. Step-by-Step "Add or Use Stock" Guided Panel -->
-      <form
-        id="admin-stock-movement-form"
-        novalidate
-        class="admin-card p-5 sm:p-6 space-y-5 ${showMovementForm ? '' : 'hidden'}"
-      >
-        <div class="pb-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 class="text-base font-bold text-slate-900">
+    <form id="admin-stock-movement-form" novalidate class="admin-card p-5 sm:p-6 space-y-5 ${showMovementForm ? '' : 'hidden'}">
+    <div class="pb-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+    <div>
+    <h2 class="text-base font-bold text-slate-900">
               ${activeMovementMode === 'Stock In' ? 'Add New Stock (Supplies Arrived)' : 'Use Stock (Deduct for Workshop)'}
-            </h2>
-            <p class="text-xs text-slate-500 mt-0.5">
+    </h2>
+    <p class="text-xs text-slate-500 mt-0.5">
               ${
                 activeMovementMode === 'Stock In'
                   ? 'Use this when new wood, fabric, stone, or hardware arrives at the workshop.'
                   : 'Use this when materials are used to build a customer order or removed due to damage.'
               }
-            </p>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-              <button
-                type="button"
-                data-movement-mode="Stock In"
-                class="admin-tab-seg ${
-                  activeMovementMode === 'Stock In' ? 'admin-tab-seg-active' : ''
-                }"
-              >
+    </p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+    <button type="button" data-movement-mode="Stock In" class="admin-tab-seg ${ activeMovementMode === 'Stock In' ? 'admin-tab-seg-active' : '' }">
                 + Add Stock
-              </button>
-              <button
-                type="button"
-                data-movement-mode="Stock Out"
-                class="admin-tab-seg ${
-                  activeMovementMode === 'Stock Out' ? 'admin-tab-seg-active' : ''
-                }"
-              >
+    </button>
+    <button type="button" data-movement-mode="Stock Out" class="admin-tab-seg ${ activeMovementMode === 'Stock Out' ? 'admin-tab-seg-active' : '' }">
                 − Use Stock
-              </button>
-            </div>
-            <button type="button" id="admin-close-movement-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
+    </button>
+    </div>
+    <button type="button" id="admin-close-movement-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
               Close
-            </button>
-          </div>
-        </div>
+    </button>
+    </div>
+    </div>
 
-        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="sm:col-span-2">
-            <label for="inv-move-product" class="admin-label">1. Which material are you updating?</label>
-            <select id="inv-move-product" class="admin-select">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="sm:col-span-2">
+    <label for="inv-move-product" class="admin-label">1. Which material are you updating?</label>
+    <select id="inv-move-product" class="admin-select">
               ${state.materials
                 .map(
                   (m) =>
                     `<option value="${esc(m.id)}" ${m.id === selectedMaterialId ? 'selected' : ''}>${esc(m.name)} — ${m.stockQuantity} ${esc(m.unit)} currently in stock</option>`
                 )
                 .join('')}
-            </select>
-          </div>
+    </select>
+    </div>
 
           ${
             activeMovementMode === 'Stock In'
               ? `
-            <div>
-              <label for="inv-move-qty" class="admin-label">2. How much arrived? (${esc(selectedMaterial?.unit || 'units')})</label>
-              <input
-                id="inv-move-qty"
-                type="number"
-                min="1"
-                step="0.5"
-                required
-                value="${esc(state.adminMovementQuantity || '10')}"
-                class="admin-input font-mono-tech text-base font-bold"
-              />
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span class="text-[11px] text-slate-500">Quick pick:</span>
+    <div>
+    <label for="inv-move-qty" class="admin-label">2. How much arrived? (${esc(selectedMaterial?.unit || 'units')})</label>
+    <input id="inv-move-qty" type="number" min="1" step="0.5" required value="${esc(state.adminMovementQuantity || '10')}" class="admin-input font-mono-tech text-base font-bold" />
+    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+    <span class="text-[11px] text-slate-500">Quick pick:</span>
                 ${[5, 10, 25, 50]
                   .map(
                     (preset) => `
-                  <button
-                    type="button"
-                    data-quick-preset-qty="${preset}"
-                    class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer"
-                  >
+    <button type="button" data-quick-preset-qty="${preset}" class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer">
                     +${preset}
-                  </button>
+    </button>
                 `
                   )
                   .join('')}
-              </div>
-            </div>
+    </div>
+    </div>
 
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label for="inv-move-cost" class="admin-label">3. Total Cost ($) <span class="font-normal text-slate-400">(Optional)</span></label>
-                <input
-                  id="inv-move-cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value="${esc(state.adminMovementCost)}"
-                  placeholder="Auto"
-                  class="admin-input font-mono-tech"
-                />
-              </div>
-              <div>
-                <label for="inv-move-date" class="admin-label">Date</label>
-                <input
-                  id="inv-move-date"
-                  type="date"
-                  required
-                  value="${esc(state.adminMovementDate)}"
-                  class="admin-input font-mono-tech"
-                />
-              </div>
-            </div>
+    <div class="grid grid-cols-2 gap-2">
+    <div>
+    <label for="inv-move-cost" class="admin-label">3. Total Cost ($) <span class="font-normal text-slate-400">(Optional)</span></label>
+    <input id="inv-move-cost" type="number" min="0" step="0.01" value="${esc(state.adminMovementCost)}" placeholder="Auto" class="admin-input font-mono-tech" />
+    </div>
+    <div>
+    <label for="inv-move-date" class="admin-label">Date</label>
+    <input id="inv-move-date" type="date" required value="${esc(state.adminMovementDate)}" class="admin-input font-mono-tech" />
+    </div>
+    </div>
           `
               : `
-            <div>
-              <label for="inv-move-qty" class="admin-label">2. How much was used? (${esc(selectedMaterial?.unit || 'units')})</label>
-              <input
-                id="inv-move-qty"
-                type="number"
-                min="0.5"
-                step="0.5"
-                max="${Math.max(1, Number(selectedMaterial?.stockQuantity ?? 1))}"
-                required
-                value="${esc(state.adminMovementQuantity || '5')}"
-                class="admin-input font-mono-tech text-base font-bold"
-              />
-              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span class="text-[11px] text-slate-500">Quick pick:</span>
+    <div>
+    <label for="inv-move-qty" class="admin-label">2. How much was used? (${esc(selectedMaterial?.unit || 'units')})</label>
+    <input id="inv-move-qty" type="number" min="0.5" step="0.5" max="${Math.max(1, Number(selectedMaterial?.stockQuantity ?? 1))}" required value="${esc(state.adminMovementQuantity || '5')}" class="admin-input font-mono-tech text-base font-bold" />
+    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+    <span class="text-[11px] text-slate-500">Quick pick:</span>
                 ${[1, 5, 10, 20]
                   .map(
                     (preset) => `
-                  <button
-                    type="button"
-                    data-quick-preset-qty="${preset}"
-                    class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer"
-                  >
+    <button type="button" data-quick-preset-qty="${preset}" class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer">
                     −${preset}
-                  </button>
+    </button>
                 `
                   )
                   .join('')}
-              </div>
-            </div>
+    </div>
+    </div>
 
-            <div>
-              <label for="inv-move-reason" class="admin-label">3. What was it used for?</label>
-              <select id="inv-move-reason" class="admin-select">
-                <option value="Workshop Production Allocation" ${state.adminMovementReason === 'Workshop Production Allocation' ? 'selected' : ''}>Building a Furniture Piece</option>
-                <option value="Custom Order Joinery" ${state.adminMovementReason === 'Custom Order Joinery' ? 'selected' : ''}>Custom Customer Order</option>
-                <option value="Kiln Moisture / Defect Cull" ${state.adminMovementReason === 'Kiln Moisture / Defect Cull' ? 'selected' : ''}>Damaged or Unusable Piece</option>
-                <option value="Adjustment" ${state.adminMovementReason === 'Adjustment' ? 'selected' : ''}>Fixing a Stock Count</option>
-                <option value="Other" ${state.adminMovementReason === 'Other' ? 'selected' : ''}>Other Reason</option>
-              </select>
-              <input
-                id="inv-move-date"
-                type="hidden"
-                value="${esc(state.adminMovementDate)}"
-              />
-            </div>
+    <div>
+    <label for="inv-move-reason" class="admin-label">3. What was it used for?</label>
+    <select id="inv-move-reason" class="admin-select">
+    <option value="Workshop Production Allocation" ${state.adminMovementReason === 'Workshop Production Allocation' ? 'selected' : ''}>Building a Furniture Piece</option>
+    <option value="Custom Order Joinery" ${state.adminMovementReason === 'Custom Order Joinery' ? 'selected' : ''}>Custom Customer Order</option>
+    <option value="Kiln Moisture / Defect Cull" ${state.adminMovementReason === 'Kiln Moisture / Defect Cull' ? 'selected' : ''}>Damaged or Unusable Piece</option>
+    <option value="Adjustment" ${state.adminMovementReason === 'Adjustment' ? 'selected' : ''}>Fixing a Stock Count</option>
+    <option value="Other" ${state.adminMovementReason === 'Other' ? 'selected' : ''}>Other Reason</option>
+    </select>
+    <input id="inv-move-date" type="hidden" value="${esc(state.adminMovementDate)}" />
+    </div>
 
-            <div class="sm:col-span-2 lg:col-span-4 ${state.adminMovementReason === 'Other' ? '' : 'hidden'}" id="inv-move-custom-reason-wrap">
-              <label for="inv-move-custom-reason" class="admin-label">Add a short note</label>
-              <input
-                id="inv-move-custom-reason"
-                type="text"
-                value="${esc(state.adminMovementCustomReason)}"
-                placeholder="e.g. Used for dining table sample..."
-                class="admin-input"
-              />
-            </div>
+    <div class="sm:col-span-2 lg:col-span-4 ${state.adminMovementReason === 'Other' ? '' : 'hidden'}" id="inv-move-custom-reason-wrap">
+    <label for="inv-move-custom-reason" class="admin-label">Add a short note</label>
+    <input id="inv-move-custom-reason" type="text" value="${esc(state.adminMovementCustomReason)}" placeholder="e.g. Used for dining table sample..." class="admin-input" />
+    </div>
           `
           }
-        </div>
+    </div>
 
-        <!-- Live Plain-English Before -> After Preview Box -->
-        <div
-          id="admin-stock-live-preview"
-          class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-        >
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-semibold text-slate-600">Summary before saving:</span>
-            <span class="font-mono-tech text-slate-800">
+    <div id="admin-stock-live-preview" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+    <div class="flex items-center gap-2 flex-wrap">
+    <span class="font-semibold text-slate-600">Summary before saving:</span>
+    <span class="font-mono-tech text-slate-800">
               Currently <strong>${livePreview.currentStock} ${esc(livePreview.unit)}</strong>
-            </span>
-            <span aria-hidden="true">→</span>
-            <span class="font-mono-tech font-bold ${
+    </span>
+    <span aria-hidden="true">→</span>
+    <span class="font-mono-tech font-bold ${
               livePreview.insufficientStock
                 ? 'text-rose-700'
                 : activeMovementMode === 'Stock In'
@@ -4819,58 +4453,46 @@ function renderDashboardContent() {
                   ? `Not enough in stock (only ${livePreview.currentStock} ${esc(livePreview.unit)} available)`
                   : `New total will be ${livePreview.projectedStock} ${esc(livePreview.unit)} (${esc(livePreview.projectedFriendlyLabel)})`
               }
-            </span>
-          </div>
-          <span class="text-slate-500 font-mono-tech">
+    </span>
+    </div>
+    <span class="text-slate-500 font-mono-tech">
             Unit cost: ${usd(selectedMaterial?.unitCost || 0)} per ${esc(livePreview.unit)}
-          </span>
-        </div>
+    </span>
+    </div>
 
-        <p id="admin-stock-movement-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
+    <p id="admin-stock-movement-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
 
-        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
-          <button type="submit" id="admin-submit-movement-btn" class="admin-btn admin-btn-primary">
+    <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+    <button type="submit" id="admin-submit-movement-btn" class="admin-btn admin-btn-primary">
             ${activeMovementMode === 'Stock In' ? 'Save Added Stock' : 'Save Used Stock'}
-          </button>
-        </div>
-      </form>
+    </button>
+    </div>
+    </form>
 
-      <!-- 4. Guided "Add / Edit Material" Form -->
-      <form
-        id="admin-material-form"
-        novalidate
-        class="admin-card p-5 sm:p-6 space-y-5 ${showMaterialForm ? '' : 'hidden'}"
-      >
-        <div class="pb-3 border-b border-slate-200 flex items-center justify-between gap-2">
-          <div>
-            <h2 class="text-base font-bold text-slate-900">
+    <form id="admin-material-form" novalidate class="admin-card p-5 sm:p-6 space-y-5 ${showMaterialForm ? '' : 'hidden'}">
+    <div class="pb-3 border-b border-slate-200 flex items-center justify-between gap-2">
+    <div>
+    <h2 class="text-base font-bold text-slate-900">
               ${editingMaterial ? `Edit Material: ${esc(editingMaterial.name)}` : 'Add a New Workshop Material'}
-            </h2>
-            <p class="text-xs text-slate-500 mt-0.5">
+    </h2>
+    <p class="text-xs text-slate-500 mt-0.5">
               Fill out the simple details below to track a wood, fabric, stone, or hardware supply in your shop.
-            </p>
-          </div>
-          <button type="button" id="admin-close-material-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
+    </p>
+    </div>
+    <button type="button" id="admin-close-material-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
             Cancel
-          </button>
-        </div>
+    </button>
+    </div>
 
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div class="sm:col-span-2 lg:col-span-1">
-            <label for="mat-name" class="admin-label">1. Material Name</label>
-            <input
-              id="mat-name"
-              type="text"
-              required
-              value="${esc(editingMaterial?.name || '')}"
-              placeholder="e.g. Solid White Oak Planks"
-              class="admin-input"
-            />
-            <p class="admin-hint">Use a clear name your team recognizes.</p>
-          </div>
-          <div>
-            <label for="mat-type" class="admin-label">2. What kind of material is it?</label>
-            <select id="mat-type" class="admin-select">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div class="sm:col-span-2 lg:col-span-1">
+    <label for="mat-name" class="admin-label">1. Material Name</label>
+    <input id="mat-name" type="text" required value="${esc(editingMaterial?.name || '')}" placeholder="e.g. Solid White Oak Planks" class="admin-input" />
+    <p class="admin-hint">Use a clear name your team recognizes.</p>
+    </div>
+    <div>
+    <label for="mat-type" class="admin-label">2. What kind of material is it?</label>
+    <select id="mat-type" class="admin-select">
               ${[
                 { value: 'Hardwood Timber', label: 'Wood & Timber (Hardwood)' },
                 { value: 'Upholstery Textile', label: 'Fabric & Leather (Upholstery)' },
@@ -4883,262 +4505,150 @@ function renderDashboardContent() {
                     `<option value="${esc(t.value)}" ${editingMaterial?.materialType === t.value ? 'selected' : ''}>${esc(t.label)}</option>`
                 )
                 .join('')}
-            </select>
-          </div>
-          <div>
-            <label for="mat-unit" class="admin-label">3. How is it measured?</label>
-            <input
-              id="mat-unit"
-              type="text"
-              required
-              value="${esc(editingMaterial?.unit || 'bd ft')}"
-              placeholder="e.g. bd ft, slabs, sq m, sets"
-              class="admin-input font-mono-tech"
-            />
-            <div class="flex items-center gap-1 mt-1.5 flex-wrap">
-              <span class="text-[11px] text-slate-400">Pick:</span>
+    </select>
+    </div>
+    <div>
+    <label for="mat-unit" class="admin-label">3. How is it measured?</label>
+    <input id="mat-unit" type="text" required value="${esc(editingMaterial?.unit || 'bd ft')}" placeholder="e.g. bd ft, slabs, sq m, sets" class="admin-input font-mono-tech" />
+    <div class="flex items-center gap-1 mt-1.5 flex-wrap">
+    <span class="text-[11px] text-slate-400">Pick:</span>
               ${['bd ft', 'slabs', 'sq m', 'sets', 'rolls']
                 .map(
                   (u) => `
-                <button
-                  type="button"
-                  data-quick-unit="${esc(u)}"
-                  class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-mono-tech text-slate-600 cursor-pointer"
-                >
+    <button type="button" data-quick-unit="${esc(u)}" class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-mono-tech text-slate-600 cursor-pointer">
                   ${esc(u)}
-                </button>
+    </button>
               `
                 )
                 .join('')}
-            </div>
-          </div>
-          <div>
-            <label for="mat-stock" class="admin-label">4. Current Amount on Hand</label>
-            <input
-              id="mat-stock"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              value="${esc(editingMaterial?.stockQuantity ?? '100')}"
-              class="admin-input font-mono-tech"
-            />
-            <p class="admin-hint">How much you currently have in the workshop.</p>
-          </div>
-          <div>
-            <label for="mat-min-stock" class="admin-label">5. Low-Stock Warning Number</label>
-            <input
-              id="mat-min-stock"
-              type="number"
-              min="0"
-              step="1"
-              required
-              value="${esc(editingMaterial?.minStockLevel ?? '25')}"
-              class="admin-input font-mono-tech"
-            />
-            <p class="admin-hint">We'll warn you when stock drops to this amount.</p>
-          </div>
-          <div>
-            <label for="mat-cost" class="admin-label">6. Cost per Unit ($ USD)</label>
-            <input
-              id="mat-cost"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              value="${esc(editingMaterial?.unitCost ?? '28.50')}"
-              class="admin-input font-mono-tech"
-            />
-            <p class="admin-hint">Price for 1 unit of this material.</p>
-          </div>
-        </div>
+    </div>
+    </div>
+    <div>
+    <label for="mat-stock" class="admin-label">4. Current Amount on Hand</label>
+    <input id="mat-stock" type="number" min="0" step="0.01" required value="${esc(editingMaterial?.stockQuantity ?? '100')}" class="admin-input font-mono-tech" />
+    <p class="admin-hint">How much you currently have in the workshop.</p>
+    </div>
+    <div>
+    <label for="mat-min-stock" class="admin-label">5. Low-Stock Warning Number</label>
+    <input id="mat-min-stock" type="number" min="0" step="1" required value="${esc(editingMaterial?.minStockLevel ?? '25')}" class="admin-input font-mono-tech" />
+    <p class="admin-hint">We'll warn you when stock drops to this amount.</p>
+    </div>
+    <div>
+    <label for="mat-cost" class="admin-label">6. Cost per Unit ($ USD)</label>
+    <input id="mat-cost" type="number" min="0" step="0.01" required value="${esc(editingMaterial?.unitCost ?? '28.50')}" class="admin-input font-mono-tech" />
+    <p class="admin-hint">Price for 1 unit of this material.</p>
+    </div>
+    </div>
 
-        <p id="admin-material-form-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
+    <p id="admin-material-form-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
 
-        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
-          <button type="submit" class="admin-btn admin-btn-primary">
+    <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+    <button type="submit" class="admin-btn admin-btn-primary">
             ${editingMaterial ? 'Save Material Changes' : 'Save New Material'}
-          </button>
-        </div>
-      </form>
+    </button>
+    </div>
+    </form>
 
-      <!-- 5. Main Inventory Card with Friendly View Switcher, 1-Click Filter Buttons & Clear Table -->
-      <div class="admin-card overflow-hidden">
-        <div class="p-4 border-b border-slate-200 space-y-3">
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <!-- View Switcher: Current Stock vs Stock History -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-100">
-                <button
-                  type="button"
-                  data-inv-view="materials"
-                  class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${
-                    activeInvView === 'materials'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }"
-                >
+    <div class="admin-card overflow-hidden">
+    <div class="p-4 border-b border-slate-200 space-y-3">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+
+    <div class="flex items-center gap-2 flex-wrap">
+    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+    <button type="button" data-inv-view="materials" class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${ activeInvView === 'materials' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900' }">
                   Current Stock (${state.materials.length})
-                </button>
-                <button
-                  type="button"
-                  data-inv-view="history"
-                  class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${
-                    activeInvView === 'history'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }"
-                >
+    </button>
+    <button type="button" data-inv-view="history" class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${ activeInvView === 'history' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900' }">
                   Stock History (${state.inventoryTransactions.length})
-                </button>
-              </div>
+    </button>
+    </div>
 
               ${
                 activeInvView === 'materials'
                   ? `
-                <!-- 1-Click Plain-English Filter Buttons -->
-                <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 flex-wrap">
-                  <button
-                    type="button"
-                    data-inv-status-pill="all"
-                    class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
-                      stockFilter === 'all'
-                        ? 'bg-slate-900 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }"
-                  >
+
+    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 flex-wrap">
+    <button type="button" data-inv-status-pill="all" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900' }">
                     All (${state.materials.length})
-                  </button>
-                  <button
-                    type="button"
-                    data-inv-status-pill="needs_restock"
-                    class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
-                      stockFilter === 'needs_restock' || stockFilter === 'low_stock' || stockFilter === 'out_of_stock'
-                        ? 'bg-amber-600 text-white'
-                        : 'text-amber-800 hover:bg-amber-50'
-                    }"
-                  >
+    </button>
+    <button type="button" data-inv-status-pill="needs_restock" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'needs_restock' || stockFilter === 'low_stock' || stockFilter === 'out_of_stock' ? 'bg-amber-600 text-white' : 'text-amber-800 hover:bg-amber-50' }">
                     Needs Restock (${needsRestockCount})
-                  </button>
-                  <button
-                    type="button"
-                    data-inv-status-pill="in_stock"
-                    class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${
-                      stockFilter === 'in_stock'
-                        ? 'bg-emerald-700 text-white'
-                        : 'text-emerald-800 hover:bg-emerald-50'
-                    }"
-                  >
+    </button>
+    <button type="button" data-inv-status-pill="in_stock" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'in_stock' ? 'bg-emerald-700 text-white' : 'text-emerald-800 hover:bg-emerald-50' }">
                     Plenty in Stock (${healthyCount})
-                  </button>
-                </div>
+    </button>
+    </div>
               `
                   : ''
               }
-            </div>
+    </div>
 
-            <!-- Action Buttons on the Right -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                id="admin-toggle-movement-form-btn"
-                class="admin-btn admin-btn-sm ${showMovementForm ? 'admin-btn-secondary' : 'admin-btn-primary'} whitespace-nowrap"
-              >
+    <div class="flex items-center gap-2 flex-wrap">
+    <button type="button" id="admin-toggle-movement-form-btn" class="admin-btn admin-btn-sm ${showMovementForm ? 'admin-btn-secondary' : 'admin-btn-primary'} whitespace-nowrap">
                 ${showMovementForm ? 'Hide Stock Form' : '+ Add or Use Stock'}
-              </button>
-              <button
-                type="button"
-                id="admin-toggle-material-form-btn"
-                class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap"
-              >
+    </button>
+    <button type="button" id="admin-toggle-material-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap">
                 ${showMaterialForm && !editingMaterial ? 'Close Form' : '+ New Material'}
-              </button>
-            </div>
-          </div>
+    </button>
+    </div>
+    </div>
 
-          <!-- Search & Filter Row -->
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
             ${
               activeInvView === 'materials'
                 ? `
-              <div class="flex items-center gap-2 flex-wrap flex-1">
-                <input
-                  id="admin-inv-stock-search"
-                  type="search"
-                  value="${esc(state.adminInventoryStockSearch)}"
-                  placeholder="Find a material by name (e.g. Walnut, Linen, Travertine, Brass)..."
-                  aria-label="Search workshop materials"
-                  class="admin-input"
-                  style="max-width: 360px;"
-                />
-                <select
-                  id="admin-inv-stock-filter"
-                  aria-label="Filter materials by stock status"
-                  class="admin-select"
-                  style="width: 190px;"
-                >
-                  <option value="all" ${stockFilter === 'all' ? 'selected' : ''}>Show All Materials (${state.materials.length})</option>
-                  <option value="needs_restock" ${stockFilter === 'needs_restock' ? 'selected' : ''}>Needs Restock (${needsRestockCount})</option>
-                  <option value="low_stock" ${stockFilter === 'low_stock' ? 'selected' : ''}>Running Low (${metrics.lowStockCount})</option>
-                  <option value="out_of_stock" ${stockFilter === 'out_of_stock' ? 'selected' : ''}>Out of Stock (${metrics.outOfStockCount})</option>
-                  <option value="in_stock" ${stockFilter === 'in_stock' ? 'selected' : ''}>Plenty in Stock (${healthyCount})</option>
-                </select>
-              </div>
-              <p class="text-xs text-slate-500">
+    <div class="flex items-center gap-2 flex-wrap flex-1">
+    <input id="admin-inv-stock-search" type="search" value="${esc(state.adminInventoryStockSearch)}" placeholder="Find a material by name (e.g. Walnut, Linen, Travertine, Brass)..." aria-label="Search workshop materials" class="admin-input" style="max-width: 360px;" />
+    <select id="admin-inv-stock-filter" aria-label="Filter materials by stock status" class="admin-select" style="width: 190px;">
+    <option value="all" ${stockFilter === 'all' ? 'selected' : ''}>Show All Materials (${state.materials.length})</option>
+    <option value="needs_restock" ${stockFilter === 'needs_restock' ? 'selected' : ''}>Needs Restock (${needsRestockCount})</option>
+    <option value="low_stock" ${stockFilter === 'low_stock' ? 'selected' : ''}>Running Low (${metrics.lowStockCount})</option>
+    <option value="out_of_stock" ${stockFilter === 'out_of_stock' ? 'selected' : ''}>Out of Stock (${metrics.outOfStockCount})</option>
+    <option value="in_stock" ${stockFilter === 'in_stock' ? 'selected' : ''}>Plenty in Stock (${healthyCount})</option>
+    </select>
+    </div>
+    <p class="text-xs text-slate-500">
                 Tip: Click <strong>+ Add Stock</strong> when new supplies arrive, or <strong>− Use Stock</strong> when materials are used.
-              </p>
+    </p>
             `
                 : `
-              <div class="flex items-center gap-2 flex-wrap flex-1">
-                <input
-                  id="admin-inv-history-search"
-                  type="search"
-                  value="${esc(state.adminInventoryHistorySearch)}"
-                  placeholder="Search history by material name or reason..."
-                  aria-label="Search stock history"
-                  class="admin-input"
-                  style="max-width: 340px;"
-                />
-                <select
-                  id="admin-inv-history-type"
-                  aria-label="Filter stock history by type"
-                  class="admin-select"
-                  style="width: 190px;"
-                >
-                  <option value="all" ${historyTypeFilter === 'all' ? 'selected' : ''}>All Activity (${state.inventoryTransactions.length})</option>
-                  <option value="Stock In" ${historyTypeFilter === 'Stock In' ? 'selected' : ''}>Added Stock Only</option>
-                  <option value="Stock Out" ${historyTypeFilter === 'Stock Out' ? 'selected' : ''}>Used Stock Only</option>
-                </select>
-              </div>
-              <p class="text-xs text-slate-500">
+    <div class="flex items-center gap-2 flex-wrap flex-1">
+    <input id="admin-inv-history-search" type="search" value="${esc(state.adminInventoryHistorySearch)}" placeholder="Search history by material name or reason..." aria-label="Search stock history" class="admin-input" style="max-width: 340px;" />
+    <select id="admin-inv-history-type" aria-label="Filter stock history by type" class="admin-select" style="width: 190px;">
+    <option value="all" ${historyTypeFilter === 'all' ? 'selected' : ''}>All Activity (${state.inventoryTransactions.length})</option>
+    <option value="Stock In" ${historyTypeFilter === 'Stock In' ? 'selected' : ''}>Added Stock Only</option>
+    <option value="Stock Out" ${historyTypeFilter === 'Stock Out' ? 'selected' : ''}>Used Stock Only</option>
+    </select>
+    </div>
+    <p class="text-xs text-slate-500">
                 Showing the most recent stock changes first.
-              </p>
+    </p>
             `
             }
-          </div>
-        </div>
+    </div>
+    </div>
 
         ${
           activeInvView === 'materials'
             ? filteredMaterials.length === 0
               ? `
-          <div class="admin-empty-state space-y-2">
-            <p class="text-sm font-bold text-slate-900">No materials match your search or filter</p>
-            <p class="text-xs text-slate-500">Try clicking "All (${state.materials.length})" above or clearing the search box.</p>
-          </div>
+    <div class="admin-empty-state space-y-2">
+    <p class="text-sm font-bold text-slate-900">No materials match your search or filter</p>
+    <p class="text-xs text-slate-500">Try clicking "All (${state.materials.length})" above or clearing the search box.</p>
+    </div>
         `
               : `
-          <div class="overflow-x-auto">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th class="admin-col-primary">Material</th>
-                  <th>Stock</th>
-                  <th>Cost</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th class="admin-col-primary">Material</th>
+    <th>Stock</th>
+    <th>Cost</th>
+    <th class="text-right">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
                 ${filteredMaterials
                   .map((mat) => {
                     const preview = describeMaterialStockPreview(mat, 'Stock In', 0);
@@ -5156,191 +4666,131 @@ function renderDashboardContent() {
                       : 'text-emerald-700 font-semibold';
 
                     return `
-                  <tr>
-                    <td class="admin-col-primary">
-                      <p class="admin-table-title">${esc(mat.name)}</p>
-                      <p class="admin-table-sub mt-0.5">
+    <tr>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(mat.name)}</p>
+    <p class="admin-table-sub mt-0.5">
                         ${esc(friendlyTypeLabel(mat.materialType))} · ${esc(mat.unit)}
-                      </p>
-                    </td>
+    </p>
+    </td>
 
-                    <td style="min-width: 240px;">
-                      <div class="flex items-baseline justify-between gap-2">
-                        <span class="font-mono-tech text-sm font-bold text-slate-900">
+    <td style="min-width: 240px;">
+    <div class="flex items-baseline justify-between gap-2">
+    <span class="font-mono-tech text-sm font-bold text-slate-900">
                           ${preview.currentStock} ${esc(mat.unit)} left
-                        </span>
-                        <span class="text-xs ${statusColor}">
+    </span>
+    <span class="text-xs ${statusColor}">
                           ${esc(preview.currentFriendlyLabel)}
-                        </span>
-                      </div>
-                      <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5 border border-slate-200/70">
-                        <div class="h-full rounded-full ${barColor}" style="width: ${preview.fillPercent}%"></div>
-                      </div>
-                      <div class="flex items-center gap-1.5 mt-2 whitespace-nowrap">
-                        <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50">
-                          <button
-                            type="button"
-                            data-inline-stock-step="-1"
-                            data-inline-step-target="${esc(mat.id)}"
-                            aria-label="Decrease count for ${esc(mat.name)}"
-                            class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-l-lg cursor-pointer"
-                          >
+    </span>
+    </div>
+    <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5 border border-slate-200/70">
+    <div class="h-full rounded-full ${barColor}" style="width: ${preview.fillPercent}%"></div>
+    </div>
+    <div class="flex items-center gap-1.5 mt-2 whitespace-nowrap">
+    <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50">
+    <button type="button" data-inline-stock-step="-1" data-inline-step-target="${esc(mat.id)}" aria-label="Decrease count for ${esc(mat.name)}" class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-l-lg cursor-pointer">
                             −
-                          </button>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            aria-label="Available stock for ${esc(mat.name)}"
-                            data-inline-stock-input="${esc(mat.id)}"
-                            value="${preview.currentStock}"
-                            class="admin-input font-mono-tech text-xs font-bold text-center border-0 bg-white"
-                            style="width: 50px; padding: 0.2rem 0.25rem; border-radius: 0;"
-                          />
-                          <button
-                            type="button"
-                            data-inline-stock-step="1"
-                            data-inline-step-target="${esc(mat.id)}"
-                            aria-label="Increase count for ${esc(mat.name)}"
-                            class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-r-lg cursor-pointer"
-                          >
+    </button>
+    <input type="number" min="0" step="0.5" aria-label="Available stock for ${esc(mat.name)}" data-inline-stock-input="${esc(mat.id)}" value="${preview.currentStock}" class="admin-input font-mono-tech text-xs font-bold text-center border-0 bg-white" style="width: 50px; padding: 0.2rem 0.25rem; border-radius: 0;" />
+    <button type="button" data-inline-stock-step="1" data-inline-step-target="${esc(mat.id)}" aria-label="Increase count for ${esc(mat.name)}" class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-r-lg cursor-pointer">
                             +
-                          </button>
-                        </div>
-                        <span class="text-[11px] text-slate-500" title="Warn me when stock drops to this number">Min:</span>
-                        <input
-                          type="number"
-                          min="0"
-                          aria-label="Minimum stock level for ${esc(mat.name)}"
-                          data-inline-min-stock-input="${esc(mat.id)}"
-                          value="${preview.minStockLevel}"
-                          class="admin-input font-mono-tech text-xs text-center"
-                          style="width: 42px; padding: 0.2rem 0.25rem;"
-                        />
-                        <button
-                          type="button"
-                          data-inline-stock-save="${esc(mat.id)}"
-                          class="admin-btn admin-btn-sm admin-btn-secondary"
-                          style="padding: 0.2rem 0.45rem;"
-                        >
+    </button>
+    </div>
+    <span class="text-[11px] text-slate-500" title="Warn me when stock drops to this number">Min:</span>
+    <input type="number" min="0" aria-label="Minimum stock level for ${esc(mat.name)}" data-inline-min-stock-input="${esc(mat.id)}" value="${preview.minStockLevel}" class="admin-input font-mono-tech text-xs text-center" style="width: 42px; padding: 0.2rem 0.25rem;" />
+    <button type="button" data-inline-stock-save="${esc(mat.id)}" class="admin-btn admin-btn-sm admin-btn-secondary" style="padding: 0.2rem 0.45rem;">
                           Save
-                        </button>
-                      </div>
-                    </td>
+    </button>
+    </div>
+    </td>
 
-                    <td class="whitespace-nowrap">
-                      <p class="font-mono-tech text-xs font-bold text-slate-900">
+    <td class="whitespace-nowrap">
+    <p class="font-mono-tech text-xs font-bold text-slate-900">
                         ${usd(mat.unitCost)} <span class="font-normal text-slate-500">/ ${esc(mat.unit)}</span>
-                      </p>
-                      <p class="font-mono-tech text-[11px] text-slate-500 mt-0.5">
+    </p>
+    <p class="font-mono-tech text-[11px] text-slate-500 mt-0.5">
                         Value: ${usd(preview.totalValue)}
-                      </p>
-                    </td>
+    </p>
+    </td>
 
-                    <td class="text-right whitespace-nowrap">
-                      <div class="inline-flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          data-quick-stock-in="${esc(mat.id)}"
-                          title="Add newly arrived stock for ${esc(mat.name)}"
-                          class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap"
-                          style="padding: 0.28rem 0.55rem;"
-                        >
+    <td class="text-right whitespace-nowrap">
+    <div class="inline-flex items-center justify-end gap-1.5">
+    <button type="button" data-quick-stock-in="${esc(mat.id)}" title="Add newly arrived stock for ${esc(mat.name)}" class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap" style="padding: 0.28rem 0.55rem;">
                           + Add
-                        </button>
-                        <button
-                          type="button"
-                          data-quick-stock-out="${esc(mat.id)}"
-                          title="Deduct stock used in workshop for ${esc(mat.name)}"
-                          ${preview.currentStock <= 0 ? 'disabled' : ''}
-                          class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap ${
-                            preview.currentStock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
-                          }"
-                          style="padding: 0.28rem 0.55rem;"
-                        >
+    </button>
+    <button type="button" data-quick-stock-out="${esc(mat.id)}" title="Deduct stock used in workshop for ${esc(mat.name)}" ${preview.currentStock <= 0 ? 'disabled' : ''} class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap ${ preview.currentStock <= 0 ? 'opacity-50 cursor-not-allowed' : '' }" style="padding: 0.28rem 0.55rem;">
                           − Use
-                        </button>
-                        <button
-                          type="button"
-                          data-edit-material="${esc(mat.id)}"
-                          class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap"
-                          style="padding: 0.28rem 0.5rem;"
-                        >
+    </button>
+    <button type="button" data-edit-material="${esc(mat.id)}" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap" style="padding: 0.28rem 0.5rem;">
                           Edit
-                        </button>
-                        <button
-                          type="button"
-                          data-delete-material="${esc(mat.id)}"
-                          aria-label="Remove ${esc(mat.name)}"
-                          class="admin-btn admin-btn-sm admin-btn-danger-ghost whitespace-nowrap"
-                          style="padding: 0.28rem 0.5rem;"
-                        >
+    </button>
+    <button type="button" data-delete-material="${esc(mat.id)}" aria-label="Remove ${esc(mat.name)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost whitespace-nowrap" style="padding: 0.28rem 0.5rem;">
                           Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+    </button>
+    </div>
+    </td>
+    </tr>
                 `;
                   })
                   .join('')}
-              </tbody>
-            </table>
-          </div>
+    </tbody>
+    </table>
+    </div>
         `
             : filteredTransactions.length === 0
             ? `
-          <div class="admin-empty-state">
-            <p class="text-sm font-bold text-slate-900">No stock activity matches your search</p>
-            <p class="text-xs text-slate-500 mt-1">Click "+ Add or Use Stock" above whenever supplies arrive or are used in the shop.</p>
-          </div>
+    <div class="admin-empty-state">
+    <p class="text-sm font-bold text-slate-900">No stock activity matches your search</p>
+    <p class="text-xs text-slate-500 mt-1">Click "+ Add or Use Stock" above whenever supplies arrive or are used in the shop.</p>
+    </div>
         `
             : `
-          <div class="overflow-x-auto">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th class="admin-col-primary">Material</th>
-                  <th>Change</th>
-                  <th>Balance</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th>Date</th>
+    <th class="admin-col-primary">Material</th>
+    <th>Change</th>
+    <th>Balance</th>
+    <th>Reason</th>
+    </tr>
+    </thead>
+    <tbody>
                 ${filteredTransactions
                   .map((tx) => {
                     const isStockIn = tx.transactionType === 'Stock In';
                     const unitLabel = tx.unit ? ` ${esc(tx.unit)}` : '';
                     return `
-                  <tr>
-                    <td class="font-mono-tech text-xs text-slate-500 whitespace-nowrap">${esc(tx.dateTime)}</td>
-                    <td class="admin-col-primary">
-                      <p class="admin-table-title">${esc(tx.materialName || tx.productName)}</p>
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <span class="font-mono-tech text-xs font-bold ${isStockIn ? 'text-emerald-700' : 'text-rose-700'}">
+    <tr>
+    <td class="font-mono-tech text-xs text-slate-500 whitespace-nowrap">${esc(tx.dateTime)}</td>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(tx.materialName || tx.productName)}</p>
+    </td>
+    <td class="whitespace-nowrap">
+    <span class="font-mono-tech text-xs font-bold ${isStockIn ? 'text-emerald-700' : 'text-rose-700'}">
                         ${isStockIn ? `+${tx.quantity}${unitLabel}` : `−${tx.quantity}${unitLabel}`}
-                      </span>
-                    </td>
-                    <td class="font-mono-tech text-xs text-slate-700 whitespace-nowrap">
+    </span>
+    </td>
+    <td class="font-mono-tech text-xs text-slate-700 whitespace-nowrap">
                       ${tx.previousStock}${unitLabel} → <strong>${tx.newStock}${unitLabel}</strong>
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <p class="admin-table-title">${esc(tx.reason || (isStockIn ? 'New Workshop Restock' : 'Used in Workshop'))}</p>
-                      <p class="admin-table-sub">
+    </td>
+    <td class="whitespace-nowrap">
+    <p class="admin-table-title">${esc(tx.reason || (isStockIn ? 'New Workshop Restock' : 'Used in Workshop'))}</p>
+    <p class="admin-table-sub">
                         ${tx.purchaseCost !== null && tx.purchaseCost !== undefined ? `Cost: ${usd(tx.purchaseCost)} · ` : ''}By ${esc(tx.adminName || 'Admin')}
-                      </p>
-                    </td>
-                  </tr>
+    </p>
+    </td>
+    </tr>
                 `;
                   })
                   .join('')}
-              </tbody>
-            </table>
-          </div>
+    </tbody>
+    </table>
+    </div>
         `
         }
-      </div>
+    </div>
     `;
 
     // Sub-view switcher (Current Stock vs Stock History)
@@ -5426,13 +4876,13 @@ function renderDashboardContent() {
             e.target.value
           );
           previewEl.innerHTML = `
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-semibold text-slate-600">Summary before saving:</span>
-              <span class="font-mono-tech text-slate-800">
+    <div class="flex items-center gap-2 flex-wrap">
+    <span class="font-semibold text-slate-600">Summary before saving:</span>
+    <span class="font-mono-tech text-slate-800">
                 Currently <strong>${updatedPreview.currentStock} ${esc(updatedPreview.unit)}</strong>
-              </span>
-              <span aria-hidden="true">→</span>
-              <span class="font-mono-tech font-bold ${
+    </span>
+    <span aria-hidden="true">→</span>
+    <span class="font-mono-tech font-bold ${
                 updatedPreview.insufficientStock
                   ? 'text-rose-700'
                   : activeMovementMode === 'Stock In'
@@ -5444,11 +4894,11 @@ function renderDashboardContent() {
                     ? `Not enough in stock (only ${updatedPreview.currentStock} ${esc(updatedPreview.unit)} available)`
                     : `New total will be ${updatedPreview.projectedStock} ${esc(updatedPreview.unit)} (${esc(updatedPreview.projectedFriendlyLabel)})`
                 }
-              </span>
-            </div>
-            <span class="text-slate-500 font-mono-tech">
+    </span>
+    </div>
+    <span class="text-slate-500 font-mono-tech">
               Unit cost: ${usd(selectedMaterial?.unitCost || 0)} per ${esc(updatedPreview.unit)}
-            </span>
+    </span>
           `;
         }
       });
@@ -5770,19 +5220,7 @@ function renderDashboardContent() {
       });
     });
 
-    const invStockSearchEl = document.getElementById('admin-inv-stock-search');
-    if (invStockSearchEl) {
-      invStockSearchEl.addEventListener('input', (e) => {
-        state.adminInventoryStockSearch = e.target.value;
-        const pos = e.target.selectionStart || 0;
-        renderDashboardContent();
-        const nextInput = document.getElementById('admin-inv-stock-search');
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.setSelectionRange(pos, pos);
-        }
-      });
-    }
+    bindLiveSearchInput('admin-inv-stock-search', 'adminInventoryStockSearch', renderDashboardContent);
 
     const invStockFilterEl = document.getElementById('admin-inv-stock-filter');
     if (invStockFilterEl) {
@@ -5792,19 +5230,7 @@ function renderDashboardContent() {
       });
     }
 
-    const invHistorySearchEl = document.getElementById('admin-inv-history-search');
-    if (invHistorySearchEl) {
-      invHistorySearchEl.addEventListener('input', (e) => {
-        state.adminInventoryHistorySearch = e.target.value;
-        const pos = e.target.selectionStart || 0;
-        renderDashboardContent();
-        const nextInput = document.getElementById('admin-inv-history-search');
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.setSelectionRange(pos, pos);
-        }
-      });
-    }
+    bindLiveSearchInput('admin-inv-history-search', 'adminInventoryHistorySearch', renderDashboardContent);
 
     const invHistoryTypeEl = document.getElementById('admin-inv-history-type');
     if (invHistoryTypeEl) {
@@ -5830,35 +5256,35 @@ function renderDashboardContent() {
   const adminVouchersEl = document.getElementById('admin-vouchers-list');
   if (adminVouchersEl) {
     adminVouchersEl.innerHTML = `
-      <div class="admin-card overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-2">
-          <div>
-            <h2 class="text-base font-bold text-slate-900">Active Vouchers (${state.vouchers.length})</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Personal single-product discount codes issued to customers</p>
-          </div>
-        </div>
+    <div class="admin-card overflow-hidden">
+    <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-2">
+    <div>
+    <h2 class="text-base font-bold text-slate-900">Active Vouchers (${state.vouchers.length})</h2>
+    <p class="text-xs text-slate-500 mt-0.5">Personal single-product discount codes issued to customers</p>
+    </div>
+    </div>
         ${
           state.vouchers.length === 0
             ? `
-          <div class="admin-empty-state">
-            <p class="text-sm font-bold text-slate-900">No vouchers created yet</p>
-            <p class="text-xs text-slate-500 mt-1">Use the form above to create a discount code for a customer.</p>
-          </div>
+    <div class="admin-empty-state">
+    <p class="text-sm font-bold text-slate-900">No vouchers created yet</p>
+    <p class="text-xs text-slate-500 mt-1">Use the form above to create a discount code for a customer.</p>
+    </div>
         `
             : `
-          <div class="overflow-x-auto">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Customer</th>
-                  <th class="admin-col-primary">Product</th>
-                  <th>Discount</th>
-                  <th>Status</th>
-                  <th class="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th>Code</th>
+    <th>Customer</th>
+    <th class="admin-col-primary">Product</th>
+    <th>Discount</th>
+    <th>Status</th>
+    <th class="text-right">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
                 ${state.vouchers
                   .map((v) => {
                     const isPct = v.discountType === 'percentage' || Number(v.discountPercent || 0) > 0;
@@ -5866,37 +5292,33 @@ function renderDashboardContent() {
                       ? `${Number(v.discountPercent ?? v.discountValue ?? 0)}% OFF (-${usd(v.discountAmount)})`
                       : `-${usd(v.discountAmount)}`;
                     return `
-                  <tr>
-                    <td class="font-mono-tech text-xs font-bold text-slate-900 whitespace-nowrap">${esc(v.code)}</td>
-                    <td class="text-xs text-slate-600 whitespace-nowrap">${esc(v.customerEmail)}</td>
-                    <td class="admin-col-primary">
-                      <p class="admin-table-title">${esc(v.furnitureName || v.productName)}</p>
-                      <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || '')}</p>
-                    </td>
-                    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">${esc(discountText)}</td>
-                    <td class="whitespace-nowrap">
-                      <span class="admin-status-dot ${v.status === 'Active' ? 'text-emerald-700' : 'text-slate-500'}">${esc(v.status)}</span>
-                      <span class="text-xs text-slate-400 ml-1">· Exp ${esc(v.expiryDate || '2026-12-31')}</span>
-                    </td>
-                    <td class="text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        data-revoke-voucher="${esc(v.id)}"
-                        class="admin-btn admin-btn-sm admin-btn-danger-ghost"
-                      >
+    <tr>
+    <td class="font-mono-tech text-xs font-bold text-slate-900 whitespace-nowrap">${esc(v.code)}</td>
+    <td class="text-xs text-slate-600 whitespace-nowrap">${esc(v.customerEmail)}</td>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(v.furnitureName || v.productName)}</p>
+    <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || '')}</p>
+    </td>
+    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">${esc(discountText)}</td>
+    <td class="whitespace-nowrap">
+    <span class="admin-status-dot ${v.status === 'Active' ? 'text-emerald-700' : 'text-slate-500'}">${esc(v.status)}</span>
+    <span class="text-xs text-slate-400 ml-1">· Exp ${esc(v.expiryDate || '2026-12-31')}</span>
+    </td>
+    <td class="text-right whitespace-nowrap">
+    <button type="button" data-revoke-voucher="${esc(v.id)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
                         Revoke
-                      </button>
-                    </td>
-                  </tr>
+    </button>
+    </td>
+    </tr>
                 `;
                   })
                   .join('')}
-              </tbody>
-            </table>
-          </div>
+    </tbody>
+    </table>
+    </div>
         `
         }
-      </div>
+    </div>
     `;
 
     adminVouchersEl.querySelectorAll('[data-revoke-voucher]').forEach((btn) => {
@@ -5953,58 +5375,47 @@ function renderDashboardContent() {
     });
 
     adminOrdersEl.innerHTML = `
-      <div class="admin-card overflow-hidden">
-        <div class="admin-toolbar">
-          <div class="admin-toolbar-filters">
-            <input
-              id="admin-orders-search"
-              type="search"
-              value="${esc(state.adminOrderSearch)}"
-              placeholder="Search order #, customer, product, or material..."
-              aria-label="Search customer orders"
-              class="admin-input admin-search-input"
-            />
-            <select
-              id="admin-orders-stage-filter"
-              aria-label="Filter orders by production stage"
-              class="admin-select admin-filter-select"
-            >
-              <option value="all" ${stageFilter === 'all' ? 'selected' : ''}>All Stages (${state.orders.length})</option>
-              <option value="confirmed" ${stageFilter === 'confirmed' ? 'selected' : ''}>Confirmed &amp; Timber Prep</option>
-              <option value="production" ${stageFilter === 'production' ? 'selected' : ''}>In Production &amp; Finishing</option>
-              <option value="quality" ${stageFilter === 'quality' ? 'selected' : ''}>Quality Check</option>
-              <option value="delivered" ${stageFilter === 'delivered' ? 'selected' : ''}>Dispatched / Delivered</option>
-            </select>
-          </div>
-          <span class="text-xs font-medium text-slate-500">Showing ${filteredOrders.length} of ${state.orders.length} orders · Updates sync live to Customer Dashboard</span>
-        </div>
+    <div class="admin-card overflow-hidden">
+    <div class="admin-toolbar">
+    <div class="admin-toolbar-filters">
+    <input id="admin-orders-search" type="search" value="${esc(state.adminOrderSearch)}" placeholder="Search order #, customer, product, or material..." aria-label="Search customer orders" class="admin-input admin-search-input" />
+    <select id="admin-orders-stage-filter" aria-label="Filter orders by production stage" class="admin-select admin-filter-select">
+    <option value="all" ${stageFilter === 'all' ? 'selected' : ''}>All Stages (${state.orders.length})</option>
+    <option value="confirmed" ${stageFilter === 'confirmed' ? 'selected' : ''}>Confirmed &amp; Timber Prep</option>
+    <option value="production" ${stageFilter === 'production' ? 'selected' : ''}>In Production &amp; Finishing</option>
+    <option value="quality" ${stageFilter === 'quality' ? 'selected' : ''}>Quality Check</option>
+    <option value="delivered" ${stageFilter === 'delivered' ? 'selected' : ''}>Dispatched / Delivered</option>
+    </select>
+    </div>
+    <span class="text-xs font-medium text-slate-500">Showing ${filteredOrders.length} of ${state.orders.length} orders · Updates sync live to Customer Dashboard</span>
+    </div>
 
         ${
           filteredOrders.length === 0
             ? `
-          <div class="admin-empty-state space-y-3">
-            <p class="text-base font-bold text-slate-900">No orders match your filter</p>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto">Try searching for a different customer name or resetting the stage filter.</p>
-            <div>
-              <button type="button" id="admin-reset-order-filters" class="admin-btn admin-btn-sm admin-btn-secondary">
+    <div class="admin-empty-state space-y-3">
+    <p class="text-base font-bold text-slate-900">No orders match your filter</p>
+    <p class="text-xs text-slate-500 max-w-sm mx-auto">Try searching for a different customer name or resetting the stage filter.</p>
+    <div>
+    <button type="button" id="admin-reset-order-filters" class="admin-btn admin-btn-sm admin-btn-secondary">
                 Reset Filters
-              </button>
-            </div>
-          </div>
+    </button>
+    </div>
+    </div>
         `
             : `
-          <div class="overflow-x-auto">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th class="admin-col-primary">Product</th>
-                  <th>Stage</th>
-                  <th class="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
+    <div class="overflow-x-auto">
+    <table class="admin-table">
+    <thead>
+    <tr>
+    <th>Order</th>
+    <th>Customer</th>
+    <th class="admin-col-primary">Product</th>
+    <th>Stage</th>
+    <th class="text-right">Total</th>
+    </tr>
+    </thead>
+    <tbody>
                 ${filteredOrders
                   .map((o) => {
                     const realIdx = state.orders.findIndex((item) => item.orderNumber === o.orderNumber);
@@ -6012,35 +5423,30 @@ function renderDashboardContent() {
                     const paidAmt = Number(o.depositPaid ?? totalAmt);
                     const balanceDue = Math.max(0, totalAmt - paidAmt);
                     return `
-                  <tr>
-                    <td class="whitespace-nowrap">
-                      <div class="flex items-center gap-1.5">
-                        <p class="font-mono-tech text-xs font-bold text-[#0284C7]">#${esc(o.orderNumber)}</p>
+    <tr>
+    <td class="whitespace-nowrap">
+    <div class="flex items-center gap-1.5">
+    <p class="font-mono-tech text-xs font-bold text-[#0284C7]">#${esc(o.orderNumber)}</p>
                         ${
                           o.itemType === 'Custom'
                             ? `<span class="px-1.5 py-0.5 rounded bg-sky-50 text-[#0284C7] border border-sky-200 font-mono-tech text-[10px] font-bold">Custom</span>`
                             : ''
                         }
-                      </div>
-                      <p class="admin-table-sub mt-0.5">${esc(o.orderDate || '2026-10-28')}</p>
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <p class="admin-table-title">${esc(o.clientName)}</p>
-                      <p class="admin-table-sub">${esc(o.clientEmail)}</p>
-                    </td>
-                    <td class="admin-col-primary">
-                      <p class="admin-table-title">${esc(o.furnitureName)}</p>
-                      <p class="admin-table-sub mt-0.5">
+    </div>
+    <p class="admin-table-sub mt-0.5">${esc(o.orderDate || '2026-10-28')}</p>
+    </td>
+    <td class="whitespace-nowrap">
+    <p class="admin-table-title">${esc(o.clientName)}</p>
+    <p class="admin-table-sub">${esc(o.clientEmail)}</p>
+    </td>
+    <td class="admin-col-primary">
+    <p class="admin-table-title">${esc(o.furnitureName)}</p>
+    <p class="admin-table-sub mt-0.5">
                         ${esc(o.selectedFinish)} · ${esc(o.materialName || 'FAS Hardwood')}
-                      </p>
-                    </td>
-                    <td class="whitespace-nowrap">
-                      <select
-                        aria-label="Update status for order ${esc(o.orderNumber)}"
-                        data-admin-order-idx="${realIdx}"
-                        class="admin-select admin-order-status-select text-xs"
-                        style="width: 190px; padding: 0.35rem 0.5rem;"
-                      >
+    </p>
+    </td>
+    <td class="whitespace-nowrap">
+    <select aria-label="Update status for order ${esc(o.orderNumber)}" data-admin-order-idx="${realIdx}" class="admin-select admin-order-status-select text-xs" style="width: 190px; padding: 0.35rem 0.5rem;">
                         ${statusOptions
                           .map(
                             (st) =>
@@ -6052,39 +5458,27 @@ function renderDashboardContent() {
                             ? `<option value="${esc(o.status)}" selected>${esc(o.status)}</option>`
                             : ''
                         }
-                      </select>
-                    </td>
-                    <td class="text-right whitespace-nowrap">
-                      <p class="font-mono-tech text-sm font-bold text-slate-900">${usd(totalAmt)}</p>
-                      <p class="text-[11px] font-semibold ${balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'} mt-0.5">
+    </select>
+    </td>
+    <td class="text-right whitespace-nowrap">
+    <p class="font-mono-tech text-sm font-bold text-slate-900">${usd(totalAmt)}</p>
+    <p class="text-[11px] font-semibold ${balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'} mt-0.5">
                         ${balanceDue > 0 ? `50% Deposit` : 'Paid in Full'}
-                      </p>
-                    </td>
-                  </tr>
+    </p>
+    </td>
+    </tr>
                 `;
                   })
                   .join('')}
-              </tbody>
-            </table>
-          </div>
+    </tbody>
+    </table>
+    </div>
         `
         }
-      </div>
+    </div>
     `;
 
-    const ordSearch = document.getElementById('admin-orders-search');
-    if (ordSearch) {
-      ordSearch.addEventListener('input', (e) => {
-        state.adminOrderSearch = e.target.value;
-        const pos = e.target.selectionStart || 0;
-        renderDashboardContent();
-        const nextInput = document.getElementById('admin-orders-search');
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.setSelectionRange(pos, pos);
-        }
-      });
-    }
+    bindLiveSearchInput('admin-orders-search', 'adminOrderSearch', renderDashboardContent);
 
     const stageSelect = document.getElementById('admin-orders-stage-filter');
     if (stageSelect) {
@@ -6286,70 +5680,7 @@ function initCatalogPage() {
     });
   }
 
-  // Cart Drawer Toggle & Voucher Apply
-  const cartDrawer = document.getElementById('cart-drawer');
-  const openCartBtn = document.getElementById('open-cart-btn');
-  const closeCartBtn = document.getElementById('close-cart-btn');
-  const closeDrawer = () => {
-    if (!cartDrawer) return;
-    cartDrawer.classList.add('hidden');
-    cartDrawer.classList.remove('flex');
-    syncBodyScrollLock();
-  };
-  if (openCartBtn && cartDrawer) {
-    openCartBtn.addEventListener('click', () => {
-      cartDrawer.classList.remove('hidden');
-      cartDrawer.classList.add('flex');
-      syncBodyScrollLock();
-      renderCartDrawer();
-    });
-  }
-  if (closeCartBtn && cartDrawer) {
-    closeCartBtn.addEventListener('click', closeDrawer);
-  }
-  if (cartDrawer) {
-    cartDrawer.addEventListener('click', (e) => {
-      if (e.target === cartDrawer) closeDrawer();
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !cartDrawer.classList.contains('hidden')) {
-        closeDrawer();
-      }
-    });
-  }
-  const applyVoucherBtn = document.getElementById('apply-voucher-btn');
-  if (applyVoucherBtn) {
-    applyVoucherBtn.addEventListener('click', () => {
-      const codeInput = document.getElementById('voucher-code-input');
-      const feedback = document.getElementById('voucher-feedback');
-      const code = codeInput ? codeInput.value : '';
-      const activeEmail = state.sessionUser ? state.sessionUser.email : 'rowena.vance@vancearchitects.com';
-      const check = validateVoucherForOrder(
-        state.vouchers,
-        code,
-        activeEmail,
-        state.cartItems,
-        state.catalog
-      );
-
-      if (feedback) {
-        feedback.classList.remove('hidden', 'text-emerald-700', 'text-rose-600');
-        if (check.valid) {
-          state.appliedVoucher = check.voucher;
-          const targetProdName =
-            check.voucher.furnitureName || check.voucher.productName || 'selected product';
-          feedback.textContent = `✓ Voucher ${check.voucher.code} (${formatVoucherBenefitLabel(check.voucher)}) applied to "${targetProdName}" (-${usd(check.discountAmount)})!`;
-          feedback.classList.add('text-emerald-700');
-        } else {
-          state.appliedVoucher = null;
-          feedback.textContent = `✕ ${check.errorMessage}`;
-          feedback.classList.add('text-rose-600');
-        }
-      }
-      renderCartDrawer();
-    });
-  }
-
+  bindCartDrawerAndVoucher();
   renderCatalogPage();
   renderCartDrawer();
 }
@@ -6415,10 +5746,10 @@ function renderCatalogPage() {
     }
     if (matchedColorDef) {
       pills.push(`
-        <span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-semibold inline-flex items-center gap-1.5">
-          <span class="w-3 h-3 rounded-full border border-white/40" style="background-color: ${esc(matchedColorDef.hex)}"></span>
-          <span>Color: ${esc(matchedColorDef.label)}</span>
-        </span>
+    <span class="px-2.5 py-1 rounded-md bg-[#0D1015] text-white font-semibold inline-flex items-center gap-1.5">
+    <span class="w-3 h-3 rounded-full border border-white/40" style="background-color: ${esc(matchedColorDef.hex)}"></span>
+    <span>Color: ${esc(matchedColorDef.label)}</span>
+    </span>
       `);
     }
     if (maxPrice < 5500) {
@@ -6441,20 +5772,10 @@ function renderCatalogPage() {
       .map((c) => {
         const isSelected = c.key === activeColorKey;
         return `
-          <button
-            type="button"
-            data-sidebar-color-key="${esc(c.key)}"
-            data-testid="sidebar-color-chip-${esc(c.key)}"
-            aria-pressed="${isSelected ? 'true' : 'false'}"
-            class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-all ${
-              isSelected
-                ? 'bg-[#0D1015] text-white border-[#0D1015] shadow-xs'
-                : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]'
-            }"
-          >
-            <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(c.hex)}"></span>
-            <span>${esc(c.label)} (${c.count})</span>
-          </button>
+    <button type="button" data-sidebar-color-key="${esc(c.key)}" data-testid="sidebar-color-chip-${esc(c.key)}" aria-pressed="${isSelected ? 'true' : 'false'}" class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-all ${ isSelected ? 'bg-[#0D1015] text-white border-[#0D1015] shadow-xs' : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]' }">
+    <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(c.hex)}"></span>
+    <span>${esc(c.label)} (${c.count})</span>
+    </button>
         `;
       })
       .join('');
@@ -6495,18 +5816,9 @@ function renderCatalogPage() {
       .map((r) => {
         const isSel = r.id === activeCatId;
         return `
-          <button
-            type="button"
-            data-sidebar-room-id="${esc(r.id)}"
-            data-testid="sidebar-room-chip-${esc(r.id)}"
-            class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-all ${
-              isSel
-                ? 'bg-[#0095FF] text-white border-[#0095FF]'
-                : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]'
-            }"
-          >
-            <span>${esc(r.label)} (${r.count})</span>
-          </button>
+    <button type="button" data-sidebar-room-id="${esc(r.id)}" data-testid="sidebar-room-chip-${esc(r.id)}" class="px-2.5 py-1.5 rounded-md border text-xs font-medium inline-flex items-center gap-1 cursor-pointer transition-all ${ isSel ? 'bg-[#0095FF] text-white border-[#0095FF]' : 'bg-white text-[#334155] border-[#94A3B8] hover:border-[#0095FF] hover:text-[#0095FF]' }">
+    <span>${esc(r.label)} (${r.count})</span>
+    </button>
         `;
       })
       .join('');
@@ -6545,95 +5857,74 @@ function renderCatalogPage() {
 
       spotlightContainer.classList.remove('hidden');
       spotlightContainer.innerHTML = `
-        <div class="rounded-2xl bg-[#F8FBFF] border border-[#0095FF] p-5 sm:p-6 shadow-md">
-          <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-[#BCE3FF]">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">
+    <div class="rounded-2xl bg-[#F8FBFF] border border-[#0095FF] p-5 sm:p-6 shadow-md">
+    <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-[#BCE3FF]">
+    <div class="flex items-center gap-2">
+    <span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold">
                 Selected from Homepage
-              </span>
-              <span class="font-mono-tech text-xs text-[#475569]">
+    </span>
+    <span class="font-mono-tech text-xs text-[#475569]">
                 ${esc(spotlightItem.sku)} · ${esc(spotlightItem.categoryName)}
-              </span>
-            </div>
-            <button
-              type="button"
-              id="catalog-close-spotlight-btn"
-              class="text-xs font-semibold text-[#475569] hover:text-[#0D1015] cursor-pointer"
-            >
+    </span>
+    </div>
+    <button type="button" id="catalog-close-spotlight-btn" class="text-xs font-semibold text-[#475569] hover:text-[#0D1015] cursor-pointer">
               Dismiss Spotlight ✕
-            </button>
-          </div>
+    </button>
+    </div>
 
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            <div class="lg:col-span-5">
-              <div class="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-[#BCE3FF]">
-                <img src="${esc(spotlightItem.image)}" alt="${esc(spotlightItem.name)}" class="w-full h-full object-cover" />
-              </div>
-            </div>
-            <div class="lg:col-span-7 space-y-4">
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015]">${esc(spotlightItem.name)}</h2>
-                  <p class="text-xs sm:text-sm text-[#475569] mt-1">${esc(spotlightItem.description)}</p>
-                </div>
-                <div class="text-right">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+    <div class="lg:col-span-5">
+    <div class="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-[#BCE3FF]">
+    <img src="${esc(spotlightItem.image)}" alt="${esc(spotlightItem.name)}" class="w-full h-full object-cover" />
+    </div>
+    </div>
+    <div class="lg:col-span-7 space-y-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+    <h2 class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015]">${esc(spotlightItem.name)}</h2>
+    <p class="text-xs sm:text-sm text-[#475569] mt-1">${esc(spotlightItem.description)}</p>
+    </div>
+    <div class="text-right">
                   ${
                     spotlightItem.discountPercent > 0
                       ? `<p class="font-mono-tech text-xs text-slate-400 line-through">${usd(pricing.variantBasePrice)}</p>`
                       : ''
                   }
-                  <p class="font-mono-tech text-2xl font-bold text-[#0095FF]">${usd(pricing.effectivePrice)}</p>
-                </div>
-              </div>
+    <p class="font-mono-tech text-2xl font-bold text-[#0095FF]">${usd(pricing.effectivePrice)}</p>
+    </div>
+    </div>
 
-              <div class="p-3.5 rounded-xl bg-white border border-[#BCE3FF] space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
-                  <span class="font-mono-tech text-[#475569]">${esc(spotlightItem.dimensions)} · ${spotlightItem.leadTimeWeeks} wks lead</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
+    <div class="p-3.5 rounded-xl bg-white border border-[#BCE3FF] space-y-2">
+    <div class="flex items-center justify-between text-xs">
+    <span class="font-semibold text-[#0D1015]">Selected Finish: <span class="text-[#0077CC]">${esc(pricing.colorName)}</span></span>
+    <span class="font-mono-tech text-[#475569]">${esc(spotlightItem.dimensions)} · ${spotlightItem.leadTimeWeeks} wks lead</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
                   ${variants
                     .map((v) => {
                       const isSel = v.name === pricing.colorName;
                       return `
-                        <button
-                          type="button"
-                          data-spotlight-color-product="${esc(spotlightItem.id)}"
-                          data-spotlight-color-name="${esc(v.name)}"
-                          class="px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
-                            isSel
-                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                              : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
-                          }"
-                        >
-                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                          <span>${esc(v.name)}</span>
-                        </button>
+    <button type="button" data-spotlight-color-product="${esc(spotlightItem.id)}" data-spotlight-color-name="${esc(v.name)}" class="px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${ isSel ? 'bg-[#0D1015] text-white border-[#0D1015]' : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]' }">
+    <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+    <span>${esc(v.name)}</span>
+    </button>
                       `;
                     })
                     .join('')}
-                </div>
-              </div>
+    </div>
+    </div>
 
-              <div class="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  data-add-cart="${esc(spotlightItem.id)}"
-                  class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
-                >
+    <div class="flex flex-wrap items-center gap-3">
+    <button type="button" data-add-cart="${esc(spotlightItem.id)}" class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors">
                   Add to Cart (${usd(pricing.effectivePrice)})
-                </button>
-                <button
-                  type="button"
-                  data-view-product="${esc(spotlightItem.id)}"
-                  class="px-4 py-2.5 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer transition-colors"
-                >
+    </button>
+    <button type="button" data-view-product="${esc(spotlightItem.id)}" class="px-4 py-2.5 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer transition-colors">
                   View Details &amp; Make Offer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+    </button>
+    </div>
+    </div>
+    </div>
+    </div>
       `;
 
       const closeSpotBtn = document.getElementById('catalog-close-spotlight-btn');
@@ -6683,21 +5974,17 @@ function renderCatalogPage() {
 
   if (filteredItems.length === 0) {
     grid.innerHTML = `
-      <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
-        <p class="font-serif-display text-xl font-bold text-[#0D1015]">No products match this filter combination</p>
-        <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
+    <div class="col-span-full p-10 rounded-2xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-3">
+    <p class="font-serif-display text-xl font-bold text-[#0D1015]">No products match this filter combination</p>
+    <p class="text-xs sm:text-sm text-[#475569] max-w-md mx-auto">
           Try clearing the active color filter or selecting "All Furniture" to see all available pieces.
-        </p>
-        <div class="pt-1">
-          <button
-            type="button"
-            id="catalog-empty-reset-btn"
-            class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors"
-          >
+    </p>
+    <div class="pt-1">
+    <button type="button" id="catalog-empty-reset-btn" class="px-5 py-2.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer transition-colors">
             Show All Products
-          </button>
-        </div>
-      </div>
+    </button>
+    </div>
+    </div>
     `;
     const emptyResetBtn = document.getElementById('catalog-empty-reset-btn');
     if (emptyResetBtn) {
@@ -6727,98 +6014,70 @@ function renderCatalogPage() {
       const isSpotlighted = state.catalogPageSpotlightProductId === item.id;
 
       return `
-        <article
-          data-testid="catalog-product-card-${esc(item.id)}"
-          class="group rounded-2xl bg-white border ${
-            isSpotlighted ? 'border-[#0095FF] ring-2' : 'border-[#E2E8F0] hover:border-[#0095FF]'
-          } overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between"
-        >
-          <div>
-            <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
-              <img src="${esc(display.image)}" alt="${esc(display.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[10px] font-bold uppercase tracking-wider shadow-2xs">
+    <article data-testid="catalog-product-card-${esc(item.id)}" class="group rounded-2xl bg-white border ${ isSpotlighted ? 'border-[#0095FF] ring-2' : 'border-[#E2E8F0] hover:border-[#0095FF]' } overflow-hidden shadow-2xs hover:shadow-xl transition-all flex flex-col justify-between">
+    <div>
+    <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+    <img src="${esc(display.image)}" alt="${esc(display.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+    <span class="px-2.5 py-1 rounded-md bg-white/95 text-[#0D1015] font-mono-tech text-[10px] font-bold uppercase tracking-wider shadow-2xs">
                   ${esc(display.categoryName)}
-                </span>
+    </span>
                 ${
                   matchedColorDef
                     ? `<span class="px-2.5 py-1 rounded-md bg-[#0095FF] text-white font-mono-tech text-[10px] font-bold uppercase tracking-wider">
                         ✓ ${esc(matchedColorDef.label)}
-                      </span>`
+    </span>`
                     : ''
                 }
-              </div>
-              <div class="absolute bottom-3 right-3">
-                <span class="px-2.5 py-1 rounded-md bg-[#0D1015]/90 text-white font-mono-tech text-xs font-bold">
+    </div>
+    <div class="absolute bottom-3 right-3">
+    <span class="px-2.5 py-1 rounded-md bg-[#0D1015]/90 text-white font-mono-tech text-xs font-bold">
                   ${usd(display.effectivePrice)}
-                </span>
-              </div>
-            </div>
+    </span>
+    </div>
+    </div>
 
-            <div class="p-5 space-y-3">
-              <div class="text-center border-b border-[#E2E8F0] pb-3">
-                <h3 class="font-serif-display text-base sm:text-lg font-bold text-[#0D1015] uppercase tracking-wide leading-snug">
+    <div class="p-5 space-y-3">
+    <div class="text-center border-b border-[#E2E8F0] pb-3">
+    <h3 class="font-serif-display text-base sm:text-lg font-bold text-[#0D1015] uppercase tracking-wide leading-snug">
                   ${esc(display.name)}
-                </h3>
-                <p class="font-mono-tech text-[11px] text-[#64748B] uppercase tracking-widest mt-0.5">
+    </h3>
+    <p class="font-mono-tech text-[11px] text-[#64748B] uppercase tracking-widest mt-0.5">
                   ${variants.length} COLOR FINISHES · ${esc(display.selectedFinish)}
-                </p>
-              </div>
+    </p>
+    </div>
 
-              <!-- Interactive Color Swatches on each card -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="font-semibold text-[#0D1015] truncate">Finish: <span class="text-[#0077CC]">${esc(display.selectedFinish)}</span></span>
-                  <span class="font-mono-tech font-bold text-[#0095FF] shrink-0">${usd(display.effectivePrice)}</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-1.5">
+    <div class="space-y-1.5">
+    <div class="flex items-center justify-between text-[11px]">
+    <span class="font-semibold text-[#0D1015] truncate">Finish: <span class="text-[#0077CC]">${esc(display.selectedFinish)}</span></span>
+    <span class="font-mono-tech font-bold text-[#0095FF] shrink-0">${usd(display.effectivePrice)}</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5">
                   ${variants
                     .map((v) => {
                       const isSel = v.name === display.selectedFinish;
                       return `
-                        <button
-                          type="button"
-                          data-catalog-card-color-product="${esc(item.id)}"
-                          data-catalog-card-color-name="${esc(v.name)}"
-                          class="px-2 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${
-                            isSel
-                              ? 'bg-[#0D1015] text-white border-[#0D1015]'
-                              : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]'
-                          }"
-                        >
-                          <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
-                          <span class="truncate max-w-[115px]">${esc(v.name.split('/')[0].trim())}</span>
-                        </button>
+    <button type="button" data-catalog-card-color-product="${esc(item.id)}" data-catalog-card-color-name="${esc(v.name)}" class="px-2 py-1 rounded-md text-[11px] font-medium border flex items-center gap-1.5 cursor-pointer transition-all ${ isSel ? 'bg-[#0D1015] text-white border-[#0D1015]' : 'bg-[#F8FBFF] text-[#0D1015] border-[#BCE3FF] hover:border-[#0095FF]' }">
+    <span class="w-3 h-3 rounded-full border border-black/20 shrink-0" style="background-color: ${esc(v.hex)}"></span>
+    <span class="truncate max-w-[115px]">${esc(v.name.split('/')[0].trim())}</span>
+    </button>
                       `;
                     })
                     .join('')}
-                </div>
-              </div>
-            </div>
-          </div>
+    </div>
+    </div>
+    </div>
+    </div>
 
-          <div class="px-5 pb-5 pt-1 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              data-add-cart="${esc(item.id)}"
-              ${display.isOutOfStock ? 'disabled' : ''}
-              class="py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${
-                display.isOutOfStock
-                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                  : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer'
-              }"
-            >
+    <div class="px-5 pb-5 pt-1 grid grid-cols-2 gap-2">
+    <button type="button" data-add-cart="${esc(item.id)}" ${display.isOutOfStock ? 'disabled' : ''} class="py-2.5 px-3 rounded-xl text-xs font-semibold transition-colors ${ display.isOutOfStock ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-[#0095FF] hover:bg-[#0077CC] text-white cursor-pointer' }">
               ${display.isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-            </button>
-            <button
-              type="button"
-              data-view-product="${esc(item.id)}"
-              class="py-2.5 px-3 rounded-xl bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] border border-[#BCE3FF] text-xs font-semibold transition-colors cursor-pointer text-center"
-            >
+    </button>
+    <button type="button" data-view-product="${esc(item.id)}" class="py-2.5 px-3 rounded-xl bg-[#F0F8FF] hover:bg-[#D8EEFF] text-[#0D1015] border border-[#BCE3FF] text-xs font-semibold transition-colors cursor-pointer text-center">
               View Details
-            </button>
-          </div>
-        </article>
+    </button>
+    </div>
+    </article>
       `;
     })
     .join('');
@@ -6835,21 +6094,7 @@ function renderCatalogPage() {
     });
   });
 
-  // Bind View Details buttons inside catalog page (both spotlight and grid)
-  document.querySelectorAll('[data-view-product]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-view-product');
-      if (pid) openProductDetailModal(pid);
-    });
-  });
-
-  // Bind Add to Cart buttons inside catalog page (both spotlight and grid)
-  document.querySelectorAll('[data-add-cart]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const pid = btn.getAttribute('data-add-cart');
-      if (pid) addProductToCartFromStorefront(pid);
-    });
-  });
+  bindStorefrontProductButtons(document);
 }
 
 /* ==========================================================================
@@ -6890,5 +6135,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     initDashboardPage();
   }
 });
-
 
