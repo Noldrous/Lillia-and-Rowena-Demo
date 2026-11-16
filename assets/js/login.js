@@ -280,32 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
 
       const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
-      const matchedCustomer = Array.isArray(serverStoreCache?.customers)
-        ? serverStoreCache.customers.find(
-            (c) => String(c.email || '').toLowerCase() === email.toLowerCase()
-          )
-        : null;
-
-      const resolvedName =
-        role === 'Admin'
-          ? 'Lillia Mercier (Business Owner)'
-          : isRegister && fullName
-          ? fullName
-          : matchedCustomer?.fullName
-          ? matchedCustomer.fullName
-          : email.toLowerCase() === 'rowena.vance@vancearchitects.com'
-          ? 'Rowena Vance'
-          : email.split('@')[0];
-
-      const userObj = {
-        email,
-        role: targetRoleParam,
-        name: resolvedName,
-      };
 
       try {
         if (isRegister && fullName) {
-          await fetch(API_ENDPOINT, {
+          const regRes = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -317,18 +295,34 @@ document.addEventListener('DOMContentLoaded', () => {
               address: 'Suite 400, 118 Mercer St, SoHo, New York, NY 10013',
             }),
           });
+          const regData = await regRes.json().catch(() => null);
+          if (!regRes.ok || (regData && regData.ok === false)) {
+            showError(regData?.error || 'Could not register account. That email may already be registered.');
+            return;
+          }
         } else {
-          await fetch(API_ENDPOINT, {
+          const loginRes = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              action: 'save_session',
-              sessionUser: userObj,
+              action: 'login_user',
+              email,
+              password,
+              role,
             }),
           });
+          const loginData = await loginRes.json().catch(() => null);
+          if (!loginRes.ok || !loginData || loginData.ok === false) {
+            showError(
+              loginData?.error ||
+                'Invalid email or password. No matching account record was found in the database.'
+            );
+            return;
+          }
         }
       } catch (_e) {
-        // Ignore network errors
+        showError('Unable to reach authentication server. Please try again.');
+        return;
       }
 
       const redirectParam = (params.get('redirect') || '').toLowerCase();

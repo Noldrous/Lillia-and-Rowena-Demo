@@ -230,6 +230,42 @@ try {
                 $db->writeStore($store);
                 break;
 
+            case 'login_user':
+                $userModel = new User($db);
+                $roleParam = trim((string) ($payload['role'] ?? 'Customer'));
+                $expectedRole = strcasecmp($roleParam, 'admin') === 0 ? 'Admin' : 'Customer';
+                $authenticated = $userModel->authenticate(
+                    (string) ($payload['email'] ?? ''),
+                    (string) ($payload['password'] ?? ''),
+                    $expectedRole
+                );
+                $store = $db->readStore();
+                $sessionObj = [
+                    'email' => $authenticated['email'],
+                    'name'  => $authenticated['fullName'] ?? $authenticated['name'] ?? $authenticated['email'],
+                    'role'  => $expectedRole === 'Admin' ? 'admin' : 'client',
+                ];
+                $_SESSION['user'] = $sessionObj;
+                $store['sessionUser'] = $sessionObj;
+                if ($expectedRole === 'Customer') {
+                    $store['customerProfile'] = [
+                        'name'    => $sessionObj['name'],
+                        'email'   => $authenticated['email'],
+                        'phone'   => (string) ($authenticated['phoneNumber'] ?? $authenticated['phone'] ?? '+1 (212) 555-0148'),
+                        'city'    => 'New York, NY 10013',
+                        'address' => (string) ($authenticated['address'] ?? 'Suite 400, 118 Mercer St, SoHo'),
+                        'notes'   => 'Standard white-glove delivery instructions.',
+                    ];
+                }
+                $db->writeStore($store);
+                echo json_encode([
+                    'ok'             => true,
+                    'user'           => $authenticated,
+                    'sessionUser'    => $sessionObj,
+                    'mysqlConnected' => $db->isMySqlConnected(),
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit;
+
             case 'register_customer':
                 $userModel = new User($db);
                 $registered = $userModel->register([

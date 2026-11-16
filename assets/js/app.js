@@ -249,6 +249,7 @@ function syncDatabaseStore(action = 'sync_store', extraPayload = {}) {
         action,
         products: state.catalog,
         materials: state.materials,
+        customers: state.customers,
         inventoryTransactions: state.inventoryTransactions,
         vouchers: state.vouchers,
         orders: state.orders,
@@ -5583,6 +5584,7 @@ function renderDashboardContent() {
           confirmLabel: 'Revoke Voucher',
           onConfirm: () => {
             state.vouchers = state.vouchers.filter((v) => v.id !== vid);
+            syncDatabaseStore('sync_store');
             showAdminBanner(`Revoked voucher ${vch.code}.`);
             renderDashboardContent();
           },
@@ -6567,6 +6569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   state.categories = Array.isArray(data.categories) ? data.categories : [];
   state.catalog = Array.isArray(data.products) ? data.products : [];
   state.materials = Array.isArray(data.materials) ? data.materials : [];
+  state.customers = Array.isArray(data.customers) ? data.customers : [];
   state.messengerConversations = Array.isArray(data.messengerConversations)
     ? data.messengerConversations
     : [];

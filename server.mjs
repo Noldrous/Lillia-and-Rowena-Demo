@@ -223,26 +223,100 @@ function handleApiRequest(req, res, parsedUrl) {
               break;
             }
 
+            case 'login_user': {
+              const email = String(payload.email || '').trim().toLowerCase();
+              const password = String(payload.password || '');
+              const roleParam = String(payload.role || 'Customer').trim();
+              const isAdminRole = roleParam.toLowerCase() === 'admin';
+
+              if (isAdminRole) {
+                if (email !== 'admin@lilliarowena.com') {
+                  return sendJson(res, 401, {
+                    ok: false,
+                    error: 'No Admin account found with that email address.',
+                  });
+                }
+                if (password !== 'MasterJoinery#01') {
+                  return sendJson(res, 401, {
+                    ok: false,
+                    error: `Incorrect password for ${email}.`,
+                  });
+                }
+                const sessionUser = {
+                  email: 'admin@lilliarowena.com',
+                  name: 'Lillia Mercier (Business Owner)',
+                  role: 'admin',
+                };
+                store.sessionUser = sessionUser;
+                writeStoreFile(store);
+                return sendJson(res, 200, { ok: true, sessionUser });
+              }
+
+              const customers = Array.isArray(store.customers) ? store.customers : [];
+              const matchedCustomer = customers.find(
+                (c) => String(c.email || '').trim().toLowerCase() === email
+              );
+
+              if (!matchedCustomer) {
+                return sendJson(res, 401, {
+                  ok: false,
+                  error: 'No account found with that email address. Please register an account first.',
+                });
+              }
+
+              const expectedPass = matchedCustomer.passwordPlain || 'ClientPass2025!';
+              if (password !== expectedPass) {
+                return sendJson(res, 401, {
+                  ok: false,
+                  error: `Incorrect password for ${email}.`,
+                });
+              }
+
+              const fullName = matchedCustomer.fullName || matchedCustomer.name || email;
+              const sessionUser = {
+                email: matchedCustomer.email,
+                name: fullName,
+                role: 'client',
+              };
+              store.sessionUser = sessionUser;
+              store.customerProfile = {
+                name: fullName,
+                email: matchedCustomer.email,
+                phone: matchedCustomer.phoneNumber || matchedCustomer.phone || '+1 (212) 555-0148',
+                city: 'New York, NY 10013',
+                address: matchedCustomer.address || 'Suite 400, 118 Mercer St, SoHo',
+                notes: 'Standard white-glove delivery instructions.',
+              };
+              writeStoreFile(store);
+              return sendJson(res, 200, { ok: true, customer: matchedCustomer, sessionUser });
+            }
+
             case 'register_customer': {
               const customers = Array.isArray(store.customers) ? [...store.customers] : [];
               const email = String(payload.email || '').trim().toLowerCase();
               const fullName = String(payload.fullName || payload.name || '').trim();
+              const password = String(payload.password || 'ClientPass2025!');
               const existingIdx = customers.findIndex(
                 (c) => String(c.email || '').toLowerCase() === email
               );
+              if (existingIdx >= 0 || email === 'admin@lilliarowena.com') {
+                return sendJson(res, 400, {
+                  ok: false,
+                  error: 'An account with this email already exists.',
+                });
+              }
               const customerRecord = {
-                id: existingIdx >= 0 ? customers[existingIdx].id : customers.length + 10,
+                id: customers.length + 10,
                 role: 'Customer',
                 fullName,
+                name: fullName,
                 email,
+                passwordPlain: password,
                 phoneNumber: payload.phoneNumber || '+1 (212) 555-0148',
+                phone: payload.phoneNumber || '+1 (212) 555-0148',
                 address: payload.address || 'Suite 400, 118 Mercer St, SoHo',
               };
-              if (existingIdx >= 0) {
-                customers[existingIdx] = { ...customers[existingIdx], ...customerRecord };
-              } else {
-                customers.push(customerRecord);
-              }
+              customers.push(customerRecord);
               store.customers = customers;
               const sessionUser = {
                 email: customerRecord.email,
