@@ -672,7 +672,7 @@
             <div class="admin-brand-mark">
               LR
             </div>
-            <span class="font-serif-display text-sm font-bold text-white truncate">
+            <span class="font-serif-display text-sm font-bold text-slate-900 truncate">
               Lillia &amp; Rowena Admin
             </span>
           </div>
@@ -681,7 +681,7 @@
             id="admin-mobile-menu-btn"
             aria-label="Toggle Admin Navigation Sidebar"
             aria-expanded="false"
-            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer"
+            class="admin-btn admin-btn-sm admin-btn-secondary"
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="6" y2="6"/><line x1="3" x2="21" y1="12" y2="12"/><line x1="3" x2="21" y1="18" y2="18"/></svg>
             <span>Menu</span>
@@ -693,19 +693,19 @@
 
         <!-- ONE UNIFIED FIXED VERTICAL LEFT SIDEBAR -->
         <aside id="admin-sidebar" class="admin-sidebar" aria-label="Admin Dashboard Navigation">
-          <div class="p-4 sm:p-5 space-y-6">
+          <div class="p-4 sm:p-5 space-y-5">
             <!-- Brand Header -->
-            <div class="flex items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div class="flex items-center justify-between gap-3 pb-4 border-b border-slate-200">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="admin-brand-mark">
                   LR
                 </div>
                 <div class="min-w-0">
-                  <p class="font-serif-display text-sm font-bold text-white truncate leading-tight">
+                  <p class="font-serif-display text-sm font-bold text-slate-900 truncate leading-tight">
                     Lillia &amp; Rowena
                   </p>
-                  <p class="text-xs text-slate-400 truncate mt-0.5">
-                    Admin Dashboard
+                  <p class="text-xs text-slate-500 truncate mt-0.5">
+                    Management System
                   </p>
                 </div>
               </div>
@@ -720,98 +720,101 @@
             </div>
 
             <!-- Single Vertical List of All Admin Navigation Items -->
-            <nav aria-label="Admin Sidebar Links" class="admin-nav-list">
-              <button
-                type="button"
-                data-admin-tab="overview"
-                aria-current="page"
-                class="admin-tab-btn admin-nav-item is-active"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
-                  <span>Overview</span>
-                </span>
-              </button>
+            <div class="space-y-1">
+              <p class="admin-nav-section-label">Store Management</p>
+              <nav aria-label="Admin Sidebar Links" class="admin-nav-list">
+                <button
+                  type="button"
+                  data-admin-tab="overview"
+                  aria-current="page"
+                  class="admin-tab-btn admin-nav-item is-active"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span>Overview</span>
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                data-admin-tab="catalog"
-                class="admin-tab-btn admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-                  <span>Products</span>
-                </span>
-                <span id="admin-nav-count-products" class="admin-nav-count">8</span>
-              </button>
+                <button
+                  type="button"
+                  data-admin-tab="catalog"
+                  class="admin-tab-btn admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                    <span>Products</span>
+                  </span>
+                  <span id="admin-nav-count-products" class="admin-nav-count">10</span>
+                </button>
 
-              <button
-                type="button"
-                id="admin-open-add-product-btn"
-                data-admin-tab="add-product"
-                class="admin-tab-btn admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
-                  <span>Add Product</span>
-                </span>
-              </button>
+                <button
+                  type="button"
+                  data-admin-tab="inventory"
+                  class="admin-tab-btn admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                    <span>Inventory</span>
+                  </span>
+                  <span id="admin-nav-count-inventory" class="admin-nav-count">8</span>
+                </button>
 
-              <button
-                type="button"
-                data-admin-tab="inventory"
-                class="admin-tab-btn admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-                  <span>Inventory</span>
-                </span>
-                <span id="admin-nav-count-inventory" class="admin-nav-count">24</span>
-              </button>
+                <button
+                  type="button"
+                  data-admin-tab="orders"
+                  class="admin-tab-btn admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 14h6"/><path d="M9 18h6"/><path d="M9 10h6"/></svg>
+                    <span>Orders</span>
+                  </span>
+                  <span id="admin-nav-count-orders" class="admin-nav-count">5</span>
+                </button>
 
-              <button
-                type="button"
-                data-admin-tab="vouchers"
-                class="admin-tab-btn admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
-                  <span>Vouchers</span>
-                </span>
-                <span id="admin-nav-count-vouchers" class="admin-nav-count">3</span>
-              </button>
+                <button
+                  type="button"
+                  data-admin-tab="customers"
+                  class="admin-tab-btn admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Customers</span>
+                  </span>
+                  <span id="admin-nav-count-customers" class="admin-nav-count">4</span>
+                </button>
 
-              <button
-                type="button"
-                data-admin-tab="orders"
-                class="admin-tab-btn admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M9 14h6"/><path d="M9 18h6"/><path d="M9 10h6"/></svg>
-                  <span>Orders</span>
-                </span>
-                <span id="admin-nav-count-orders" class="admin-nav-count">3</span>
-              </button>
+                <button
+                  type="button"
+                  data-admin-tab="vouchers"
+                  class="admin-tab-btn admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                    <span>Vouchers</span>
+                  </span>
+                  <span id="admin-nav-count-vouchers" class="admin-nav-count">3</span>
+                </button>
 
-              <a
-                href="index.html"
-                class="admin-nav-item"
-              >
-                <span class="admin-nav-item-label">
-                  <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                  <span>View Store</span>
-                </span>
-              </a>
-            </nav>
+                <a
+                  href="index.html"
+                  class="admin-nav-item"
+                >
+                  <span class="admin-nav-item-label">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>View Storefront</span>
+                  </span>
+                </a>
+              </nav>
+            </div>
           </div>
 
           <!-- Bottom: Signed-In Admin Summary & Logout Button -->
-          <div class="p-4 sm:p-5 border-t border-slate-800 space-y-3">
+          <div class="p-4 sm:p-5 border-t border-slate-200 space-y-3 bg-slate-50/60">
             <div class="px-1">
-              <p id="admin-sidebar-user-name" class="text-xs font-semibold text-white truncate">
+              <p id="admin-sidebar-user-name" class="text-xs font-semibold text-slate-900 truncate">
                 Lillia Mercier
               </p>
-              <p id="admin-sidebar-user-email" class="text-xs text-slate-400 truncate mt-0.5">
+              <p id="admin-sidebar-user-email" class="text-xs text-slate-500 truncate mt-0.5">
                 admin@lilliarowena.com
               </p>
             </div>
@@ -830,9 +833,9 @@
         <div id="admin-main-content" class="admin-main-content">
           <div class="admin-content-inner space-y-6">
             <!-- Clean Page Header -->
-            <div class="pb-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div class="pb-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div class="space-y-1">
-                <p id="admin-page-eyebrow" class="text-xs font-semibold text-[#0284C7]">
+                <p id="admin-page-eyebrow" class="text-xs font-semibold uppercase tracking-wider text-[#0284C7]">
                   Store Summary
                 </p>
                 <h1 id="admin-page-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-slate-900">
@@ -845,39 +848,39 @@
             </div>
 
             <!-- Action Feedback Banner -->
-            <div id="admin-status-banner" role="status" class="hidden px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-medium flex items-center justify-between gap-3"></div>
+            <div id="admin-status-banner" role="status" class="hidden px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-medium flex items-center justify-between gap-3"></div>
 
             <!-- =========================================================
                  PAGE 1: OVERVIEW (KPI Cards, Breakdowns & Recent Orders)
                  ========================================================= -->
             <div id="admin-overview-section" class="space-y-6">
-              <!-- 4 Simple KPI Cards -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="admin-kpi-card">
-                  <p class="text-xs font-semibold text-slate-500">Total Products</p>
-                  <p id="admin-stat-catalog" class="font-mono-tech text-2xl font-bold text-slate-900 mt-1">8 Pieces</p>
-                  <p id="admin-stat-catalog-sub" class="text-xs text-slate-500 mt-1">Across 4 room categories</p>
+              <!-- 4 Compact KPI Summary Cards -->
+              <div class="admin-summary-grid-4">
+                <div class="admin-summary-card">
+                  <p class="admin-summary-label">Total Products</p>
+                  <p id="admin-stat-catalog" class="admin-summary-value">10 Pieces</p>
+                  <p id="admin-stat-catalog-sub" class="admin-summary-meta">Across 5 room categories</p>
                 </div>
-                <div class="admin-kpi-card">
-                  <p class="text-xs font-semibold text-slate-500">Active Vouchers</p>
-                  <p id="admin-stat-vouchers" class="font-mono-tech text-2xl font-bold text-[#0284C7] mt-1">3 Active</p>
-                  <p class="text-xs text-slate-500 mt-1">Personal discount codes</p>
+                <div class="admin-summary-card">
+                  <p class="admin-summary-label">Active Vouchers</p>
+                  <p id="admin-stat-vouchers" class="admin-summary-value text-[#0284C7]">3 Active</p>
+                  <p class="admin-summary-meta">Single-product client codes</p>
                 </div>
-                <div class="admin-kpi-card">
-                  <p class="text-xs font-semibold text-slate-500">Customer Orders</p>
-                  <p id="admin-stat-orders" class="font-mono-tech text-2xl font-bold text-slate-900 mt-1">3 Orders</p>
-                  <p class="text-xs text-slate-500 mt-1">Currently in progress</p>
+                <div class="admin-summary-card">
+                  <p class="admin-summary-label">Customer Orders</p>
+                  <p id="admin-stat-orders" class="admin-summary-value">5 Orders</p>
+                  <p class="admin-summary-meta">Active production &amp; delivery</p>
                 </div>
-                <div class="admin-kpi-card">
-                  <p class="text-xs font-semibold text-slate-500">Total Revenue</p>
-                  <p id="admin-stat-revenue" class="font-mono-tech text-2xl font-bold text-emerald-700 mt-1">$16,911</p>
-                  <p class="text-xs text-slate-500 mt-1">From active orders</p>
+                <div class="admin-summary-card admin-summary-card-blue">
+                  <p class="admin-summary-label text-[#0369A1]">Total Revenue</p>
+                  <p id="admin-stat-revenue" class="admin-summary-value text-[#0284C7]">$22,005</p>
+                  <p class="admin-summary-meta text-slate-600">Confirmed customer orders</p>
                 </div>
               </div>
 
               <!-- 2 Clean Summary Charts -->
               <div class="admin-charts-grid">
-                <div class="admin-card p-6 space-y-4">
+                <div class="admin-card p-5 sm:p-6 space-y-4">
                   <div>
                     <h2 class="text-base font-bold text-slate-900">Products by Category</h2>
                     <p class="text-xs text-slate-500 mt-0.5">Number of items and average price per room</p>
@@ -885,7 +888,7 @@
                   <div id="admin-chart-categories" class="space-y-3"></div>
                 </div>
 
-                <div class="admin-card p-6 space-y-4">
+                <div class="admin-card p-5 sm:p-6 space-y-4">
                   <div>
                     <h2 class="text-base font-bold text-slate-900">Orders by Stage</h2>
                     <p class="text-xs text-slate-500 mt-0.5">Current fulfillment progress across customer orders</p>
@@ -899,7 +902,7 @@
             </div>
 
             <!-- =========================================================
-                 PAGE 2 & 3: STREAMLINED PRODUCTS & ADD/EDIT PRODUCT FORM
+                 PAGE 2: PRODUCTS MANAGEMENT
                  ========================================================= -->
             <div id="admin-tab-catalog" class="admin-tab-panel hidden space-y-5">
               <form id="admin-product-form" novalidate class="admin-card p-5 sm:p-6 space-y-5 hidden">
@@ -963,11 +966,11 @@
 
                   <div class="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label for="prod-stock" class="admin-label">Stock Qty</label>
+                      <label for="prod-stock" class="admin-label">Available Stock</label>
                       <input id="prod-stock" type="number" min="0" required value="4" class="admin-input font-mono-tech" />
                     </div>
                     <div>
-                      <label for="prod-min-stock" class="admin-label">Min Alert</label>
+                      <label for="prod-min-stock" class="admin-label">Minimum Stock</label>
                       <input id="prod-min-stock" type="number" min="0" required value="2" class="admin-input font-mono-tech" />
                     </div>
                   </div>
@@ -1086,27 +1089,37 @@
             </div>
 
             <!-- =========================================================
-                 PAGE 4: WORKSHOP RAW MATERIAL INVENTORY
+                 PAGE 3: INVENTORY & STOCK MANAGEMENT
                  ========================================================= -->
-            <div id="admin-tab-inventory" class="admin-tab-panel hidden space-y-6"></div>
+            <div id="admin-tab-inventory" class="admin-tab-panel hidden space-y-5"></div>
 
             <!-- =========================================================
-                 PAGE 6: VOUCHERS
+                 PAGE 4: ORDERS MANAGEMENT
                  ========================================================= -->
-            <div id="admin-tab-vouchers" class="admin-tab-panel hidden space-y-6">
-              <form id="admin-voucher-form" novalidate class="admin-card p-6 sm:p-8 space-y-6">
-                <div class="pb-4 border-b border-slate-200">
-                  <h2 class="text-lg font-bold text-slate-900">
+            <div id="admin-tab-orders" class="admin-tab-panel hidden space-y-5"></div>
+
+            <!-- =========================================================
+                 PAGE 5: CUSTOMERS MANAGEMENT
+                 ========================================================= -->
+            <div id="admin-tab-customers" class="admin-tab-panel hidden space-y-5"></div>
+
+            <!-- =========================================================
+                 PAGE 6: VOUCHERS MANAGEMENT
+                 ========================================================= -->
+            <div id="admin-tab-vouchers" class="admin-tab-panel hidden space-y-5">
+              <form id="admin-voucher-form" novalidate class="admin-card p-5 sm:p-6 space-y-5">
+                <div class="pb-3.5 border-b border-slate-200">
+                  <h2 class="text-base font-bold text-slate-900">
                     Create Discount Voucher
                   </h2>
                   <p class="text-xs text-slate-500 mt-0.5">
-                    Create a single-item discount code linked to a customer's email address.
+                    Issue a single-product discount code linked to a customer's email address.
                   </p>
                 </div>
 
-                <div id="admin-voucher-form-error" role="alert" class="hidden px-4 py-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold"></div>
+                <div id="admin-voucher-form-error" role="alert" class="hidden px-4 py-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold"></div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label for="vch-email" class="admin-label">Customer Email</label>
                     <input id="vch-email" type="email" required value="rowena.vance@vancearchitects.com" placeholder="customer@example.com" class="admin-input" />
@@ -1124,22 +1137,22 @@
                       </button>
                     </div>
                   </div>
-                  <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label for="vch-discount-type" class="admin-label">Discount Type</label>
+                      <label for="vch-discount-type" class="admin-label">Type</label>
                       <select id="vch-discount-type" class="admin-select">
-                        <option value="fixed">Fixed Amount ($)</option>
-                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed ($)</option>
+                        <option value="percentage">Percent (%)</option>
                       </select>
                     </div>
                     <div>
-                      <label id="vch-discount-label" for="vch-discount" class="admin-label">Discount Value</label>
+                      <label id="vch-discount-label" for="vch-discount" class="admin-label">Value</label>
                       <input id="vch-discount" type="number" min="1" required value="300" class="admin-input font-mono-tech" />
                     </div>
                   </div>
                 </div>
 
-                <div class="flex justify-end pt-2">
+                <div class="flex justify-end pt-2 border-t border-slate-100">
                   <button type="submit" class="admin-btn admin-btn-primary">
                     Create Voucher
                   </button>
@@ -1148,11 +1161,6 @@
 
               <div id="admin-vouchers-list" class="space-y-4"></div>
             </div>
-
-            <!-- =========================================================
-                 PAGE 7: ORDERS
-                 ========================================================= -->
-            <div id="admin-tab-orders" class="admin-tab-panel hidden space-y-6"></div>
           </div>
         </div>
 

@@ -1016,8 +1016,10 @@ export function computeMaterialInventoryMetrics(materials = []) {
   const safeMaterials = Array.isArray(materials) ? materials : [];
   let totalStockUnits = 0;
   let totalInventoryValue = 0;
+  let inStockCount = 0;
   let lowStockCount = 0;
   let outOfStockCount = 0;
+  const inStockItems = [];
   const lowStockItems = [];
   const outOfStockItems = [];
 
@@ -1031,6 +1033,9 @@ export function computeMaterialInventoryMetrics(materials = []) {
     } else if (info.statusKey === 'low_stock') {
       lowStockCount += 1;
       lowStockItems.push(mat);
+    } else {
+      inStockCount += 1;
+      inStockItems.push(mat);
     }
   });
 
@@ -1040,11 +1045,169 @@ export function computeMaterialInventoryMetrics(materials = []) {
     totalStockAvailable: totalStockUnits,
     totalStockQuantity: totalStockUnits,
     totalInventoryValue,
+    inStockCount,
     lowStockCount,
     outOfStockCount,
+    inStockItems,
     lowStockItems,
     outOfStockItems,
   };
+}
+
+export function getMaterialCategories(materials = []) {
+  const defaultCategories = [
+    'Solid Timber',
+    'Upholstery Textile',
+    'Architectural Stone',
+    'Hardware & Joinery',
+    'Cord & Finishes',
+  ];
+  const seen = new Set(defaultCategories);
+  const result = [...defaultCategories];
+  (Array.isArray(materials) ? materials : []).forEach((mat) => {
+    const cat = String(mat?.materialType || '').trim();
+    if (cat && !seen.has(cat)) {
+      seen.add(cat);
+      result.push(cat);
+    }
+  });
+  return result;
+}
+
+export function filterInventoryMaterials(materials = [], filters = {}) {
+  const safeMaterials = Array.isArray(materials) ? materials : [];
+  const query = String(filters?.searchQuery || '').trim().toLowerCase();
+  const category = String(filters?.category || 'all').trim();
+  const status = String(filters?.status || 'all').trim().toLowerCase();
+
+  return safeMaterials.filter((mat) => {
+    const matCategory = String(mat?.materialType || 'Solid Timber').trim();
+    if (category && category !== 'all' && matCategory.toLowerCase() !== category.toLowerCase()) {
+      return false;
+    }
+
+    const st = getMaterialStockStatus(mat);
+    if (status && status !== 'all') {
+      if (status === 'needs_restock') {
+        if (st.statusKey !== 'low_stock' && st.statusKey !== 'out_of_stock') return false;
+      } else if (st.statusKey !== status) {
+        return false;
+      }
+    }
+
+    if (query) {
+      const hay = [
+        mat?.name,
+        mat?.code,
+        mat?.sku,
+        matCategory,
+        mat?.unit,
+        mat?.usedIn,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!hay.includes(query)) return false;
+    }
+
+    return true;
+  });
+}
+
+export function paginateItems(items = [], currentPage = 1, pageSize = 5) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const safePageSize = Math.max(1, Math.floor(Number(pageSize) || 5));
+  const totalItems = safeItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+  const safePage = Math.min(totalPages, Math.max(1, Math.floor(Number(currentPage) || 1)));
+  const offset = (safePage - 1) * safePageSize;
+  const pagedItems = safeItems.slice(offset, offset + safePageSize);
+  const startIndex = totalItems === 0 ? 0 : offset + 1;
+  const endIndex = Math.min(totalItems, offset + pagedItems.length);
+
+  return {
+    items: pagedItems,
+    currentPage: safePage,
+    pageSize: safePageSize,
+    totalPages,
+    totalItems,
+    startIndex,
+    endIndex,
+    hasPrev: safePage > 1,
+    hasNext: safePage < totalPages,
+  };
+}
+
+export function computeCustomerDirectory(orders = [], customers = [], customerProfile = null) {
+  const byEmail = new Map();
+
+  const upsert = (entry) => {
+    const email = String(entry?.email || '').trim().toLowerCase();
+    if (!email || email === 'admin@lilliarowena.com' || entry?.role === 'admin') return;
+    const existing = byEmail.get(email) || {
+      id: entry.id || `cust-${byEmail.size + 101}`,
+      name: entry.name || 'Client',
+      email: entry.email.trim(),
+      phone: entry.phone || '+1 (212) 555-0140',
+      address: entry.address || 'Showroom Registered Client',
+      company: entry.company || 'Private Residence',
+      orderCount: 0,
+      totalSpent: 0,
+      lastOrderDate: '—',
+    };
+    byEmail.set(email, {
+      ...existing,
+      name: entry.name || existing.name,
+      phone: entry.phone || existing.phone,
+      address: entry.address || existing.address,
+      company: entry.company || existing.company,
+    });
+  };
+
+  if (
+    customerProfile &&
+    customerProfile.email &&
+    String(customerProfile.email).trim().toLowerCase() !== 'admin@lilliarowena.com' &&
+    customerProfile.role !== 'admin'
+  ) {
+    upsert({
+      id: 'cust-profile',
+      name: customerProfile.name,
+      email: customerProfile.email,
+      phone: customerProfile.phone,
+      address: [customerProfile.address, customerProfile.city].filter(Boolean).join(', '),
+      company: 'Vance & Associates Spatial Design',
+    });
+  }
+
+  (Array.isArray(customers) ? customers : []).forEach((c) => upsert(c));
+
+  (Array.isArray(orders) ? orders : []).forEach((ord) => {
+    const email = String(ord?.clientEmail || '').trim().toLowerCase();
+    if (!email || email === 'admin@lilliarowena.com') return;
+    if (!byEmail.has(email)) {
+      upsert({
+        id: `cust-${byEmail.size + 101}`,
+        name: ord.clientName || 'Showroom Client',
+        email: ord.clientEmail,
+        phone: '+1 (212) 555-0192',
+        address: ord.deliveryAddress || 'Private Residence',
+        company: ord.clientCompany || 'Private Residence',
+      });
+    }
+    const rec = byEmail.get(email);
+    if (!rec) return;
+    rec.orderCount += 1;
+    rec.totalSpent += Math.max(0, Number(ord.totalAmount || 0));
+    if (ord.orderDate && (rec.lastOrderDate === '—' || String(ord.orderDate) > String(rec.lastOrderDate))) {
+      rec.lastOrderDate = ord.orderDate;
+    }
+    if (ord.deliveryAddress && (!rec.address || rec.address === 'Showroom Registered Client')) {
+      rec.address = ord.deliveryAddress;
+    }
+  });
+
+  return Array.from(byEmail.values());
 }
 
 export function computeInventoryMetrics(items = []) {
@@ -1054,6 +1217,7 @@ export function computeInventoryMetrics(items = []) {
   }
 
   let totalStockAvailable = 0;
+  let inStockCount = 0;
   let lowStockCount = 0;
   let outOfStockCount = 0;
   const lowStockItems = [];
@@ -1068,6 +1232,8 @@ export function computeInventoryMetrics(items = []) {
     } else if (statusInfo.statusKey === 'low_stock') {
       lowStockCount += 1;
       lowStockItems.push(p);
+    } else {
+      inStockCount += 1;
     }
   });
 
@@ -1075,6 +1241,7 @@ export function computeInventoryMetrics(items = []) {
     totalProducts: safeItems.length,
     totalMaterials: safeItems.length,
     totalStockAvailable,
+    inStockCount,
     lowStockCount,
     outOfStockCount,
     lowStockItems,

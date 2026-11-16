@@ -9,19 +9,24 @@ import {
   buildProductRecord,
   buildRequestDesignMessengerUrl,
   calculateOrderPricing,
+  computeCustomerDirectory,
+  computeInventoryMetrics,
   computeMaterialInventoryMetrics,
   computeVariantPricing,
   createCustomOrderRequest,
   describeMaterialStockPreview,
   filterCatalogPageItems,
   filterFurnitureItems,
+  filterInventoryMaterials,
   findMatchingColorVariant,
   formatCustomerProductDisplay,
   formatVoucherBenefitLabel,
   getColorFilterCounts,
+  getMaterialCategories,
   getMaterialStockStatus,
   getProductStockStatus,
   getRecommendedBestSellers,
+  paginateItems,
   recordCustomerOrderPayment,
   removeMaterialFromInventory,
   removeProductFromCatalog,
@@ -117,6 +122,7 @@ const state = {
   categories: [],
   catalog: [],
   materials: [],
+  customers: [],
   messengerConversations: [],
   inventoryTransactions: [],
   vouchers: [],
@@ -149,24 +155,33 @@ const state = {
   adminProductSearch: '',
   adminProductCategory: 'all',
   adminProductTypeFilter: 'all',
+  adminProductStockFilter: 'all',
+  adminProductPage: 1,
   adminMaterialFormOpen: false,
   adminEditingMaterialId: '',
   adminInventoryView: 'materials',
   adminMovementFormOpen: false,
+  adminHistoryModalOpen: false,
+  adminHistoryMaterialId: 'all',
   adminInventoryStockSearch: '',
+  adminInventoryCategoryFilter: 'all',
   adminInventoryStockFilter: 'all',
+  adminInventoryPage: 1,
+  adminInventoryPageSize: 5,
   adminInventoryHistorySearch: '',
   adminInventoryHistoryTypeFilter: 'all',
   adminMovementMode: 'Stock In',
   adminMovementMaterialId: '',
   adminMovementProductId: '',
-  adminMovementQuantity: '25',
+  adminMovementQuantity: '20',
   adminMovementCost: '',
   adminMovementReason: 'Allocated to Workshop Production',
   adminMovementCustomReason: '',
   adminMovementDate: new Date().toISOString().slice(0, 10),
+  adminOpenActionMenuId: '',
   adminOrderSearch: '',
   adminOrderStage: 'all',
+  adminCustomerSearch: '',
   customerProfile: {
     name: 'Rowena Vance',
     email: 'rowena.vance@vancearchitects.com',
@@ -2173,43 +2188,49 @@ function initDashboardPage() {
     adminBackdrop.addEventListener('click', () => setAdminSidebarOpen(false));
   }
 
-  // Unified Admin Left-Sidebar Navigation (overview, catalog, add-product, inventory, vouchers, orders)
+  // Unified Admin Left-Sidebar Navigation (overview, catalog, add-product, inventory, orders, customers, vouchers)
   const ADMIN_SECTION_META = {
     overview: {
       eyebrow: 'Store Summary',
       title: 'Dashboard Overview',
       description:
-        'Track your store performance, inventory breakdown, and recent customer orders in one place.',
+        'Monitor store performance, inventory health, and recent customer orders at a glance.',
     },
     catalog: {
       eyebrow: 'Catalog Management',
       title: 'Products',
       description:
-        'View all furniture pieces, filter by room category or product type, and manage catalog items.',
+        'Manage handcrafted furniture pieces, pricing, room categories, and finished stock availability.',
     },
     'add-product': {
       eyebrow: 'Catalog Management',
-      title: 'Add New Product',
+      title: 'Add or Edit Product',
       description:
-        'Add a Normal Product or a Customized Product (Messenger) — both remain publicly visible to all customers.',
+        'Create or update a Standard Product or Customized Product (Messenger) in the store catalog.',
     },
     inventory: {
-      eyebrow: 'Workshop Supplies',
-      title: 'Materials & Stock',
+      eyebrow: 'Inventory & Stock Management',
+      title: 'Inventory & Stock Management',
       description:
-        'See how much wood, fabric, stone, and hardware you have left, add newly arrived supplies, or deduct materials used for orders.',
+        'Track workshop materials, monitor stock thresholds, record stock movements, and review audit history.',
     },
     vouchers: {
       eyebrow: 'Promotions',
       title: 'Discount Vouchers',
       description:
-        'Create and manage single-item discount codes for your customers.',
+        'Issue and manage single-item promotional discount codes for customers.',
     },
     orders: {
-      eyebrow: 'Fulfillment & Production',
+      eyebrow: 'Order Management',
       title: 'Customer Orders',
       description:
-        'Update order production stage and track customer payments — changes sync live with the Customer Dashboard.',
+        'Manage order production stages and track customer payments — updates sync live to the Customer Dashboard.',
+    },
+    customers: {
+      eyebrow: 'Customer Management',
+      title: 'Customer Directory',
+      description:
+        'View registered client profiles, delivery addresses, order history, and lifetime spend.',
     },
   };
 
@@ -2538,7 +2559,8 @@ function initDashboardPage() {
     }
 
     adminTabBtns.forEach((b) => {
-      const isSel = b.getAttribute('data-admin-tab') === target;
+      const tabAttr = b.getAttribute('data-admin-tab');
+      const isSel = tabAttr === target || (target === 'add-product' && tabAttr === 'catalog');
       b.classList.toggle('is-active', isSel);
       if (isSel) {
         b.setAttribute('aria-current', 'page');
@@ -2878,12 +2900,22 @@ function showClientBanner(msg) {
   }, 3500);
 }
 
-function showAdminBanner(msg) {
+function showAdminBanner(msg, isError = false) {
   const banner = document.getElementById('admin-status-banner');
   if (!banner) return;
+  if (isError) {
+    banner.className =
+      'p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium flex items-center justify-between gap-3';
+  } else {
+    banner.className =
+      'p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium flex items-center justify-between gap-3';
+  }
   banner.innerHTML = `
-    <span>✓ ${esc(msg)}</span>
-    <button type="button" id="admin-banner-dismiss" class="text-xs font-semibold text-emerald-800 hover:underline cursor-pointer">Dismiss</button>
+    <span class="flex items-center gap-2">
+      <span class="font-bold">${isError ? '!' : '✓'}</span>
+      <span>${esc(msg)}</span>
+    </span>
+    <button type="button" id="admin-banner-dismiss" class="text-xs font-semibold ${isError ? 'text-rose-800' : 'text-emerald-800'} hover:underline cursor-pointer">Dismiss</button>
   `;
   banner.classList.remove('hidden');
   const dismissBtn = document.getElementById('admin-banner-dismiss');
@@ -3729,11 +3761,17 @@ function renderDashboardContent() {
   const navCountInventory = document.getElementById('admin-nav-count-inventory');
   const navCountVouchers = document.getElementById('admin-nav-count-vouchers');
   const navCountOrders = document.getElementById('admin-nav-count-orders');
+  const navCountCustomers = document.getElementById('admin-nav-count-customers');
 
   const discountedCount = state.catalog.filter((p) => Number(p.discountPercent || 0) > 0).length;
   const activeVoucherCount = state.vouchers.filter((v) => v.status === 'Active').length;
   const totalOrderRevenue = state.orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
   const invMetrics = computeMaterialInventoryMetrics(state.materials);
+  const customerDirectory = computeCustomerDirectory(
+    state.orders,
+    state.customers,
+    state.customerProfile
+  );
 
   if (adminStatCatalog) adminStatCatalog.textContent = `${state.catalog.length} Items`;
   if (adminStatCatalogSub) {
@@ -3748,6 +3786,34 @@ function renderDashboardContent() {
   if (navCountInventory) navCountInventory.textContent = String(invMetrics.totalMaterials);
   if (navCountVouchers) navCountVouchers.textContent = String(state.vouchers.length);
   if (navCountOrders) navCountOrders.textContent = String(state.orders.length);
+  if (navCountCustomers) navCountCustomers.textContent = String(customerDirectory.length);
+
+  // Close open 3-dot action dropdown when clicking outside
+  if (!window.__adminActionMenuListenerBound) {
+    window.__adminActionMenuListenerBound = true;
+    document.addEventListener('click', (e) => {
+      if (!state.adminOpenActionMenuId) return;
+      const targetEl = e.target;
+      if (targetEl && typeof targetEl.closest === 'function' && targetEl.closest('.admin-action-menu')) {
+        return;
+      }
+      state.adminOpenActionMenuId = '';
+      document.querySelectorAll('.admin-action-dropdown').forEach((el) => el.classList.add('hidden'));
+      document
+        .querySelectorAll('.admin-action-trigger[aria-expanded="true"]')
+        .forEach((btn) => btn.setAttribute('aria-expanded', 'false'));
+    });
+  }
+
+  const renderStockStatusBadge = (statusKey) => {
+    if (statusKey === 'out_of_stock') {
+      return `<span class="admin-status-badge admin-status-out-of-stock"><span class="admin-status-badge-dot"></span>Out of Stock</span>`;
+    }
+    if (statusKey === 'low_stock') {
+      return `<span class="admin-status-badge admin-status-low-stock"><span class="admin-status-badge-dot"></span>Low Stock</span>`;
+    }
+    return `<span class="admin-status-badge admin-status-in-stock"><span class="admin-status-badge-dot"></span>In Stock</span>`;
+  };
 
   const chartCategoriesEl = document.getElementById('admin-chart-categories');
   if (chartCategoriesEl) {
@@ -3768,15 +3834,15 @@ function renderDashboardContent() {
             ? Math.round(matches.reduce((s, i) => s + Number(i.effectivePrice || i.price || 0), 0) / matches.length)
             : 0;
         return `
-    <div>
-    <div class="flex items-center justify-between text-xs">
-    <span class="font-semibold text-slate-800">${esc(cat.label)}</span>
-    <span class="font-mono-tech text-slate-500">${matches.length} items · Avg ${usd(avgPrice)}</span>
-    </div>
-    <div class="admin-progress-track">
-    <div class="admin-progress-fill-blue" style="width: ${matches.length > 0 ? Math.max(8, pct) : 0}%"></div>
-    </div>
-    </div>
+          <div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-800">${esc(cat.label)}</span>
+              <span class="font-mono-tech text-slate-500">${matches.length} items · Avg ${usd(avgPrice)}</span>
+            </div>
+            <div class="admin-progress-track">
+              <div class="admin-progress-fill-blue" style="width: ${matches.length > 0 ? Math.max(8, pct) : 0}%"></div>
+            </div>
+          </div>
         `;
       })
       .join('');
@@ -3807,15 +3873,15 @@ function renderDashboardContent() {
       .map((st) => {
         const pct = Math.round((st.count / totalOrds) * 100);
         return `
-    <div>
-    <div class="flex items-center justify-between text-xs">
-    <span class="font-semibold text-slate-800">${esc(st.label)}</span>
-    <span class="font-mono-tech text-slate-500">${st.count} ${st.count === 1 ? 'order' : 'orders'} (${pct}%)</span>
-    </div>
-    <div class="admin-progress-track">
-    <div class="admin-progress-fill-slate" style="width: ${st.count > 0 ? Math.max(10, pct) : 0}%"></div>
-    </div>
-    </div>
+          <div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-800">${esc(st.label)}</span>
+              <span class="font-mono-tech text-slate-500">${st.count} ${st.count === 1 ? 'order' : 'orders'} (${pct}%)</span>
+            </div>
+            <div class="admin-progress-track">
+              <div class="admin-progress-fill-slate" style="width: ${st.count > 0 ? Math.max(10, pct) : 0}%"></div>
+            </div>
+          </div>
         `;
       })
       .join('');
@@ -3826,66 +3892,66 @@ function renderDashboardContent() {
   if (recentOrdersEl) {
     const recentList = state.orders.slice(0, 4);
     recentOrdersEl.innerHTML = `
-    <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-    <div>
-    <h2 class="text-base font-bold text-slate-900">Recent Customer Orders</h2>
-    <p class="text-xs text-slate-500 mt-0.5">Latest orders placed by customers</p>
-    </div>
-    <div class="flex items-center gap-2">
-    <button type="button" data-admin-jump="add-product" class="admin-btn admin-btn-sm admin-btn-secondary">
-            + Add Product
-    </button>
-    <button type="button" data-admin-jump="orders" class="admin-btn admin-btn-sm admin-btn-primary">
+      <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Recent Customer Orders</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Latest orders placed by customers</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" data-admin-jump="inventory" class="admin-btn admin-btn-sm admin-btn-secondary">
+            Manage Inventory
+          </button>
+          <button type="button" data-admin-jump="orders" class="admin-btn admin-btn-sm admin-btn-primary">
             View All Orders
-    </button>
-    </div>
-    </div>
+          </button>
+        </div>
+      </div>
       ${
         recentList.length === 0
           ? `<div class="admin-empty-state"><p class="text-sm font-semibold text-slate-700">No customer orders yet</p><p class="text-xs text-slate-500 mt-1">New orders will appear here automatically.</p></div>`
           : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th>Order</th>
-    <th>Customer</th>
-    <th class="admin-col-primary">Product</th>
-    <th>Stage</th>
-    <th class="text-right">Total</th>
-    </tr>
-    </thead>
-    <tbody>
+        <div class="overflow-x-auto">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th class="admin-col-primary">Product</th>
+                <th>Stage</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
               ${recentList
                 .map(
                   (o) => `
-    <tr>
-    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">#${esc(o.orderNumber)}</td>
-    <td class="whitespace-nowrap">
-    <p class="admin-table-title">${esc(o.clientName)}</p>
-    <p class="admin-table-sub">${esc(o.clientEmail)}</p>
-    </td>
-    <td class="admin-col-primary">
-    <p class="admin-table-title">${esc(o.furnitureName)}</p>
-    <p class="admin-table-sub">${esc(o.selectedFinish)}</p>
-    </td>
-    <td class="whitespace-nowrap">
-    <span class="admin-status-dot ${
-                      /Dispatched|Delivered/i.test(o.status)
-                        ? 'text-emerald-700'
-                        : /Quality/i.test(o.status)
-                        ? 'text-amber-700'
-                        : 'text-[#0284C7]'
-                    }">${esc(o.status.split('·')[0].trim())}</span>
-    </td>
-    <td class="text-right font-mono-tech font-bold text-slate-900 whitespace-nowrap">${usd(o.totalAmount)}</td>
-    </tr>
-              `
+                  <tr>
+                    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">#${esc(o.orderNumber)}</td>
+                    <td class="whitespace-nowrap">
+                      <p class="admin-table-title">${esc(o.clientName)}</p>
+                      <p class="admin-table-sub">${esc(o.clientEmail)}</p>
+                    </td>
+                    <td class="admin-col-primary">
+                      <p class="admin-table-title">${esc(o.furnitureName)}</p>
+                      <p class="admin-table-sub">${esc(o.selectedFinish)}</p>
+                    </td>
+                    <td class="whitespace-nowrap">
+                      <span class="admin-status-badge ${
+                        /Dispatched|Delivered/i.test(o.status)
+                          ? 'admin-status-in-stock'
+                          : /Quality/i.test(o.status)
+                          ? 'admin-status-low-stock'
+                          : 'bg-sky-50 text-[#0284C7] border border-sky-200'
+                      }">${esc(o.status.split('·')[0].trim())}</span>
+                    </td>
+                    <td class="text-right font-mono-tech font-bold text-slate-900 whitespace-nowrap">${usd(o.totalAmount)}</td>
+                  </tr>
+                `
                 )
                 .join('')}
-    </tbody>
-    </table>
-    </div>
+            </tbody>
+          </table>
+        </div>
       `
       }
     `;
@@ -3903,212 +3969,282 @@ function renderDashboardContent() {
   if (adminCatalogEl) {
     const query = (state.adminProductSearch || '').trim().toLowerCase();
     const catFilter = state.adminProductCategory || 'all';
+    const stockFilter = state.adminProductStockFilter || 'all';
     const typeFilter = state.adminProductTypeFilter || 'all';
 
-    const totalCatalogCount = state.catalog.length;
-    const inStockCatalogCount = state.catalog.filter(
-      (p) => getProductStockStatus(p).statusKey === 'in_stock'
-    ).length;
-    const lowOrOutCatalogCount = state.catalog.filter(
-      (p) => getProductStockStatus(p).statusKey !== 'in_stock'
-    ).length;
-    const discountedCatalogCount = state.catalog.filter(
-      (p) => Number(p.discountPercent || 0) > 0
-    ).length;
+    const prodMetrics = computeInventoryMetrics(state.catalog);
 
     const filteredProducts = state.catalog.filter((p) => {
       const pType = p.productType === 'customized' || p.isCustomClientDesign ? 'customized' : 'standard';
+      const stockInfo = getProductStockStatus(p);
       const matchesCat = catFilter === 'all' || p.categoryId === catFilter;
       const matchesType = typeFilter === 'all' || pType === typeFilter;
+      const matchesStock = stockFilter === 'all' || stockInfo.statusKey === stockFilter;
       const matchesQuery =
         !query ||
         p.name.toLowerCase().includes(query) ||
         p.sku.toLowerCase().includes(query) ||
-        (p.categoryName || '').toLowerCase().includes(query) ||
-        (p.origin || '').toLowerCase().includes(query) ||
-        (p.customizationNotes || '').toLowerCase().includes(query);
-      return matchesCat && matchesType && matchesQuery;
+        (p.categoryName || '').toLowerCase().includes(query);
+      return matchesCat && matchesType && matchesStock && matchesQuery;
     });
 
+    const prodPagination = paginateItems(filteredProducts, state.adminProductPage || 1, 6);
+    state.adminProductPage = prodPagination.currentPage;
+
     const isFormOpen = !document.getElementById('admin-product-form')?.classList.contains('hidden');
+    const hasActiveProdFilters =
+      Boolean(query) || catFilter !== 'all' || stockFilter !== 'all' || typeFilter !== 'all';
 
     adminCatalogEl.innerHTML = `
+      <!-- Product Summary Cards -->
+      <div class="admin-summary-grid-4">
+        <div class="admin-summary-card">
+          <span class="admin-summary-label">Total Products</span>
+          <span id="prod-kpi-total" class="admin-summary-value">${prodMetrics.totalProducts}</span>
+          <span class="admin-summary-sub">Active catalog items</span>
+        </div>
+        <div class="admin-summary-card">
+          <span class="admin-summary-label">In Stock</span>
+          <span class="admin-summary-value is-green">${prodMetrics.inStockCount}</span>
+          <span class="admin-summary-sub">Ready for dispatch</span>
+        </div>
+        <div class="admin-summary-card">
+          <span class="admin-summary-label">Low Stock</span>
+          <span class="admin-summary-value is-orange">${prodMetrics.lowStockCount}</span>
+          <span class="admin-summary-sub">At or below minimum</span>
+        </div>
+        <div class="admin-summary-card">
+          <span class="admin-summary-label">Out of Stock</span>
+          <span class="admin-summary-value is-red">${prodMetrics.outOfStockCount}</span>
+          <span class="admin-summary-sub">Requires production</span>
+        </div>
+      </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-    <div class="admin-kpi-card py-3 px-4">
-    <p class="admin-kpi-label">Total Products</p>
-    <p id="prod-kpi-total" class="text-xl font-bold text-slate-900 mt-0.5">${totalCatalogCount}</p>
-    </div>
-    <div class="admin-kpi-card py-3 px-4">
-    <p class="admin-kpi-label">Ready in Stock</p>
-    <p class="text-xl font-bold text-emerald-700 mt-0.5">${inStockCatalogCount}</p>
-    </div>
-    <div class="admin-kpi-card py-3 px-4">
-    <p class="admin-kpi-label">Low / Out of Stock</p>
-    <p class="text-xl font-bold ${lowOrOutCatalogCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${lowOrOutCatalogCount}</p>
-    </div>
-    <div class="admin-kpi-card py-3 px-4">
-    <p class="admin-kpi-label">On Sale / Discount</p>
-    <p class="text-xl font-bold text-[#0284C7] mt-0.5">${discountedCatalogCount}</p>
-    </div>
-    </div>
-
-    <div class="admin-card overflow-hidden">
-
-    <div class="admin-toolbar py-3 px-4">
-    <div class="admin-toolbar-filters">
-    <input id="admin-catalog-search" type="search" value="${esc(state.adminProductSearch)}" placeholder="Search name, SKU, or category..." aria-label="Search products" class="admin-input admin-search-input" />
-    <select id="admin-catalog-category" aria-label="Filter products by category" class="admin-select admin-filter-select">
-    <option value="all" ${catFilter === 'all' ? 'selected' : ''}>All Categories (${state.catalog.length})</option>
-    <option value="living" ${catFilter === 'living' ? 'selected' : ''}>Living Room</option>
-    <option value="dining" ${catFilter === 'dining' ? 'selected' : ''}>Dining Room</option>
-    <option value="bedroom" ${catFilter === 'bedroom' ? 'selected' : ''}>Bedroom</option>
-    <option value="office" ${catFilter === 'office' ? 'selected' : ''}>Study/Work Desks</option>
-    <option value="kitchen" ${catFilter === 'kitchen' ? 'selected' : ''}>Kitchen</option>
-    </select>
-    <select id="admin-catalog-type" aria-label="Filter products by type" class="admin-select admin-filter-select">
-    <option value="all" ${typeFilter === 'all' ? 'selected' : ''}>All Types</option>
-    <option value="standard" ${typeFilter === 'standard' ? 'selected' : ''}>Standard Catalog</option>
-    <option value="customized" ${typeFilter === 'customized' ? 'selected' : ''}>Custom / Bespoke</option>
-    </select>
-            ${
-              query || catFilter !== 'all' || typeFilter !== 'all'
-                ? `<button type="button" id="admin-reset-product-filters" class="admin-btn admin-btn-sm admin-btn-secondary">Clear</button>`
-                : ''
-            }
-    </div>
-    <div class="flex items-center gap-2.5">
-    <span class="text-xs font-medium text-slate-500 hidden md:inline">${filteredProducts.length} of ${state.catalog.length} shown</span>
-    <button type="button" id="admin-toggle-add-product-btn" class="admin-btn admin-btn-sm ${isFormOpen ? 'admin-btn-secondary' : 'admin-btn-primary'}">
-              ${isFormOpen ? 'Close Product Form' : '+ Add Product'}
-    </button>
-    </div>
-    </div>
+      <div class="admin-card">
+        <div class="admin-toolbar">
+          <div class="admin-toolbar-filters">
+            <input
+              id="admin-catalog-search"
+              type="search"
+              value="${esc(state.adminProductSearch)}"
+              placeholder="Search product name, SKU, or category..."
+              aria-label="Search products"
+              class="admin-input admin-search-input"
+            />
+            <select id="admin-catalog-category" aria-label="Filter products by category" class="admin-select admin-filter-select">
+              <option value="all" ${catFilter === 'all' ? 'selected' : ''}>All Categories</option>
+              <option value="living" ${catFilter === 'living' ? 'selected' : ''}>Living Room</option>
+              <option value="dining" ${catFilter === 'dining' ? 'selected' : ''}>Dining Room</option>
+              <option value="bedroom" ${catFilter === 'bedroom' ? 'selected' : ''}>Bedroom</option>
+              <option value="office" ${catFilter === 'office' ? 'selected' : ''}>Study/Work Desks</option>
+              <option value="kitchen" ${catFilter === 'kitchen' ? 'selected' : ''}>Kitchen</option>
+            </select>
+            <select id="admin-catalog-stock-filter" aria-label="Filter products by stock status" class="admin-select admin-filter-select">
+              <option value="all" ${stockFilter === 'all' ? 'selected' : ''}>All Stock Statuses</option>
+              <option value="in_stock" ${stockFilter === 'in_stock' ? 'selected' : ''}>In Stock</option>
+              <option value="low_stock" ${stockFilter === 'low_stock' ? 'selected' : ''}>Low Stock</option>
+              <option value="out_of_stock" ${stockFilter === 'out_of_stock' ? 'selected' : ''}>Out of Stock</option>
+            </select>
+            <select id="admin-catalog-type" aria-label="Filter products by type" class="admin-select admin-filter-select">
+              <option value="all" ${typeFilter === 'all' ? 'selected' : ''}>All Types</option>
+              <option value="standard" ${typeFilter === 'standard' ? 'selected' : ''}>Standard Catalog</option>
+              <option value="customized" ${typeFilter === 'customized' ? 'selected' : ''}>Custom (Messenger)</option>
+            </select>
+            <button
+              type="button"
+              id="admin-reset-product-filters"
+              class="admin-btn admin-btn-sm admin-btn-secondary ${hasActiveProdFilters ? '' : 'opacity-60'}"
+            >
+              Reset Filters
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              id="admin-toggle-add-product-btn"
+              class="admin-btn admin-btn-sm ${isFormOpen ? 'admin-btn-secondary' : 'admin-btn-primary'}"
+            >
+              ${isFormOpen ? 'Close Form' : '+ Add Product'}
+            </button>
+          </div>
+        </div>
 
         ${
           filteredProducts.length === 0
             ? `
-    <div class="admin-empty-state space-y-3">
-    <p class="text-base font-bold text-slate-900">No matching products found</p>
-    <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search or selecting a different product category.</p>
-    <div>
-    <button type="button" id="admin-reset-product-filters-empty" class="admin-btn admin-btn-sm admin-btn-secondary">
+          <div class="admin-empty-state space-y-3">
+            <p class="text-base font-bold text-slate-900">No matching products found</p>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search query or resetting the category and status filters.</p>
+            <div>
+              <button type="button" id="admin-reset-product-filters-empty" class="admin-btn admin-btn-sm admin-btn-secondary">
                 Reset Filters
-    </button>
-    </div>
-    </div>
+              </button>
+            </div>
+          </div>
         `
             : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th class="admin-col-primary">Product</th>
-    <th>Category</th>
-    <th>Price</th>
-    <th>Stock</th>
-    <th class="text-right">Actions</th>
-    </tr>
-    </thead>
-    <tbody>
-                ${filteredProducts
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th class="admin-col-primary">Product Name</th>
+                  <th>Category</th>
+                  <th>Available Stock</th>
+                  <th>Minimum Stock</th>
+                  <th>Unit Price</th>
+                  <th>Stock Status</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${prodPagination.items
                   .map((p) => {
-                    const variants = p.colorVariants || [];
                     const imgUrl = (p.image || 'assets/images/category_dining_tables.jpg').replace(/^\//, '');
                     const isCustomized =
                       p.productType === 'customized' || Boolean(p.isCustomClientDesign);
                     const stockInfo = getProductStockStatus(p);
-                    const stockPillClass =
-                      stockInfo.statusKey === 'out_of_stock'
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : stockInfo.statusKey === 'low_stock'
-                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    const menuId = `prod-menu-${p.id}`;
+                    const isMenuOpen = state.adminOpenActionMenuId === menuId;
                     return `
-    <tr data-product-row="${esc(p.id)}">
-    <td class="admin-col-primary">
-    <div class="flex items-center gap-3.5">
-    <img src="${esc(imgUrl)}" alt="${esc(p.name)}" class="admin-thumb" />
-    <div class="min-w-0">
-    <div class="flex items-center gap-2">
-    <p class="admin-table-title">${esc(p.name)}</p>
+                      <tr data-product-row="${esc(p.id)}">
+                        <td class="admin-col-primary">
+                          <div class="flex items-center gap-3">
+                            <img src="${esc(imgUrl)}" alt="${esc(p.name)}" class="admin-thumb" />
+                            <div class="min-w-0">
+                              <div class="flex items-center gap-2">
+                                <p class="admin-table-title truncate">${esc(p.name)}</p>
+                                ${
+                                  isCustomized
+                                    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-[#0284C7] border border-sky-200 shrink-0">Custom</span>`
+                                    : ''
+                                }
+                              </div>
+                              <p class="admin-table-sub font-mono-tech">${esc(p.sku)} · ${esc(p.dimensions || 'Standard')}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="whitespace-nowrap">
+                          <span class="admin-category-tag">${esc(p.categoryName)}</span>
+                        </td>
+                        <td class="font-mono-tech font-semibold text-slate-900 whitespace-nowrap">
+                          ${stockInfo.availableStock} pcs
+                        </td>
+                        <td class="font-mono-tech text-slate-600 whitespace-nowrap">
+                          ${stockInfo.minStockLevel} pcs
+                        </td>
+                        <td class="whitespace-nowrap">
+                          <div class="flex items-center gap-1.5">
+                            <span class="font-mono-tech font-semibold text-slate-900">${usd(p.effectivePrice)}</span>
                             ${
-                              isCustomized
-                                ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-[#0284C7] border border-sky-200 shrink-0">Custom</span>`
+                              p.discountPercent > 0
+                                ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-[#0284C7] border border-sky-200">-${p.discountPercent}%</span>`
                                 : ''
                             }
-    </div>
-    <div class="flex items-center gap-2 mt-0.5">
-    <span class="admin-table-sub font-mono-tech">${esc(p.sku)} · ${esc(p.dimensions || 'Standard')}</span>
-    <span class="inline-flex items-center gap-1 shrink-0">
-                              ${variants
-                                .slice(0, 3)
-                                .map(
-                                  (v) =>
-                                    `<span title="${esc(v.name)}" class="admin-swatch-dot" style="width:9px;height:9px;background-color:${esc(v.hex || '#5C3A21')}"></span>`
-                                )
-                                .join('')}
-    </span>
-    </div>
-    </div>
-    </div>
-    </td>
-    <td class="text-xs font-medium text-slate-600 whitespace-nowrap">
-                      ${esc(p.categoryName)}
-    </td>
-    <td class="whitespace-nowrap">
-    <div class="flex items-center gap-1.5">
-    <span class="font-mono-tech text-sm font-bold text-slate-900">${usd(p.effectivePrice)}</span>
-                        ${
-                          p.discountPercent > 0
-                            ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">-${p.discountPercent}%</span>`
-                            : ''
-                        }
-    </div>
-                      ${
-                        p.discountPercent > 0
-                          ? `<p class="text-[11px] line-through text-slate-400 font-mono-tech">${usd(p.price)}</p>`
-                          : ''
-                      }
-    </td>
-    <td class="whitespace-nowrap">
-    <div class="flex items-center gap-1.5">
-    <input type="number" min="0" step="1" aria-label="Stock for ${esc(p.name)}" data-prod-inline-stock="${esc(p.id)}" value="${stockInfo.availableStock}" class="admin-input font-mono-tech text-xs font-bold" style="width: 64px; padding: 0.25rem 0.45rem;" />
-    <button type="button" data-prod-inline-save="${esc(p.id)}" title="Save stock quantity" class="admin-btn admin-btn-sm admin-btn-secondary" style="padding: 0.25rem 0.5rem;">
-                          Save
-    </button>
-    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${stockPillClass}">
-                          ${esc(stockInfo.statusLabel)}
-    </span>
-    </div>
-    </td>
-    <td class="text-right whitespace-nowrap">
-    <div class="inline-flex items-center justify-end gap-1.5">
-    <button type="button" data-edit-product="${esc(p.id)}" aria-label="Edit ${esc(p.name)}" class="admin-btn admin-btn-sm admin-btn-secondary">
-                          Edit
-    </button>
-    <button type="button" data-delete-product="${esc(p.id)}" aria-label="Remove ${esc(p.name)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
-                          Remove
-    </button>
-    </div>
-    </td>
-    </tr>`;
+                          </div>
+                        </td>
+                        <td class="whitespace-nowrap">
+                          ${renderStockStatusBadge(stockInfo.statusKey)}
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                          <div class="admin-action-menu">
+                            <button
+                              type="button"
+                              class="admin-action-trigger"
+                              data-action-menu-trigger="${esc(menuId)}"
+                              aria-label="Actions for ${esc(p.name)}"
+                              aria-haspopup="menu"
+                              aria-expanded="${isMenuOpen ? 'true' : 'false'}"
+                            >
+                              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="5" r="2" />
+                                <circle cx="12" cy="12" r="2" />
+                                <circle cx="12" cy="19" r="2" />
+                              </svg>
+                            </button>
+                            <div
+                              class="admin-action-dropdown ${isMenuOpen ? '' : 'hidden'}"
+                              role="menu"
+                              aria-label="Product actions for ${esc(p.name)}"
+                            >
+                              <button type="button" role="menuitem" class="admin-action-item" data-edit-product="${esc(p.id)}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                <span>Edit Product</span>
+                              </button>
+                              <div class="admin-action-divider"></div>
+                              <button type="button" role="menuitem" class="admin-action-item is-danger" data-delete-product="${esc(p.id)}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                <span>Remove Product</span>
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
                   })
                   .join('')}
-    </tbody>
-    </table>
-    </div>
+              </tbody>
+            </table>
+          </div>
+          <div class="admin-pagination">
+            <p class="admin-pagination-info">
+              Showing <strong>${prodPagination.startIndex}–${prodPagination.endIndex}</strong> of <strong>${prodPagination.totalItems}</strong> products
+            </p>
+            <div class="admin-pagination-controls">
+              <button
+                type="button"
+                data-prod-page="${prodPagination.currentPage - 1}"
+                class="admin-page-btn"
+                ${prodPagination.hasPrev ? '' : 'disabled'}
+              >
+                Previous
+              </button>
+              ${Array.from({ length: prodPagination.totalPages }, (_, idx) => idx + 1)
+                .map(
+                  (pageNum) => `
+                  <button
+                    type="button"
+                    data-prod-page="${pageNum}"
+                    class="admin-page-btn ${pageNum === prodPagination.currentPage ? 'is-active' : ''}"
+                  >
+                    ${pageNum}
+                  </button>
+                `
+                )
+                .join('')}
+              <button
+                type="button"
+                data-prod-page="${prodPagination.currentPage + 1}"
+                class="admin-page-btn"
+                ${prodPagination.hasNext ? '' : 'disabled'}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         `
         }
-    </div>
+      </div>
     `;
 
-    bindLiveSearchInput('admin-catalog-search', 'adminProductSearch', renderDashboardContent);
+    bindLiveSearchInput('admin-catalog-search', 'adminProductSearch', () => {
+      state.adminProductPage = 1;
+      renderDashboardContent();
+    });
 
     const catSelect = document.getElementById('admin-catalog-category');
     if (catSelect) {
       catSelect.addEventListener('change', (e) => {
         state.adminProductCategory = e.target.value;
+        state.adminProductPage = 1;
+        renderDashboardContent();
+      });
+    }
+
+    const stockSelect = document.getElementById('admin-catalog-stock-filter');
+    if (stockSelect) {
+      stockSelect.addEventListener('change', (e) => {
+        state.adminProductStockFilter = e.target.value;
+        state.adminProductPage = 1;
         renderDashboardContent();
       });
     }
@@ -4117,6 +4253,7 @@ function renderDashboardContent() {
     if (typeSelect) {
       typeSelect.addEventListener('change', (e) => {
         state.adminProductTypeFilter = e.target.value;
+        state.adminProductPage = 1;
         renderDashboardContent();
       });
     }
@@ -4127,10 +4264,22 @@ function renderDashboardContent() {
         resetBtn.addEventListener('click', () => {
           state.adminProductSearch = '';
           state.adminProductCategory = 'all';
+          state.adminProductStockFilter = 'all';
           state.adminProductTypeFilter = 'all';
+          state.adminProductPage = 1;
           renderDashboardContent();
         });
       }
+    });
+
+    adminCatalogEl.querySelectorAll('[data-prod-page]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextP = Number(btn.getAttribute('data-prod-page'));
+        if (Number.isFinite(nextP) && nextP >= 1) {
+          state.adminProductPage = nextP;
+          renderDashboardContent();
+        }
+      });
     });
 
     const toggleAddProdBtn = document.getElementById('admin-toggle-add-product-btn');
@@ -4148,29 +4297,18 @@ function renderDashboardContent() {
       });
     }
 
-    adminCatalogEl.querySelectorAll('[data-prod-inline-save]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const pid = btn.getAttribute('data-prod-inline-save') || '';
-        const prod = state.catalog.find((item) => item.id === pid);
-        if (!prod) return;
-        const inputEl = adminCatalogEl.querySelector(`[data-prod-inline-stock="${pid}"]`);
-        const nextStock = Math.max(0, Math.floor(Number(inputEl ? inputEl.value : prod.stockQuantity ?? 0)));
-        if (!Number.isFinite(nextStock)) return;
-
-        const updatedProduct = {
-          ...prod,
-          stockQuantity: nextStock,
-          inStockCount: nextStock,
-        };
-        state.catalog = state.catalog.map((item) => (item.id === pid ? updatedProduct : item));
-        persistProductToStorage(updatedProduct);
-        showAdminBanner(`Updated "${prod.name}" stock to ${nextStock} units.`);
+    adminCatalogEl.querySelectorAll('[data-action-menu-trigger]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menuId = btn.getAttribute('data-action-menu-trigger') || '';
+        state.adminOpenActionMenuId = state.adminOpenActionMenuId === menuId ? '' : menuId;
         renderDashboardContent();
       });
     });
 
     adminCatalogEl.querySelectorAll('[data-edit-product]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        state.adminOpenActionMenuId = '';
         const pid = btn.getAttribute('data-edit-product');
         const prod = state.catalog.find((item) => item.id === pid);
         if (prod && typeof window.__openProductFormForEdit === 'function') {
@@ -4182,6 +4320,7 @@ function renderDashboardContent() {
 
     adminCatalogEl.querySelectorAll('[data-delete-product]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        state.adminOpenActionMenuId = '';
         const pid = btn.getAttribute('data-delete-product');
         if (pid && typeof window.__removeProductById === 'function') {
           window.__removeProductById(pid);
@@ -4190,12 +4329,40 @@ function renderDashboardContent() {
     });
   }
 
-  // 6B. Admin Workshop Materials & Stock Page (#admin-tab-inventory) — Non-Techy, Plain-English UI
+  // 6B. Admin Inventory & Stock Management (#admin-tab-inventory)
   const adminInventoryEl = document.getElementById('admin-tab-inventory');
   if (adminInventoryEl) {
     const metrics = computeMaterialInventoryMetrics(state.materials);
+    const categories = getMaterialCategories(state.materials);
+    const categoryOptions = Array.from(
+      new Set([
+        'Hardwood Timber',
+        'Upholstery & Textile',
+        'Architectural Stone',
+        'Hardware & Metal',
+        'Finishing & Cord',
+        ...categories,
+      ])
+    );
+
+    const searchQuery = state.adminInventoryStockSearch || '';
+    const categoryFilter = state.adminInventoryCategoryFilter || 'all';
+    const statusFilter = state.adminInventoryStockFilter || 'all';
+    const hasActiveInvFilters =
+      Boolean(searchQuery.trim()) || categoryFilter !== 'all' || statusFilter !== 'all';
+
+    const filteredMaterials = filterInventoryMaterials(state.materials, {
+      searchQuery,
+      categoryFilter,
+      statusFilter,
+    });
+
+    const pageSize = Number(state.adminInventoryPageSize) || 5;
+    const pagination = paginateItems(filteredMaterials, state.adminInventoryPage || 1, pageSize);
+    state.adminInventoryPage = pagination.currentPage;
+
+    // Modal state
     const activeMovementMode = state.adminMovementMode === 'Stock Out' ? 'Stock Out' : 'Stock In';
-    const activeInvView = state.adminInventoryView === 'history' ? 'history' : 'materials';
     const selectedMaterialId =
       (state.adminMovementMaterialId || state.adminMovementProductId) &&
       state.materials.some((m) => m.id === (state.adminMovementMaterialId || state.adminMovementProductId))
@@ -4206,58 +4373,27 @@ function renderDashboardContent() {
     const editingMaterial = state.adminEditingMaterialId
       ? state.materials.find((m) => m.id === state.adminEditingMaterialId) || null
       : null;
-    const showMaterialForm = Boolean(state.adminMaterialFormOpen || editingMaterial);
-    const showMovementForm = Boolean(state.adminMovementFormOpen);
 
-    const stockSearch = (state.adminInventoryStockSearch || '').trim().toLowerCase();
-    const stockFilter = state.adminInventoryStockFilter || 'all';
-    const needsRestockCount = metrics.lowStockCount + metrics.outOfStockCount;
-    const healthyCount = Math.max(0, metrics.totalMaterials - needsRestockCount);
+    const isMovementModalOpen = Boolean(state.adminMovementFormOpen && selectedMaterial);
+    const isMaterialModalOpen = Boolean(state.adminMaterialFormOpen);
+    const isHistoryModalOpen = Boolean(state.adminHistoryModalOpen);
 
-    const friendlyTypeLabel = (typeStr) => {
-      const t = String(typeStr || '');
-      if (/Timber|Wood/i.test(t)) return 'Wood & Timber';
-      if (/Textile|Upholstery|Fabric|Leather/i.test(t)) return 'Fabric & Leather';
-      if (/Stone|Travertine|Marble/i.test(t)) return 'Natural Stone';
-      if (/Hardware|Metal|Brass/i.test(t)) return 'Hardware & Metal';
-      if (/Weaving|Finish|Cord/i.test(t)) return 'Cord & Finishing';
-      return t || 'Workshop Material';
-    };
-
-    const filteredMaterials = state.materials.filter((m) => {
-      const st = getMaterialStockStatus(m);
-      const matchesSearch =
-        !stockSearch ||
-        m.name.toLowerCase().includes(stockSearch) ||
-        friendlyTypeLabel(m.materialType).toLowerCase().includes(stockSearch) ||
-        (m.materialType || '').toLowerCase().includes(stockSearch) ||
-        (m.unit || '').toLowerCase().includes(stockSearch) ||
-        (m.sku || '').toLowerCase().includes(stockSearch);
-      let matchesStatus = true;
-      if (stockFilter === 'needs_restock') {
-        matchesStatus = st.statusKey === 'low_stock' || st.statusKey === 'out_of_stock';
-      } else if (stockFilter === 'low_stock') {
-        matchesStatus = st.statusKey === 'low_stock';
-      } else if (stockFilter === 'out_of_stock') {
-        matchesStatus = st.statusKey === 'out_of_stock';
-      } else if (stockFilter === 'in_stock') {
-        matchesStatus = st.statusKey === 'in_stock';
-      }
-      return matchesSearch && matchesStatus;
-    });
-
-    const historySearch = (state.adminInventoryHistorySearch || '').trim().toLowerCase();
+    const historyMaterialFilter = state.adminHistoryMaterialId || 'all';
     const historyTypeFilter = state.adminInventoryHistoryTypeFilter || 'all';
+    const historySearch = (state.adminInventoryHistorySearch || '').trim().toLowerCase();
 
     const filteredTransactions = state.inventoryTransactions.filter((tx) => {
-      const matchesType =
-        historyTypeFilter === 'all' || tx.transactionType === historyTypeFilter;
+      const matchesMaterial =
+        historyMaterialFilter === 'all' ||
+        tx.materialId === historyMaterialFilter ||
+        tx.productId === historyMaterialFilter;
+      const matchesType = historyTypeFilter === 'all' || tx.transactionType === historyTypeFilter;
       const matchesSearch =
         !historySearch ||
         (tx.materialName || tx.productName || '').toLowerCase().includes(historySearch) ||
         (tx.reason || '').toLowerCase().includes(historySearch) ||
         (tx.adminName || '').toLowerCase().includes(historySearch);
-      return matchesType && matchesSearch;
+      return matchesMaterial && matchesType && matchesSearch;
     });
 
     const livePreview = describeMaterialStockPreview(
@@ -4267,610 +4403,870 @@ function renderDashboardContent() {
     );
 
     adminInventoryEl.innerHTML = `
+      <div class="space-y-5">
+        <!-- 5 Compact Inventory Summary Cards -->
+        <div class="admin-summary-grid-5" data-testid="inventory-summary-cards">
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Total Materials</span>
+            <span id="inv-kpi-total-materials" class="admin-summary-value">${metrics.totalMaterials}</span>
+            <span class="admin-summary-sub">Tracked workshop supplies</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">In Stock</span>
+            <span id="inv-kpi-in-stock" class="admin-summary-value is-green">${metrics.inStockCount}</span>
+            <span class="admin-summary-sub">Above minimum threshold</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Low Stock</span>
+            <span id="inv-kpi-low-stock" class="admin-summary-value is-orange">${metrics.lowStockCount}</span>
+            <span class="admin-summary-sub">At or below minimum</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Out of Stock</span>
+            <span id="inv-kpi-out-stock" class="admin-summary-value is-red">${metrics.outOfStockCount}</span>
+            <span class="admin-summary-sub">Depleted (0 available)</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Total Inventory Value</span>
+            <span id="inv-kpi-total-value" class="admin-summary-value is-blue font-mono-tech">${usd(metrics.totalInventoryValue)}</span>
+            <span class="admin-summary-sub">Current stock × unit cost</span>
+          </div>
+        </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-    <div class="admin-kpi-card py-3.5 px-4">
-    <p class="admin-kpi-label">Materials Tracked</p>
-    <p id="inv-kpi-total-products" class="text-xl font-bold font-mono-tech text-slate-900 mt-0.5">${metrics.totalMaterials} Materials</p>
-    <p class="text-xs text-slate-500 mt-0.5">Wood, fabric, stone &amp; hardware</p>
-    </div>
-    <div class="admin-kpi-card py-3.5 px-4">
-    <p class="admin-kpi-label">Plenty in Stock</p>
-    <p id="inv-kpi-total-stock" class="text-xl font-bold font-mono-tech text-emerald-700 mt-0.5">${healthyCount} Ready</p>
-    <p class="text-xs text-slate-500 mt-0.5">${metrics.totalStockQuantity} total units on hand</p>
-    </div>
-    <div class="admin-kpi-card py-3.5 px-4">
-    <p class="admin-kpi-label">Running Low</p>
-    <p id="inv-kpi-low-stock" class="text-xl font-bold font-mono-tech ${metrics.lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'} mt-0.5">${metrics.lowStockCount} Low</p>
-    <p class="text-xs text-slate-500 mt-0.5">${metrics.lowStockCount > 0 ? 'Getting close to running out' : 'Nothing is running low'}</p>
-    </div>
-    <div class="admin-kpi-card py-3.5 px-4">
-    <p class="admin-kpi-label">Out of Stock</p>
-    <p id="inv-kpi-out-of-stock" class="text-xl font-bold font-mono-tech ${metrics.outOfStockCount > 0 ? 'text-rose-700' : 'text-slate-900'} mt-0.5">${metrics.outOfStockCount} Empty</p>
-    <p class="text-xs text-slate-500 mt-0.5">${metrics.outOfStockCount > 0 ? 'Needs restocking right away' : 'Zero empty materials'}</p>
-    </div>
-    </div>
+        <!-- Main Inventory Card: Search, Filters, Table, and Pagination -->
+        <div class="admin-card">
+          <div class="admin-toolbar">
+            <div class="admin-toolbar-filters">
+              <input
+                id="admin-inv-stock-search"
+                type="search"
+                value="${esc(state.adminInventoryStockSearch)}"
+                placeholder="Search material name, SKU, or category..."
+                aria-label="Search materials"
+                class="admin-input admin-search-input"
+              />
+              <select
+                id="admin-inv-category-filter"
+                aria-label="Filter materials by category"
+                class="admin-select admin-filter-select"
+              >
+                <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Categories</option>
+                ${categories
+                  .map(
+                    (cat) =>
+                      `<option value="${esc(cat)}" ${categoryFilter === cat ? 'selected' : ''}>${esc(cat)}</option>`
+                  )
+                  .join('')}
+              </select>
+              <select
+                id="admin-inv-stock-filter"
+                aria-label="Filter materials by stock status"
+                class="admin-select admin-filter-select"
+              >
+                <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All Statuses</option>
+                <option value="in_stock" ${statusFilter === 'in_stock' ? 'selected' : ''}>In Stock</option>
+                <option value="low_stock" ${statusFilter === 'low_stock' ? 'selected' : ''}>Low Stock</option>
+                <option value="out_of_stock" ${statusFilter === 'out_of_stock' ? 'selected' : ''}>Out of Stock</option>
+              </select>
+              <button
+                type="button"
+                id="admin-inv-reset-filters"
+                class="admin-btn admin-btn-sm admin-btn-secondary ${hasActiveInvFilters ? '' : 'opacity-60'}"
+              >
+                Reset Filters
+              </button>
+            </div>
 
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                id="admin-open-history-modal-btn"
+                class="admin-btn admin-btn-sm admin-btn-secondary"
+              >
+                Stock History (${state.inventoryTransactions.length})
+              </button>
+              <button
+                type="button"
+                id="admin-open-add-material-btn"
+                class="admin-btn admin-btn-sm admin-btn-primary"
+              >
+                + Add Material
+              </button>
+            </div>
+          </div>
+
+          ${
+            filteredMaterials.length === 0
+              ? `
+            <div class="admin-empty-state space-y-3">
+              <p class="text-base font-bold text-slate-900">No materials match your filters</p>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search or resetting the category and stock status filters.</p>
+              <div>
+                <button type="button" id="admin-inv-empty-reset-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          `
+              : `
+            <div class="overflow-x-auto">
+              <table class="admin-table" data-testid="inventory-materials-table">
+                <thead>
+                  <tr>
+                    <th class="admin-col-primary">Material Name</th>
+                    <th>Category</th>
+                    <th>Available Stock</th>
+                    <th>Minimum Stock</th>
+                    <th>Unit Cost</th>
+                    <th>Stock Status</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pagination.items
+                    .map((m) => {
+                      const st = getMaterialStockStatus(m);
+                      const menuId = `mat-menu-${m.id}`;
+                      const isMenuOpen = state.adminOpenActionMenuId === menuId;
+                      return `
+                        <tr data-material-row="${esc(m.id)}">
+                          <td class="admin-col-primary">
+                            <p class="admin-table-title">${esc(m.name)}</p>
+                            <p class="admin-table-sub font-mono-tech">${esc(m.sku)}</p>
+                          </td>
+                          <td class="whitespace-nowrap">
+                            <span class="admin-category-tag">${esc(m.materialType)}</span>
+                          </td>
+                          <td class="font-mono-tech font-semibold text-slate-900 whitespace-nowrap">
+                            ${st.availableStock} <span class="text-xs font-normal text-slate-500">${esc(m.unit)}</span>
+                          </td>
+                          <td class="font-mono-tech text-slate-600 whitespace-nowrap">
+                            ${st.minStockLevel} <span class="text-xs font-normal text-slate-400">${esc(m.unit)}</span>
+                          </td>
+                          <td class="font-mono-tech text-slate-800 whitespace-nowrap">
+                            ${usd(m.unitCost)} <span class="text-xs font-normal text-slate-400">/ ${esc(m.unit)}</span>
+                          </td>
+                          <td class="whitespace-nowrap">
+                            ${renderStockStatusBadge(st.statusKey)}
+                          </td>
+                          <td class="text-right whitespace-nowrap">
+                            <div class="admin-action-menu">
+                              <button
+                                type="button"
+                                class="admin-action-trigger"
+                                data-action-menu-trigger="${esc(menuId)}"
+                                aria-label="Actions for ${esc(m.name)}"
+                                aria-haspopup="menu"
+                                aria-expanded="${isMenuOpen ? 'true' : 'false'}"
+                              >
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                  <circle cx="12" cy="5" r="2" />
+                                  <circle cx="12" cy="12" r="2" />
+                                  <circle cx="12" cy="19" r="2" />
+                                </svg>
+                              </button>
+                              <div
+                                class="admin-action-dropdown ${isMenuOpen ? '' : 'hidden'}"
+                                role="menu"
+                                aria-label="Inventory actions for ${esc(m.name)}"
+                              >
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  class="admin-action-item"
+                                  data-inv-action="add-stock"
+                                  data-material-id="${esc(m.id)}"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                  <span>Add Stock</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  class="admin-action-item"
+                                  data-inv-action="use-stock"
+                                  data-material-id="${esc(m.id)}"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
+                                  <span>Use Stock</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  class="admin-action-item"
+                                  data-inv-action="edit-material"
+                                  data-material-id="${esc(m.id)}"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                  <span>Edit Material</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  class="admin-action-item"
+                                  data-inv-action="view-history"
+                                  data-material-id="${esc(m.id)}"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                                  <span>View Stock History</span>
+                                </button>
+                                <div class="admin-action-divider"></div>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  class="admin-action-item is-danger"
+                                  data-inv-action="remove-material"
+                                  data-material-id="${esc(m.id)}"
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                  <span>Remove Material</span>
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Footer -->
+            <div class="admin-pagination" data-testid="inventory-pagination">
+              <p class="admin-pagination-info">
+                Showing <strong>${pagination.startIndex}–${pagination.endIndex}</strong> of <strong>${pagination.totalItems}</strong> materials
+              </p>
+              <div class="admin-pagination-controls">
+                <button
+                  type="button"
+                  data-inv-page="${pagination.currentPage - 1}"
+                  class="admin-page-btn"
+                  ${pagination.hasPrev ? '' : 'disabled'}
+                >
+                  Previous
+                </button>
+                ${Array.from({ length: pagination.totalPages }, (_, idx) => idx + 1)
+                  .map(
+                    (pageNum) => `
+                    <button
+                      type="button"
+                      data-inv-page="${pageNum}"
+                      class="admin-page-btn ${pageNum === pagination.currentPage ? 'is-active' : ''}"
+                    >
+                      ${pageNum}
+                    </button>
+                  `
+                  )
+                  .join('')}
+                <button
+                  type="button"
+                  data-inv-page="${pagination.currentPage + 1}"
+                  class="admin-page-btn"
+                  ${pagination.hasNext ? '' : 'disabled'}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          `
+          }
+        </div>
+      </div>
+
+      <!-- MODAL 1: Add Stock / Use Stock Modal Dialog -->
       ${
-        needsRestockCount > 0
+        isMovementModalOpen
           ? `
-    <div class="p-4 rounded-xl border ${
-          metrics.outOfStockCount > 0
-            ? 'bg-rose-50/80 border-rose-200 text-rose-950'
-            : 'bg-amber-50/80 border-amber-200 text-amber-950'
-        } flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-    <div class="space-y-0.5">
-    <p class="font-bold text-sm">
+        <div
+          id="admin-stock-movement-modal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-movement-modal-title"
+        >
+          <div class="admin-modal-backdrop fixed inset-0" data-close-movement-modal="true"></div>
+          <div class="admin-modal-dialog relative z-10">
+            <div class="admin-modal-header">
+              <div>
+                <p class="admin-eyebrow">${activeMovementMode === 'Stock In' ? 'Restock Inventory' : 'Deduct Inventory'}</p>
+                <h3 id="admin-movement-modal-title" class="text-base font-bold text-slate-900 mt-0.5">
+                  ${activeMovementMode === 'Stock In' ? 'Add Stock' : 'Use Stock'} — ${esc(selectedMaterial?.name || '')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                data-close-movement-modal="true"
+                class="admin-btn admin-btn-sm admin-btn-secondary"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+            <form id="admin-stock-movement-form" class="admin-modal-body space-y-4">
+              <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  data-movement-mode="Stock In"
+                  class="py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                    activeMovementMode === 'Stock In'
+                      ? 'bg-white text-[#0284C7] shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }"
+                >
+                  + Add Stock (Restock)
+                </button>
+                <button
+                  type="button"
+                  data-movement-mode="Stock Out"
+                  class="py-1.5 px-3 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                    activeMovementMode === 'Stock Out'
+                      ? 'bg-white text-[#0284C7] shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }"
+                >
+                  − Use Stock (Deduct)
+                </button>
+              </div>
+
+              <div>
+                <label for="inv-move-product" class="admin-label">Material</label>
+                <select id="inv-move-product" required class="admin-select">
+                  ${state.materials
+                    .map(
+                      (m) =>
+                        `<option value="${esc(m.id)}" ${m.id === selectedMaterialId ? 'selected' : ''}>${esc(m.name)} (${m.stockQuantity} ${esc(m.unit)} available)</option>`
+                    )
+                    .join('')}
+                </select>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label for="inv-move-qty" class="admin-label">
+                    Quantity (${esc(selectedMaterial?.unit || 'units')})
+                  </label>
+                  <input
+                    id="inv-move-qty"
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    required
+                    value="${esc(state.adminMovementQuantity || (activeMovementMode === 'Stock In' ? '10' : '5'))}"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+                <div>
+                  <label for="inv-move-date" class="admin-label">Transaction Date</label>
+                  <input
+                    id="inv-move-date"
+                    type="date"
+                    required
+                    value="${esc(state.adminMovementDate)}"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+              </div>
+
               ${
-                metrics.outOfStockCount > 0
-                  ? `${metrics.outOfStockCount} material is out of stock and ${metrics.lowStockCount} running low`
-                  : `Heads up: ${metrics.lowStockCount} material${metrics.lowStockCount === 1 ? ' is' : 's are'} running low on stock`
+                activeMovementMode === 'Stock In'
+                  ? `
+                <div>
+                  <label for="inv-move-cost" class="admin-label">Total Purchase Cost ($ USD, Optional)</label>
+                  <input
+                    id="inv-move-cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value="${esc(state.adminMovementPurchaseCost)}"
+                    placeholder="e.g. 420.00"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+              `
+                  : `
+                <div>
+                  <label for="inv-move-reason" class="admin-label">Reason for Using Stock</label>
+                  <select id="inv-move-reason" class="admin-select">
+                    <option value="Workshop Production Allocation" ${state.adminMovementReason === 'Workshop Production Allocation' ? 'selected' : ''}>Used for Customer Order / Production</option>
+                    <option value="Custom Bespoke Order" ${state.adminMovementReason === 'Custom Bespoke Order' ? 'selected' : ''}>Used for Custom Bespoke Order</option>
+                    <option value="Damaged / Kiln Defect" ${state.adminMovementReason === 'Damaged / Kiln Defect' ? 'selected' : ''}>Damaged or Defective Material</option>
+                    <option value="Manual Stock Count Adjustment" ${state.adminMovementReason === 'Manual Stock Count Adjustment' ? 'selected' : ''}>Stock Count Correction</option>
+                    <option value="Other" ${state.adminMovementReason === 'Other' ? 'selected' : ''}>Other Reason</option>
+                  </select>
+                </div>
+                <div id="inv-move-custom-reason-wrap" class="${state.adminMovementReason === 'Other' ? '' : 'hidden'}">
+                  <label for="inv-move-custom-reason" class="admin-label">Specify Reason</label>
+                  <input
+                    id="inv-move-custom-reason"
+                    type="text"
+                    value="${esc(state.adminMovementCustomReason)}"
+                    placeholder="Enter brief note..."
+                    class="admin-input"
+                  />
+                </div>
+              `
               }
-    </p>
-    <p class="text-slate-700">
-              ${[
-                ...metrics.outOfStockItems.map((i) => `${i.name} (0 ${i.unit} left)`),
-                ...metrics.lowStockItems.map((i) => `${i.name} (only ${i.stockQuantity} ${i.unit} left — warning set at ${i.minStockLevel ?? 10})`),
-              ]
-                .slice(0, 3)
-                .map((txt) => esc(txt))
-                .join(' · ')}
-    </p>
-    </div>
-    <div class="flex items-center gap-2 shrink-0">
-    <button type="button" id="admin-alert-filter-low-btn" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap">
-              ${stockFilter === 'needs_restock' || stockFilter === 'low_stock' ? 'Show All Materials' : 'View Low Stock Only'}
-    </button>
-    <button type="button" id="admin-alert-restock-first-btn" class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap">
-              + Add Stock Now
-    </button>
-    </div>
-    </div>
+
+              <div id="admin-stock-live-preview" class="p-3 rounded-lg bg-[#F8FAFC] border border-slate-200 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-slate-600">Updated Balance:</span>
+                  <span class="font-mono-tech text-slate-800">
+                    ${livePreview.currentStock} ${esc(livePreview.unit)}
+                  </span>
+                  <span aria-hidden="true">→</span>
+                  <span class="font-mono-tech font-bold ${
+                    livePreview.insufficientStock
+                      ? 'text-rose-700'
+                      : activeMovementMode === 'Stock In'
+                      ? 'text-emerald-700'
+                      : 'text-[#0284C7]'
+                  }">
+                    ${
+                      livePreview.insufficientStock
+                        ? `Insufficient stock (${livePreview.currentStock} ${esc(livePreview.unit)} available)`
+                        : `${livePreview.projectedStock} ${esc(livePreview.unit)}`
+                    }
+                  </span>
+                </div>
+                <span class="text-slate-500 font-mono-tech">
+                  Unit cost: ${usd(selectedMaterial?.unitCost || 0)}/${esc(livePreview.unit)}
+                </span>
+              </div>
+
+              <div id="admin-stock-movement-feedback" class="hidden" role="alert"></div>
+
+              <div class="pt-4 mt-2 border-t border-slate-200 flex items-center justify-end gap-2.5">
+                <button type="button" data-close-movement-modal="true" class="admin-btn admin-btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" class="admin-btn admin-btn-primary">
+                  ${activeMovementMode === 'Stock In' ? 'Confirm Add Stock' : 'Confirm Use Stock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       `
           : ''
       }
 
-    <form id="admin-stock-movement-form" novalidate class="admin-card p-5 sm:p-6 space-y-5 ${showMovementForm ? '' : 'hidden'}">
-    <div class="pb-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-    <div>
-    <h2 class="text-base font-bold text-slate-900">
-              ${activeMovementMode === 'Stock In' ? 'Add New Stock (Supplies Arrived)' : 'Use Stock (Deduct for Workshop)'}
-    </h2>
-    <p class="text-xs text-slate-500 mt-0.5">
-              ${
-                activeMovementMode === 'Stock In'
-                  ? 'Use this when new wood, fabric, stone, or hardware arrives at the workshop.'
-                  : 'Use this when materials are used to build a customer order or removed due to damage.'
-              }
-    </p>
-    </div>
-    <div class="flex items-center gap-2 flex-wrap">
-    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
-    <button type="button" data-movement-mode="Stock In" class="admin-tab-seg ${ activeMovementMode === 'Stock In' ? 'admin-tab-seg-active' : '' }">
-                + Add Stock
-    </button>
-    <button type="button" data-movement-mode="Stock Out" class="admin-tab-seg ${ activeMovementMode === 'Stock Out' ? 'admin-tab-seg-active' : '' }">
-                − Use Stock
-    </button>
-    </div>
-    <button type="button" id="admin-close-movement-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
-              Close
-    </button>
-    </div>
-    </div>
+      <!-- MODAL 2: Add / Edit Material Modal Dialog -->
+      ${
+        isMaterialModalOpen
+          ? `
+        <div
+          id="admin-material-modal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-material-modal-title"
+        >
+          <div class="admin-modal-backdrop fixed inset-0" data-close-material-modal="true"></div>
+          <div class="admin-modal-dialog relative z-10">
+            <div class="admin-modal-header">
+              <div>
+                <p class="admin-eyebrow">${editingMaterial ? 'Update Material' : 'New Workshop Material'}</p>
+                <h3 id="admin-material-modal-title" class="text-base font-bold text-slate-900 mt-0.5">
+                  ${editingMaterial ? `Edit Material — ${esc(editingMaterial.name)}` : 'Add Material to Inventory'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                data-close-material-modal="true"
+                class="admin-btn admin-btn-sm admin-btn-secondary"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+            <form id="admin-material-form" class="admin-modal-body space-y-4">
+              <div>
+                <label for="mat-name" class="admin-label">Material Name</label>
+                <input
+                  id="mat-name"
+                  type="text"
+                  required
+                  value="${esc(editingMaterial ? editingMaterial.name : '')}"
+                  placeholder="e.g. FAS American Black Walnut (8/4 Rough)"
+                  class="admin-input"
+                />
+              </div>
 
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <div class="sm:col-span-2">
-    <label for="inv-move-product" class="admin-label">1. Which material are you updating?</label>
-    <select id="inv-move-product" class="admin-select">
-              ${state.materials
-                .map(
-                  (m) =>
-                    `<option value="${esc(m.id)}" ${m.id === selectedMaterialId ? 'selected' : ''}>${esc(m.name)} — ${m.stockQuantity} ${esc(m.unit)} currently in stock</option>`
-                )
-                .join('')}
-    </select>
-    </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label for="mat-type" class="admin-label">Category</label>
+                  <select id="mat-type" class="admin-select">
+                    ${categoryOptions
+                      .map(
+                        (cat) =>
+                          `<option value="${esc(cat)}" ${editingMaterial?.materialType === cat ? 'selected' : ''}>${esc(cat)}</option>`
+                      )
+                      .join('')}
+                  </select>
+                </div>
+                <div>
+                  <label for="mat-unit" class="admin-label">Measurement Unit</label>
+                  <input
+                    id="mat-unit"
+                    type="text"
+                    required
+                    value="${esc(editingMaterial ? editingMaterial.unit : 'bd ft')}"
+                    placeholder="bd ft, yd, sq ft, pcs"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+              </div>
 
-          ${
-            activeMovementMode === 'Stock In'
-              ? `
-    <div>
-    <label for="inv-move-qty" class="admin-label">2. How much arrived? (${esc(selectedMaterial?.unit || 'units')})</label>
-    <input id="inv-move-qty" type="number" min="1" step="0.5" required value="${esc(state.adminMovementQuantity || '10')}" class="admin-input font-mono-tech text-base font-bold" />
-    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-    <span class="text-[11px] text-slate-500">Quick pick:</span>
-                ${[5, 10, 25, 50]
-                  .map(
-                    (preset) => `
-    <button type="button" data-quick-preset-qty="${preset}" class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer">
-                    +${preset}
-    </button>
-                `
-                  )
-                  .join('')}
-    </div>
-    </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label for="mat-stock" class="admin-label">Available Stock</label>
+                  <input
+                    id="mat-stock"
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    value="${esc(editingMaterial ? String(editingMaterial.stockQuantity) : '25')}"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+                <div>
+                  <label for="mat-min-stock" class="admin-label">Minimum Stock</label>
+                  <input
+                    id="mat-min-stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value="${esc(editingMaterial ? String(editingMaterial.minStockLevel ?? 10) : '10')}"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+                <div>
+                  <label for="mat-cost" class="admin-label">Unit Cost ($ USD)</label>
+                  <input
+                    id="mat-cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value="${esc(editingMaterial ? String(editingMaterial.unitCost) : '18.50')}"
+                    class="admin-input font-mono-tech"
+                  />
+                </div>
+              </div>
 
-    <div class="grid grid-cols-2 gap-2">
-    <div>
-    <label for="inv-move-cost" class="admin-label">3. Total Cost ($) <span class="font-normal text-slate-400">(Optional)</span></label>
-    <input id="inv-move-cost" type="number" min="0" step="0.01" value="${esc(state.adminMovementCost)}" placeholder="Auto" class="admin-input font-mono-tech" />
-    </div>
-    <div>
-    <label for="inv-move-date" class="admin-label">Date</label>
-    <input id="inv-move-date" type="date" required value="${esc(state.adminMovementDate)}" class="admin-input font-mono-tech" />
-    </div>
-    </div>
-          `
-              : `
-    <div>
-    <label for="inv-move-qty" class="admin-label">2. How much was used? (${esc(selectedMaterial?.unit || 'units')})</label>
-    <input id="inv-move-qty" type="number" min="0.5" step="0.5" max="${Math.max(1, Number(selectedMaterial?.stockQuantity ?? 1))}" required value="${esc(state.adminMovementQuantity || '5')}" class="admin-input font-mono-tech text-base font-bold" />
-    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-    <span class="text-[11px] text-slate-500">Quick pick:</span>
-                ${[1, 5, 10, 20]
-                  .map(
-                    (preset) => `
-    <button type="button" data-quick-preset-qty="${preset}" class="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-mono-tech font-semibold text-slate-700 cursor-pointer">
-                    −${preset}
-    </button>
-                `
-                  )
-                  .join('')}
-    </div>
-    </div>
+              <div id="admin-material-form-feedback" class="hidden" role="alert"></div>
 
-    <div>
-    <label for="inv-move-reason" class="admin-label">3. What was it used for?</label>
-    <select id="inv-move-reason" class="admin-select">
-    <option value="Workshop Production Allocation" ${state.adminMovementReason === 'Workshop Production Allocation' ? 'selected' : ''}>Building a Furniture Piece</option>
-    <option value="Custom Order Joinery" ${state.adminMovementReason === 'Custom Order Joinery' ? 'selected' : ''}>Custom Customer Order</option>
-    <option value="Kiln Moisture / Defect Cull" ${state.adminMovementReason === 'Kiln Moisture / Defect Cull' ? 'selected' : ''}>Damaged or Unusable Piece</option>
-    <option value="Adjustment" ${state.adminMovementReason === 'Adjustment' ? 'selected' : ''}>Fixing a Stock Count</option>
-    <option value="Other" ${state.adminMovementReason === 'Other' ? 'selected' : ''}>Other Reason</option>
-    </select>
-    <input id="inv-move-date" type="hidden" value="${esc(state.adminMovementDate)}" />
-    </div>
+              <div class="pt-4 mt-2 border-t border-slate-200 flex items-center justify-end gap-2.5">
+                <button type="button" data-close-material-modal="true" class="admin-btn admin-btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" class="admin-btn admin-btn-primary">
+                  ${editingMaterial ? 'Save Material Changes' : 'Add Material'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `
+          : ''
+      }
 
-    <div class="sm:col-span-2 lg:col-span-4 ${state.adminMovementReason === 'Other' ? '' : 'hidden'}" id="inv-move-custom-reason-wrap">
-    <label for="inv-move-custom-reason" class="admin-label">Add a short note</label>
-    <input id="inv-move-custom-reason" type="text" value="${esc(state.adminMovementCustomReason)}" placeholder="e.g. Used for dining table sample..." class="admin-input" />
-    </div>
-          `
-          }
-    </div>
-
-    <div id="admin-stock-live-preview" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-    <div class="flex items-center gap-2 flex-wrap">
-    <span class="font-semibold text-slate-600">Summary before saving:</span>
-    <span class="font-mono-tech text-slate-800">
-              Currently <strong>${livePreview.currentStock} ${esc(livePreview.unit)}</strong>
-    </span>
-    <span aria-hidden="true">→</span>
-    <span class="font-mono-tech font-bold ${
-              livePreview.insufficientStock
-                ? 'text-rose-700'
-                : activeMovementMode === 'Stock In'
-                ? 'text-emerald-700'
-                : 'text-slate-900'
-            }">
-              ${
-                livePreview.insufficientStock
-                  ? `Not enough in stock (only ${livePreview.currentStock} ${esc(livePreview.unit)} available)`
-                  : `New total will be ${livePreview.projectedStock} ${esc(livePreview.unit)} (${esc(livePreview.projectedFriendlyLabel)})`
-              }
-    </span>
-    </div>
-    <span class="text-slate-500 font-mono-tech">
-            Unit cost: ${usd(selectedMaterial?.unitCost || 0)} per ${esc(livePreview.unit)}
-    </span>
-    </div>
-
-    <p id="admin-stock-movement-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
-
-    <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
-    <button type="submit" id="admin-submit-movement-btn" class="admin-btn admin-btn-primary">
-            ${activeMovementMode === 'Stock In' ? 'Save Added Stock' : 'Save Used Stock'}
-    </button>
-    </div>
-    </form>
-
-    <form id="admin-material-form" novalidate class="admin-card p-5 sm:p-6 space-y-5 ${showMaterialForm ? '' : 'hidden'}">
-    <div class="pb-3 border-b border-slate-200 flex items-center justify-between gap-2">
-    <div>
-    <h2 class="text-base font-bold text-slate-900">
-              ${editingMaterial ? `Edit Material: ${esc(editingMaterial.name)}` : 'Add a New Workshop Material'}
-    </h2>
-    <p class="text-xs text-slate-500 mt-0.5">
-              Fill out the simple details below to track a wood, fabric, stone, or hardware supply in your shop.
-    </p>
-    </div>
-    <button type="button" id="admin-close-material-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary">
-            Cancel
-    </button>
-    </div>
-
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    <div class="sm:col-span-2 lg:col-span-1">
-    <label for="mat-name" class="admin-label">1. Material Name</label>
-    <input id="mat-name" type="text" required value="${esc(editingMaterial?.name || '')}" placeholder="e.g. Solid White Oak Planks" class="admin-input" />
-    <p class="admin-hint">Use a clear name your team recognizes.</p>
-    </div>
-    <div>
-    <label for="mat-type" class="admin-label">2. What kind of material is it?</label>
-    <select id="mat-type" class="admin-select">
-              ${[
-                { value: 'Hardwood Timber', label: 'Wood & Timber (Hardwood)' },
-                { value: 'Upholstery Textile', label: 'Fabric & Leather (Upholstery)' },
-                { value: 'Natural Stone', label: 'Natural Stone (Travertine / Marble)' },
-                { value: 'Metal & Joinery Hardware', label: 'Hardware & Metal (Brass / Steel)' },
-                { value: 'Weaving & Finishing', label: 'Cord, Cane & Wood Finish' },
-              ]
-                .map(
-                  (t) =>
-                    `<option value="${esc(t.value)}" ${editingMaterial?.materialType === t.value ? 'selected' : ''}>${esc(t.label)}</option>`
-                )
-                .join('')}
-    </select>
-    </div>
-    <div>
-    <label for="mat-unit" class="admin-label">3. How is it measured?</label>
-    <input id="mat-unit" type="text" required value="${esc(editingMaterial?.unit || 'bd ft')}" placeholder="e.g. bd ft, slabs, sq m, sets" class="admin-input font-mono-tech" />
-    <div class="flex items-center gap-1 mt-1.5 flex-wrap">
-    <span class="text-[11px] text-slate-400">Pick:</span>
-              ${['bd ft', 'slabs', 'sq m', 'sets', 'rolls']
-                .map(
-                  (u) => `
-    <button type="button" data-quick-unit="${esc(u)}" class="px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-mono-tech text-slate-600 cursor-pointer">
-                  ${esc(u)}
-    </button>
-              `
-                )
-                .join('')}
-    </div>
-    </div>
-    <div>
-    <label for="mat-stock" class="admin-label">4. Current Amount on Hand</label>
-    <input id="mat-stock" type="number" min="0" step="0.01" required value="${esc(editingMaterial?.stockQuantity ?? '100')}" class="admin-input font-mono-tech" />
-    <p class="admin-hint">How much you currently have in the workshop.</p>
-    </div>
-    <div>
-    <label for="mat-min-stock" class="admin-label">5. Low-Stock Warning Number</label>
-    <input id="mat-min-stock" type="number" min="0" step="1" required value="${esc(editingMaterial?.minStockLevel ?? '25')}" class="admin-input font-mono-tech" />
-    <p class="admin-hint">We'll warn you when stock drops to this amount.</p>
-    </div>
-    <div>
-    <label for="mat-cost" class="admin-label">6. Cost per Unit ($ USD)</label>
-    <input id="mat-cost" type="number" min="0" step="0.01" required value="${esc(editingMaterial?.unitCost ?? '28.50')}" class="admin-input font-mono-tech" />
-    <p class="admin-hint">Price for 1 unit of this material.</p>
-    </div>
-    </div>
-
-    <p id="admin-material-form-feedback" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></p>
-
-    <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
-    <button type="submit" class="admin-btn admin-btn-primary">
-            ${editingMaterial ? 'Save Material Changes' : 'Save New Material'}
-    </button>
-    </div>
-    </form>
-
-    <div class="admin-card overflow-hidden">
-    <div class="p-4 border-b border-slate-200 space-y-3">
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-
-    <div class="flex items-center gap-2 flex-wrap">
-    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-100">
-    <button type="button" data-inv-view="materials" class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${ activeInvView === 'materials' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900' }">
-                  Current Stock (${state.materials.length})
-    </button>
-    <button type="button" data-inv-view="history" class="px-3 py-1.5 rounded-md text-xs font-bold transition whitespace-nowrap ${ activeInvView === 'history' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900' }">
-                  Stock History (${state.inventoryTransactions.length})
-    </button>
-    </div>
+      <!-- MODAL 3: View Stock History Modal Dialog -->
+      ${
+        isHistoryModalOpen
+          ? `
+        <div
+          id="admin-stock-history-modal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-history-modal-title"
+        >
+          <div class="admin-modal-backdrop fixed inset-0" data-close-history-modal="true"></div>
+          <div class="admin-modal-dialog admin-modal-dialog-lg relative z-10">
+            <div class="admin-modal-header">
+              <div>
+                <p class="admin-eyebrow">Audit Log</p>
+                <h3 id="admin-history-modal-title" class="text-base font-bold text-slate-900 mt-0.5">
+                  Material Stock Movement History
+                </h3>
+              </div>
+              <button
+                type="button"
+                data-close-history-modal="true"
+                class="admin-btn admin-btn-sm admin-btn-secondary"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
+            </div>
+            <div class="admin-modal-body space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2.5">
+                <div class="flex flex-wrap items-center gap-2 flex-1">
+                  <select id="admin-inv-history-material" aria-label="Filter history by material" class="admin-select admin-filter-select">
+                    <option value="all" ${historyMaterialFilter === 'all' ? 'selected' : ''}>All Materials</option>
+                    ${state.materials
+                      .map(
+                        (m) =>
+                          `<option value="${esc(m.id)}" ${historyMaterialFilter === m.id ? 'selected' : ''}>${esc(m.name)}</option>`
+                      )
+                      .join('')}
+                  </select>
+                  <select id="admin-inv-history-type" aria-label="Filter history by movement type" class="admin-select admin-filter-select">
+                    <option value="all" ${historyTypeFilter === 'all' ? 'selected' : ''}>All Movements</option>
+                    <option value="Stock In" ${historyTypeFilter === 'Stock In' ? 'selected' : ''}>Stock In (Added)</option>
+                    <option value="Stock Out" ${historyTypeFilter === 'Stock Out' ? 'selected' : ''}>Stock Out (Used)</option>
+                  </select>
+                  ${
+                    historyMaterialFilter !== 'all' || historyTypeFilter !== 'all'
+                      ? `<button type="button" id="admin-inv-history-reset" class="admin-btn admin-btn-sm admin-btn-secondary">Reset</button>`
+                      : ''
+                  }
+                </div>
+                <span class="text-xs font-medium text-slate-500">${filteredTransactions.length} records</span>
+              </div>
 
               ${
-                activeInvView === 'materials'
+                filteredTransactions.length === 0
                   ? `
-
-    <div class="inline-flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 flex-wrap">
-    <button type="button" data-inv-status-pill="all" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900' }">
-                    All (${state.materials.length})
-    </button>
-    <button type="button" data-inv-status-pill="needs_restock" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'needs_restock' || stockFilter === 'low_stock' || stockFilter === 'out_of_stock' ? 'bg-amber-600 text-white' : 'text-amber-800 hover:bg-amber-50' }">
-                    Needs Restock (${needsRestockCount})
-    </button>
-    <button type="button" data-inv-status-pill="in_stock" class="px-2.5 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap ${ stockFilter === 'in_stock' ? 'bg-emerald-700 text-white' : 'text-emerald-800 hover:bg-emerald-50' }">
-                    Plenty in Stock (${healthyCount})
-    </button>
-    </div>
+                <div class="admin-empty-state">
+                  <p class="text-sm font-bold text-slate-900">No stock history records found</p>
+                  <p class="text-xs text-slate-500 mt-1">Stock additions and deductions will appear here automatically.</p>
+                </div>
               `
-                  : ''
+                  : `
+                <div class="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Date &amp; Time</th>
+                        <th class="admin-col-primary">Material</th>
+                        <th>Movement</th>
+                        <th>Stock Balance</th>
+                        <th>Notes &amp; Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${filteredTransactions
+                        .map((tx) => {
+                          const isStockIn = tx.transactionType === 'Stock In';
+                          const unitLabel = tx.unit ? ` ${esc(tx.unit)}` : '';
+                          return `
+                            <tr>
+                              <td class="font-mono-tech text-xs text-slate-500 whitespace-nowrap">${esc(tx.dateTime)}</td>
+                              <td class="admin-col-primary">
+                                <p class="admin-table-title">${esc(tx.materialName || tx.productName)}</p>
+                              </td>
+                              <td class="whitespace-nowrap">
+                                <span class="admin-status-badge ${isStockIn ? 'admin-status-in-stock' : 'admin-status-low-stock'}">
+                                  ${isStockIn ? `+${tx.quantity}${unitLabel}` : `−${tx.quantity}${unitLabel}`}
+                                </span>
+                              </td>
+                              <td class="font-mono-tech text-xs text-slate-700 whitespace-nowrap">
+                                ${tx.previousStock}${unitLabel} → <strong>${tx.newStock}${unitLabel}</strong>
+                              </td>
+                              <td class="whitespace-nowrap">
+                                <p class="admin-table-title">${esc(tx.reason || (isStockIn ? 'Workshop Restock' : 'Used in Production'))}</p>
+                                <p class="admin-table-sub">
+                                  ${tx.purchaseCost !== null && tx.purchaseCost !== undefined ? `Cost: ${usd(tx.purchaseCost)} · ` : ''}${esc(tx.adminName || 'Admin')}
+                                </p>
+                              </td>
+                            </tr>
+                          `;
+                        })
+                        .join('')}
+                    </tbody>
+                  </table>
+                </div>
+              `
               }
-    </div>
-
-    <div class="flex items-center gap-2 flex-wrap">
-    <button type="button" id="admin-toggle-movement-form-btn" class="admin-btn admin-btn-sm ${showMovementForm ? 'admin-btn-secondary' : 'admin-btn-primary'} whitespace-nowrap">
-                ${showMovementForm ? 'Hide Stock Form' : '+ Add or Use Stock'}
-    </button>
-    <button type="button" id="admin-toggle-material-form-btn" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap">
-                ${showMaterialForm && !editingMaterial ? 'Close Form' : '+ New Material'}
-    </button>
-    </div>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-            ${
-              activeInvView === 'materials'
-                ? `
-    <div class="flex items-center gap-2 flex-wrap flex-1">
-    <input id="admin-inv-stock-search" type="search" value="${esc(state.adminInventoryStockSearch)}" placeholder="Find a material by name (e.g. Walnut, Linen, Travertine, Brass)..." aria-label="Search workshop materials" class="admin-input" style="max-width: 360px;" />
-    <select id="admin-inv-stock-filter" aria-label="Filter materials by stock status" class="admin-select" style="width: 190px;">
-    <option value="all" ${stockFilter === 'all' ? 'selected' : ''}>Show All Materials (${state.materials.length})</option>
-    <option value="needs_restock" ${stockFilter === 'needs_restock' ? 'selected' : ''}>Needs Restock (${needsRestockCount})</option>
-    <option value="low_stock" ${stockFilter === 'low_stock' ? 'selected' : ''}>Running Low (${metrics.lowStockCount})</option>
-    <option value="out_of_stock" ${stockFilter === 'out_of_stock' ? 'selected' : ''}>Out of Stock (${metrics.outOfStockCount})</option>
-    <option value="in_stock" ${stockFilter === 'in_stock' ? 'selected' : ''}>Plenty in Stock (${healthyCount})</option>
-    </select>
-    </div>
-    <p class="text-xs text-slate-500">
-                Tip: Click <strong>+ Add Stock</strong> when new supplies arrive, or <strong>− Use Stock</strong> when materials are used.
-    </p>
-            `
-                : `
-    <div class="flex items-center gap-2 flex-wrap flex-1">
-    <input id="admin-inv-history-search" type="search" value="${esc(state.adminInventoryHistorySearch)}" placeholder="Search history by material name or reason..." aria-label="Search stock history" class="admin-input" style="max-width: 340px;" />
-    <select id="admin-inv-history-type" aria-label="Filter stock history by type" class="admin-select" style="width: 190px;">
-    <option value="all" ${historyTypeFilter === 'all' ? 'selected' : ''}>All Activity (${state.inventoryTransactions.length})</option>
-    <option value="Stock In" ${historyTypeFilter === 'Stock In' ? 'selected' : ''}>Added Stock Only</option>
-    <option value="Stock Out" ${historyTypeFilter === 'Stock Out' ? 'selected' : ''}>Used Stock Only</option>
-    </select>
-    </div>
-    <p class="text-xs text-slate-500">
-                Showing the most recent stock changes first.
-    </p>
-            `
-            }
-    </div>
-    </div>
-
-        ${
-          activeInvView === 'materials'
-            ? filteredMaterials.length === 0
-              ? `
-    <div class="admin-empty-state space-y-2">
-    <p class="text-sm font-bold text-slate-900">No materials match your search or filter</p>
-    <p class="text-xs text-slate-500">Try clicking "All (${state.materials.length})" above or clearing the search box.</p>
-    </div>
-        `
-              : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th class="admin-col-primary">Material</th>
-    <th>Stock</th>
-    <th>Cost</th>
-    <th class="text-right">Actions</th>
-    </tr>
-    </thead>
-    <tbody>
-                ${filteredMaterials
-                  .map((mat) => {
-                    const preview = describeMaterialStockPreview(mat, 'Stock In', 0);
-                    const isOut = preview.currentStatusKey === 'out_of_stock';
-                    const isLow = preview.currentStatusKey === 'low_stock';
-                    const barColor = isOut
-                      ? 'bg-rose-500'
-                      : isLow
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-600';
-                    const statusColor = isOut
-                      ? 'text-rose-700 font-bold'
-                      : isLow
-                      ? 'text-amber-700 font-bold'
-                      : 'text-emerald-700 font-semibold';
-
-                    return `
-    <tr>
-    <td class="admin-col-primary">
-    <p class="admin-table-title">${esc(mat.name)}</p>
-    <p class="admin-table-sub mt-0.5">
-                        ${esc(friendlyTypeLabel(mat.materialType))} · ${esc(mat.unit)}
-    </p>
-    </td>
-
-    <td style="min-width: 240px;">
-    <div class="flex items-baseline justify-between gap-2">
-    <span class="font-mono-tech text-sm font-bold text-slate-900">
-                          ${preview.currentStock} ${esc(mat.unit)} left
-    </span>
-    <span class="text-xs ${statusColor}">
-                          ${esc(preview.currentFriendlyLabel)}
-    </span>
-    </div>
-    <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden mt-1.5 border border-slate-200/70">
-    <div class="h-full rounded-full ${barColor}" style="width: ${preview.fillPercent}%"></div>
-    </div>
-    <div class="flex items-center gap-1.5 mt-2 whitespace-nowrap">
-    <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50">
-    <button type="button" data-inline-stock-step="-1" data-inline-step-target="${esc(mat.id)}" aria-label="Decrease count for ${esc(mat.name)}" class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-l-lg cursor-pointer">
-                            −
-    </button>
-    <input type="number" min="0" step="0.5" aria-label="Available stock for ${esc(mat.name)}" data-inline-stock-input="${esc(mat.id)}" value="${preview.currentStock}" class="admin-input font-mono-tech text-xs font-bold text-center border-0 bg-white" style="width: 50px; padding: 0.2rem 0.25rem; border-radius: 0;" />
-    <button type="button" data-inline-stock-step="1" data-inline-step-target="${esc(mat.id)}" aria-label="Increase count for ${esc(mat.name)}" class="px-2 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-r-lg cursor-pointer">
-                            +
-    </button>
-    </div>
-    <span class="text-[11px] text-slate-500" title="Warn me when stock drops to this number">Min:</span>
-    <input type="number" min="0" aria-label="Minimum stock level for ${esc(mat.name)}" data-inline-min-stock-input="${esc(mat.id)}" value="${preview.minStockLevel}" class="admin-input font-mono-tech text-xs text-center" style="width: 42px; padding: 0.2rem 0.25rem;" />
-    <button type="button" data-inline-stock-save="${esc(mat.id)}" class="admin-btn admin-btn-sm admin-btn-secondary" style="padding: 0.2rem 0.45rem;">
-                          Save
-    </button>
-    </div>
-    </td>
-
-    <td class="whitespace-nowrap">
-    <p class="font-mono-tech text-xs font-bold text-slate-900">
-                        ${usd(mat.unitCost)} <span class="font-normal text-slate-500">/ ${esc(mat.unit)}</span>
-    </p>
-    <p class="font-mono-tech text-[11px] text-slate-500 mt-0.5">
-                        Value: ${usd(preview.totalValue)}
-    </p>
-    </td>
-
-    <td class="text-right whitespace-nowrap">
-    <div class="inline-flex items-center justify-end gap-1.5">
-    <button type="button" data-quick-stock-in="${esc(mat.id)}" title="Add newly arrived stock for ${esc(mat.name)}" class="admin-btn admin-btn-sm admin-btn-primary whitespace-nowrap" style="padding: 0.28rem 0.55rem;">
-                          + Add
-    </button>
-    <button type="button" data-quick-stock-out="${esc(mat.id)}" title="Deduct stock used in workshop for ${esc(mat.name)}" ${preview.currentStock <= 0 ? 'disabled' : ''} class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap ${ preview.currentStock <= 0 ? 'opacity-50 cursor-not-allowed' : '' }" style="padding: 0.28rem 0.55rem;">
-                          − Use
-    </button>
-    <button type="button" data-edit-material="${esc(mat.id)}" class="admin-btn admin-btn-sm admin-btn-secondary whitespace-nowrap" style="padding: 0.28rem 0.5rem;">
-                          Edit
-    </button>
-    <button type="button" data-delete-material="${esc(mat.id)}" aria-label="Remove ${esc(mat.name)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost whitespace-nowrap" style="padding: 0.28rem 0.5rem;">
-                          Remove
-    </button>
-    </div>
-    </td>
-    </tr>
-                `;
-                  })
-                  .join('')}
-    </tbody>
-    </table>
-    </div>
-        `
-            : filteredTransactions.length === 0
-            ? `
-    <div class="admin-empty-state">
-    <p class="text-sm font-bold text-slate-900">No stock activity matches your search</p>
-    <p class="text-xs text-slate-500 mt-1">Click "+ Add or Use Stock" above whenever supplies arrive or are used in the shop.</p>
-    </div>
-        `
-            : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th>Date</th>
-    <th class="admin-col-primary">Material</th>
-    <th>Change</th>
-    <th>Balance</th>
-    <th>Reason</th>
-    </tr>
-    </thead>
-    <tbody>
-                ${filteredTransactions
-                  .map((tx) => {
-                    const isStockIn = tx.transactionType === 'Stock In';
-                    const unitLabel = tx.unit ? ` ${esc(tx.unit)}` : '';
-                    return `
-    <tr>
-    <td class="font-mono-tech text-xs text-slate-500 whitespace-nowrap">${esc(tx.dateTime)}</td>
-    <td class="admin-col-primary">
-    <p class="admin-table-title">${esc(tx.materialName || tx.productName)}</p>
-    </td>
-    <td class="whitespace-nowrap">
-    <span class="font-mono-tech text-xs font-bold ${isStockIn ? 'text-emerald-700' : 'text-rose-700'}">
-                        ${isStockIn ? `+${tx.quantity}${unitLabel}` : `−${tx.quantity}${unitLabel}`}
-    </span>
-    </td>
-    <td class="font-mono-tech text-xs text-slate-700 whitespace-nowrap">
-                      ${tx.previousStock}${unitLabel} → <strong>${tx.newStock}${unitLabel}</strong>
-    </td>
-    <td class="whitespace-nowrap">
-    <p class="admin-table-title">${esc(tx.reason || (isStockIn ? 'New Workshop Restock' : 'Used in Workshop'))}</p>
-    <p class="admin-table-sub">
-                        ${tx.purchaseCost !== null && tx.purchaseCost !== undefined ? `Cost: ${usd(tx.purchaseCost)} · ` : ''}By ${esc(tx.adminName || 'Admin')}
-    </p>
-    </td>
-    </tr>
-                `;
-                  })
-                  .join('')}
-    </tbody>
-    </table>
-    </div>
-        `
-        }
-    </div>
+            </div>
+            <div class="admin-modal-footer">
+              <button type="button" data-close-history-modal="true" class="admin-btn admin-btn-secondary">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `
+          : ''
+      }
     `;
 
-    // Sub-view switcher (Current Stock vs Stock History)
-    adminInventoryEl.querySelectorAll('[data-inv-view]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.adminInventoryView = btn.getAttribute('data-inv-view') === 'history' ? 'history' : 'materials';
-        renderDashboardContent();
-      });
+    // Search & Filters bindings
+    bindLiveSearchInput('admin-inv-stock-search', 'adminInventoryStockSearch', () => {
+      state.adminInventoryPage = 1;
+      renderDashboardContent();
     });
 
-    // 1-Click Plain-English Status Filter Buttons
-    adminInventoryEl.querySelectorAll('[data-inv-status-pill]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.adminInventoryView = 'materials';
-        state.adminInventoryStockFilter = btn.getAttribute('data-inv-status-pill') || 'all';
-        renderDashboardContent();
-      });
-    });
-
-    const alertLowBtn = document.getElementById('admin-alert-filter-low-btn');
-    if (alertLowBtn) {
-      alertLowBtn.addEventListener('click', () => {
-        state.adminInventoryView = 'materials';
-        state.adminInventoryStockFilter =
-          state.adminInventoryStockFilter === 'needs_restock' || state.adminInventoryStockFilter === 'low_stock'
-            ? 'all'
-            : 'needs_restock';
+    const invCategoryEl = document.getElementById('admin-inv-category-filter');
+    if (invCategoryEl) {
+      invCategoryEl.addEventListener('change', (e) => {
+        state.adminInventoryCategoryFilter = e.target.value;
+        state.adminInventoryPage = 1;
         renderDashboardContent();
       });
     }
 
-    const alertRestockFirstBtn = document.getElementById('admin-alert-restock-first-btn');
-    if (alertRestockFirstBtn) {
-      alertRestockFirstBtn.addEventListener('click', () => {
-        const firstLow = metrics.outOfStockItems[0] || metrics.lowStockItems[0] || state.materials[0];
-        if (firstLow) {
-          state.adminMovementMaterialId = firstLow.id;
-          state.adminMovementProductId = firstLow.id;
+    const invStockFilterEl = document.getElementById('admin-inv-stock-filter');
+    if (invStockFilterEl) {
+      invStockFilterEl.addEventListener('change', (e) => {
+        state.adminInventoryStockFilter = e.target.value;
+        state.adminInventoryPage = 1;
+        renderDashboardContent();
+      });
+    }
+
+    ['admin-inv-reset-filters', 'admin-inv-empty-reset-btn'].forEach((btnId) => {
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          state.adminInventoryStockSearch = '';
+          state.adminInventoryCategoryFilter = 'all';
+          state.adminInventoryStockFilter = 'all';
+          state.adminInventoryPage = 1;
+          renderDashboardContent();
+        });
+      }
+    });
+
+    // Pagination buttons
+    adminInventoryEl.querySelectorAll('[data-inv-page]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextP = Number(btn.getAttribute('data-inv-page'));
+        if (Number.isFinite(nextP) && nextP >= 1) {
+          state.adminInventoryPage = nextP;
+          renderDashboardContent();
         }
-        state.adminMovementMode = 'Stock In';
-        state.adminMovementFormOpen = true;
-        renderDashboardContent();
-        document.getElementById('admin-stock-movement-form')?.scrollIntoView({ behavior: 'smooth' });
       });
-    }
+    });
 
-    // Toggle Stock Movement Form Drawer
-    const toggleMoveFormBtn = document.getElementById('admin-toggle-movement-form-btn');
-    if (toggleMoveFormBtn) {
-      toggleMoveFormBtn.addEventListener('click', () => {
-        state.adminMovementFormOpen = !state.adminMovementFormOpen;
+    // Top toolbar buttons
+    const openAddMatBtn = document.getElementById('admin-open-add-material-btn');
+    if (openAddMatBtn) {
+      openAddMatBtn.addEventListener('click', () => {
+        state.adminOpenActionMenuId = '';
+        state.adminEditingMaterialId = '';
+        state.adminMaterialFormOpen = true;
         renderDashboardContent();
       });
     }
 
-    const closeMoveFormBtn = document.getElementById('admin-close-movement-form-btn');
-    if (closeMoveFormBtn) {
-      closeMoveFormBtn.addEventListener('click', () => {
+    const openHistoryBtn = document.getElementById('admin-open-history-modal-btn');
+    if (openHistoryBtn) {
+      openHistoryBtn.addEventListener('click', () => {
+        state.adminOpenActionMenuId = '';
+        state.adminHistoryMaterialId = 'all';
+        state.adminHistoryModalOpen = true;
+        renderDashboardContent();
+      });
+    }
+
+    // Three-dot action menu trigger
+    adminInventoryEl.querySelectorAll('[data-action-menu-trigger]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menuId = btn.getAttribute('data-action-menu-trigger') || '';
+        state.adminOpenActionMenuId = state.adminOpenActionMenuId === menuId ? '' : menuId;
+        renderDashboardContent();
+      });
+    });
+
+    // Three-dot action menu items (Add Stock, Use Stock, Edit Material, View Stock History, Remove Material)
+    adminInventoryEl.querySelectorAll('[data-inv-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-inv-action') || '';
+        const mid = btn.getAttribute('data-material-id') || '';
+        const mat = state.materials.find((m) => m.id === mid);
+        state.adminOpenActionMenuId = '';
+
+        if (action === 'add-stock' && mat) {
+          state.adminMovementMode = 'Stock In';
+          state.adminMovementMaterialId = mid;
+          state.adminMovementProductId = mid;
+          state.adminMovementQuantity = '10';
+          state.adminMovementPurchaseCost = '';
+          state.adminMovementFormOpen = true;
+          renderDashboardContent();
+          return;
+        }
+
+        if (action === 'use-stock' && mat) {
+          state.adminMovementMode = 'Stock Out';
+          state.adminMovementMaterialId = mid;
+          state.adminMovementProductId = mid;
+          state.adminMovementQuantity = '5';
+          state.adminMovementFormOpen = true;
+          renderDashboardContent();
+          return;
+        }
+
+        if (action === 'edit-material' && mat) {
+          state.adminEditingMaterialId = mid;
+          state.adminMaterialFormOpen = true;
+          renderDashboardContent();
+          return;
+        }
+
+        if (action === 'view-history') {
+          state.adminHistoryMaterialId = mid || 'all';
+          state.adminHistoryModalOpen = true;
+          renderDashboardContent();
+          return;
+        }
+
+        if (action === 'remove-material' && mat) {
+          renderDashboardContent();
+          openAdminConfirmModal({
+            title: 'Remove Material',
+            message: `Are you sure you want to remove "${mat.name}" (${mat.sku}) from inventory? This action cannot be undone.`,
+            confirmLabel: 'Remove Material',
+            onConfirm: () => {
+              const removal = removeMaterialFromInventory({
+                materials: state.materials,
+                materialId: mid,
+              });
+              if (!removal.ok) {
+                showAdminBanner(removal.errorMessage || 'Could not remove material.', true);
+                return;
+              }
+              state.materials = removal.updatedMaterials;
+              saveMaterialsToStorage();
+              showAdminBanner(`Removed "${mat.name}" from workshop inventory.`);
+              renderDashboardContent();
+            },
+          });
+        }
+      });
+    });
+
+    // Modal 1: Add / Use Stock Modal handlers
+    adminInventoryEl.querySelectorAll('[data-close-movement-modal]').forEach((el) => {
+      el.addEventListener('click', () => {
         state.adminMovementFormOpen = false;
         renderDashboardContent();
       });
-    }
+    });
 
-    // Quick-Tap Preset Quantity Buttons (+5, +10, +25, +50)
-    adminInventoryEl.querySelectorAll('[data-quick-preset-qty]').forEach((btn) => {
+    adminInventoryEl.querySelectorAll('[data-movement-mode]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const presetVal = btn.getAttribute('data-quick-preset-qty') || '10';
-        state.adminMovementQuantity = presetVal;
+        state.adminMovementMode = btn.getAttribute('data-movement-mode') || 'Stock In';
         renderDashboardContent();
       });
     });
 
-    // Live update when typing quantity in the Add/Use Stock form
+    const moveProdSelect = document.getElementById('inv-move-product');
+    if (moveProdSelect) {
+      moveProdSelect.addEventListener('change', (e) => {
+        state.adminMovementMaterialId = e.target.value;
+        state.adminMovementProductId = e.target.value;
+        renderDashboardContent();
+      });
+    }
+
     const moveQtyInput = document.getElementById('inv-move-qty');
     if (moveQtyInput) {
       moveQtyInput.addEventListener('input', (e) => {
@@ -4883,186 +5279,31 @@ function renderDashboardContent() {
             e.target.value
           );
           previewEl.innerHTML = `
-    <div class="flex items-center gap-2 flex-wrap">
-    <span class="font-semibold text-slate-600">Summary before saving:</span>
-    <span class="font-mono-tech text-slate-800">
-                Currently <strong>${updatedPreview.currentStock} ${esc(updatedPreview.unit)}</strong>
-    </span>
-    <span aria-hidden="true">→</span>
-    <span class="font-mono-tech font-bold ${
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-slate-600">Updated Balance:</span>
+              <span class="font-mono-tech text-slate-800">
+                ${updatedPreview.currentStock} ${esc(updatedPreview.unit)}
+              </span>
+              <span aria-hidden="true">→</span>
+              <span class="font-mono-tech font-bold ${
                 updatedPreview.insufficientStock
                   ? 'text-rose-700'
                   : activeMovementMode === 'Stock In'
                   ? 'text-emerald-700'
-                  : 'text-slate-900'
+                  : 'text-[#0284C7]'
               }">
                 ${
                   updatedPreview.insufficientStock
-                    ? `Not enough in stock (only ${updatedPreview.currentStock} ${esc(updatedPreview.unit)} available)`
-                    : `New total will be ${updatedPreview.projectedStock} ${esc(updatedPreview.unit)} (${esc(updatedPreview.projectedFriendlyLabel)})`
+                    ? `Insufficient stock (${updatedPreview.currentStock} ${esc(updatedPreview.unit)} available)`
+                    : `${updatedPreview.projectedStock} ${esc(updatedPreview.unit)}`
                 }
-    </span>
-    </div>
-    <span class="text-slate-500 font-mono-tech">
-              Unit cost: ${usd(selectedMaterial?.unitCost || 0)} per ${esc(updatedPreview.unit)}
-    </span>
+              </span>
+            </div>
+            <span class="text-slate-500 font-mono-tech">
+              Unit cost: ${usd(selectedMaterial?.unitCost || 0)}/${esc(updatedPreview.unit)}
+            </span>
           `;
         }
-      });
-    }
-
-    // Quick-Pick Unit Buttons in Add/Edit Material Form
-    adminInventoryEl.querySelectorAll('[data-quick-unit]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const unitInput = document.getElementById('mat-unit');
-        if (unitInput) {
-          unitInput.value = btn.getAttribute('data-quick-unit') || 'bd ft';
-          unitInput.focus();
-        }
-      });
-    });
-
-    // Inline Stepper (- / +) buttons next to each material's stock input
-    adminInventoryEl.querySelectorAll('[data-inline-stock-step]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-inline-step-target') || '';
-        const delta = Number(btn.getAttribute('data-inline-stock-step') || 0);
-        const stockInput = adminInventoryEl.querySelector(`[data-inline-stock-input="${mid}"]`);
-        if (!stockInput) return;
-        const curr = Number(stockInput.value || 0);
-        stockInput.value = String(Math.max(0, Math.round((curr + delta) * 100) / 100));
-      });
-    });
-
-    // Toggle Add / Edit Raw Material Form Drawer
-    const toggleMatFormBtn = document.getElementById('admin-toggle-material-form-btn');
-    if (toggleMatFormBtn) {
-      toggleMatFormBtn.addEventListener('click', () => {
-        if (state.adminEditingMaterialId) {
-          state.adminEditingMaterialId = '';
-          state.adminMaterialFormOpen = true;
-        } else {
-          state.adminMaterialFormOpen = !state.adminMaterialFormOpen;
-        }
-        renderDashboardContent();
-      });
-    }
-
-    const closeMatFormBtn = document.getElementById('admin-close-material-form-btn');
-    if (closeMatFormBtn) {
-      closeMatFormBtn.addEventListener('click', () => {
-        state.adminEditingMaterialId = '';
-        state.adminMaterialFormOpen = false;
-        renderDashboardContent();
-      });
-    }
-
-    const matForm = document.getElementById('admin-material-form');
-    if (matForm) {
-      matForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = document.getElementById('mat-name')?.value.trim() || '';
-        const materialType = document.getElementById('mat-type')?.value || 'Hardwood Timber';
-        const unit = document.getElementById('mat-unit')?.value.trim() || 'bd ft';
-        const unitCost = Number(document.getElementById('mat-cost')?.value ?? 0);
-        const stockQuantity = Number(document.getElementById('mat-stock')?.value ?? 0);
-        const minStockLevel = Number(document.getElementById('mat-min-stock')?.value ?? 10);
-
-        const validation = validateMaterialInput({
-          name,
-          unit,
-          unitCost,
-          stockQuantity,
-        });
-        const feedbackEl = document.getElementById('admin-material-form-feedback');
-        if (!validation.valid) {
-          if (feedbackEl) {
-            feedbackEl.textContent = validation.errorMessage;
-            feedbackEl.className =
-              'text-xs font-semibold p-2.5 rounded-lg border bg-rose-50 border-rose-200 text-rose-700 block';
-          }
-          return;
-        }
-
-        const existingMat = state.adminEditingMaterialId
-          ? state.materials.find((m) => m.id === state.adminEditingMaterialId) || null
-          : null;
-        const savedMat = buildMaterialRecord(
-          {
-            name,
-            materialType,
-            unit,
-            unitCost,
-            stockQuantity,
-            minStockLevel,
-          },
-          existingMat
-        );
-
-        if (existingMat) {
-          state.materials = state.materials.map((m) => (m.id === existingMat.id ? savedMat : m));
-          showAdminBanner(`Updated "${savedMat.name}" (${savedMat.stockQuantity} ${savedMat.unit} in stock).`);
-        } else {
-          state.materials.unshift(savedMat);
-          showAdminBanner(`Added new material "${savedMat.name}" (${savedMat.stockQuantity} ${savedMat.unit} in stock).`);
-        }
-
-        saveMaterialsToStorage();
-        state.adminEditingMaterialId = '';
-        state.adminMaterialFormOpen = false;
-        renderDashboardContent();
-      });
-    }
-
-    adminInventoryEl.querySelectorAll('[data-edit-material]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-edit-material') || '';
-        state.adminEditingMaterialId = mid;
-        state.adminMaterialFormOpen = true;
-        renderDashboardContent();
-        document.getElementById('admin-material-form')?.scrollIntoView({ behavior: 'smooth' });
-      });
-    });
-
-    adminInventoryEl.querySelectorAll('[data-delete-material]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-delete-material') || '';
-        const mat = state.materials.find((m) => m.id === mid);
-        if (!mat) return;
-        openAdminConfirmModal({
-          title: 'Remove Material',
-          message: `Remove "${mat.name}" from your workshop materials list?`,
-          confirmLabel: 'Remove Material',
-          onConfirm: () => {
-            const removal = removeMaterialFromInventory({
-              materials: state.materials,
-              materialId: mid,
-            });
-            if (!removal.ok) return;
-            state.materials = removal.updatedMaterials;
-            saveMaterialsToStorage();
-            showAdminBanner(`Removed "${mat.name}" from workshop inventory.`);
-            renderDashboardContent();
-          },
-        });
-      });
-    });
-
-    // Mode toggle buttons (Stock In vs Stock Out)
-    adminInventoryEl.querySelectorAll('[data-movement-mode]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.adminMovementMode = btn.getAttribute('data-movement-mode') || 'Stock In';
-        state.adminMovementFormOpen = true;
-        renderDashboardContent();
-      });
-    });
-
-    const moveProdSelect = document.getElementById('inv-move-product');
-    if (moveProdSelect) {
-      moveProdSelect.addEventListener('change', (e) => {
-        state.adminMovementMaterialId = e.target.value;
-        state.adminMovementProductId = e.target.value;
-        renderDashboardContent();
       });
     }
 
@@ -5129,126 +5370,117 @@ function renderDashboardContent() {
         state.adminMovementFormOpen = false;
 
         showAdminBanner(
-          `${result.transaction.transactionType === 'Stock In' ? 'Added stock' : 'Used stock'}: "${result.transaction.materialName}" is now ${result.transaction.newStock} ${result.transaction.unit} (was ${result.transaction.previousStock} ${result.transaction.unit}).`
+          `${result.transaction.transactionType === 'Stock In' ? 'Added stock' : 'Used stock'}: "${result.transaction.materialName}" updated from ${result.transaction.previousStock} ${result.transaction.unit} to ${result.transaction.newStock} ${result.transaction.unit}.`
         );
         renderDashboardContent();
       });
     }
 
-    // Inline Raw Material Stock & Min Alert Level Update buttons
-    adminInventoryEl.querySelectorAll('[data-inline-stock-save]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-inline-stock-save') || '';
-        const mat = state.materials.find((m) => m.id === mid);
-        if (!mat) return;
+    // Modal 2: Add / Edit Material Modal handlers
+    adminInventoryEl.querySelectorAll('[data-close-material-modal]').forEach((el) => {
+      el.addEventListener('click', () => {
+        state.adminEditingMaterialId = '';
+        state.adminMaterialFormOpen = false;
+        renderDashboardContent();
+      });
+    });
 
-        const stockInput = adminInventoryEl.querySelector(`[data-inline-stock-input="${mid}"]`);
-        const minInput = adminInventoryEl.querySelector(`[data-inline-min-stock-input="${mid}"]`);
-        const nextStockRaw = Number(stockInput ? stockInput.value : mat.stockQuantity);
-        const nextMinRaw = Number(minInput ? minInput.value : mat.minStockLevel ?? 10);
+    const matForm = document.getElementById('admin-material-form');
+    if (matForm) {
+      matForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('mat-name')?.value.trim() || '';
+        const materialType = document.getElementById('mat-type')?.value || 'Hardwood Timber';
+        const unit = document.getElementById('mat-unit')?.value.trim() || 'bd ft';
+        const unitCost = Number(document.getElementById('mat-cost')?.value ?? 0);
+        const stockQuantity = Number(document.getElementById('mat-stock')?.value ?? 0);
+        const minStockLevel = Number(document.getElementById('mat-min-stock')?.value ?? 10);
 
-        if (!Number.isFinite(nextStockRaw) || nextStockRaw < 0) {
-          showAdminBanner('Please enter 0 or a positive number for the stock amount.');
+        const validation = validateMaterialInput({
+          name,
+          unit,
+          unitCost,
+          stockQuantity,
+        });
+        const feedbackEl = document.getElementById('admin-material-form-feedback');
+        if (!validation.valid) {
+          if (feedbackEl) {
+            feedbackEl.textContent = validation.errorMessage;
+            feedbackEl.className =
+              'text-xs font-semibold p-2.5 rounded-lg border bg-rose-50 border-rose-200 text-rose-700 block';
+          }
           return;
         }
-        if (!Number.isFinite(nextMinRaw) || nextMinRaw < 0) {
-          showAdminBanner('Please enter 0 or a positive number for the warning level.');
-          return;
+
+        const existingMat = state.adminEditingMaterialId
+          ? state.materials.find((m) => m.id === state.adminEditingMaterialId) || null
+          : null;
+        const savedMat = buildMaterialRecord(
+          {
+            name,
+            materialType,
+            unit,
+            unitCost,
+            stockQuantity,
+            minStockLevel,
+          },
+          existingMat
+        );
+
+        if (existingMat) {
+          state.materials = state.materials.map((m) => (m.id === existingMat.id ? savedMat : m));
+          showAdminBanner(
+            `Updated material "${savedMat.name}" (${savedMat.stockQuantity} ${savedMat.unit} available).`
+          );
+        } else {
+          state.materials.unshift(savedMat);
+          showAdminBanner(
+            `Added new material "${savedMat.name}" (${savedMat.stockQuantity} ${savedMat.unit} available).`
+          );
         }
 
-        const prevStock = Math.max(0, Number(mat.stockQuantity ?? 0));
-        const nextStock = Math.round(nextStockRaw * 100) / 100;
-        const nextMin = Math.floor(nextMinRaw);
-
-        const updatedMat = {
-          ...mat,
-          stockQuantity: nextStock,
-          inStockCount: nextStock,
-          minStockLevel: nextMin,
-        };
-        state.materials = state.materials.map((item) => (item.id === mid ? updatedMat : item));
         saveMaterialsToStorage();
-
-        if (nextStock !== prevStock) {
-          const delta = Math.round(Math.abs(nextStock - prevStock) * 100) / 100;
-          const txType = nextStock > prevStock ? 'Stock In' : 'Stock Out';
-          state.inventoryTransactions.unshift({
-            id: `inv-tx-${Date.now()}-${Math.floor(100 + Math.random() * 899)}`,
-            materialId: mat.id,
-            materialName: mat.name,
-            materialSku: mat.sku,
-            unit: mat.unit,
-            productId: mat.id,
-            productName: mat.name,
-            productSku: mat.sku,
-            transactionType: txType,
-            quantity: delta,
-            previousStock: prevStock,
-            newStock: nextStock,
-            purchaseCost: null,
-            reason: 'Quick Stock Count Update',
-            dateTime: `${new Date().toISOString().slice(0, 10)} ${new Date().toTimeString().slice(0, 5)}`,
-            adminName: state.sessionUser?.name
-              ? `${state.sessionUser.name} (Admin)`
-              : 'Lillia Mercier (Business Owner)',
-          });
-          saveInventoryTransactionsToStorage();
-        }
-
-        showAdminBanner(
-          `Saved! "${mat.name}" now has ${nextStock} ${mat.unit} in stock (low-stock warning at ${nextMin} ${mat.unit}).`
-        );
-        renderDashboardContent();
-      });
-    });
-
-    // Quick + Add Stock / - Use Stock buttons in table open the guided panel pre-selected
-    adminInventoryEl.querySelectorAll('[data-quick-stock-in]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-quick-stock-in') || '';
-        state.adminMovementMode = 'Stock In';
-        state.adminMovementMaterialId = mid;
-        state.adminMovementProductId = mid;
-        state.adminMovementFormOpen = true;
-        renderDashboardContent();
-        document.getElementById('admin-stock-movement-form')?.scrollIntoView({ behavior: 'smooth' });
-      });
-    });
-
-    adminInventoryEl.querySelectorAll('[data-quick-stock-out]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mid = btn.getAttribute('data-quick-stock-out') || '';
-        state.adminMovementMode = 'Stock Out';
-        state.adminMovementMaterialId = mid;
-        state.adminMovementProductId = mid;
-        state.adminMovementFormOpen = true;
-        renderDashboardContent();
-        document.getElementById('admin-stock-movement-form')?.scrollIntoView({ behavior: 'smooth' });
-      });
-    });
-
-    bindLiveSearchInput('admin-inv-stock-search', 'adminInventoryStockSearch', renderDashboardContent);
-
-    const invStockFilterEl = document.getElementById('admin-inv-stock-filter');
-    if (invStockFilterEl) {
-      invStockFilterEl.addEventListener('change', (e) => {
-        state.adminInventoryStockFilter = e.target.value;
+        state.adminEditingMaterialId = '';
+        state.adminMaterialFormOpen = false;
         renderDashboardContent();
       });
     }
 
-    bindLiveSearchInput('admin-inv-history-search', 'adminInventoryHistorySearch', renderDashboardContent);
+    // Modal 3: Stock History Modal handlers
+    adminInventoryEl.querySelectorAll('[data-close-history-modal]').forEach((el) => {
+      el.addEventListener('click', () => {
+        state.adminHistoryModalOpen = false;
+        renderDashboardContent();
+      });
+    });
 
-    const invHistoryTypeEl = document.getElementById('admin-inv-history-type');
-    if (invHistoryTypeEl) {
-      invHistoryTypeEl.addEventListener('change', (e) => {
+    const histMatSelect = document.getElementById('admin-inv-history-material');
+    if (histMatSelect) {
+      histMatSelect.addEventListener('change', (e) => {
+        state.adminHistoryMaterialId = e.target.value;
+        renderDashboardContent();
+      });
+    }
+
+    const histTypeSelect = document.getElementById('admin-inv-history-type');
+    if (histTypeSelect) {
+      histTypeSelect.addEventListener('change', (e) => {
         state.adminInventoryHistoryTypeFilter = e.target.value;
+        renderDashboardContent();
+      });
+    }
+
+    const histResetBtn = document.getElementById('admin-inv-history-reset');
+    if (histResetBtn) {
+      histResetBtn.addEventListener('click', () => {
+        state.adminHistoryMaterialId = 'all';
+        state.adminInventoryHistoryTypeFilter = 'all';
         renderDashboardContent();
       });
     }
   }
 
-  // 7. Populate Voucher Product Dropdown & Issued Vouchers Table
+  // 7. Populate Voucher Product Dropdown & Issued Vouchers Table (#admin-tab-vouchers)
   const vchSelect = document.getElementById('vch-product');
   if (vchSelect) {
     const prevSelectedProduct = vchSelect.value;
@@ -5263,35 +5495,35 @@ function renderDashboardContent() {
   const adminVouchersEl = document.getElementById('admin-vouchers-list');
   if (adminVouchersEl) {
     adminVouchersEl.innerHTML = `
-    <div class="admin-card overflow-hidden">
-    <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-2">
-    <div>
-    <h2 class="text-base font-bold text-slate-900">Active Vouchers (${state.vouchers.length})</h2>
-    <p class="text-xs text-slate-500 mt-0.5">Personal single-product discount codes issued to customers</p>
-    </div>
-    </div>
+      <div class="admin-card overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Issued Vouchers (${state.vouchers.length})</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Personal single-product discount codes issued to customers</p>
+          </div>
+        </div>
         ${
           state.vouchers.length === 0
             ? `
-    <div class="admin-empty-state">
-    <p class="text-sm font-bold text-slate-900">No vouchers created yet</p>
-    <p class="text-xs text-slate-500 mt-1">Use the form above to create a discount code for a customer.</p>
-    </div>
+          <div class="admin-empty-state">
+            <p class="text-sm font-bold text-slate-900">No vouchers created yet</p>
+            <p class="text-xs text-slate-500 mt-1">Use the form above to issue a discount code for a customer.</p>
+          </div>
         `
             : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th>Code</th>
-    <th>Customer</th>
-    <th class="admin-col-primary">Product</th>
-    <th>Discount</th>
-    <th>Status</th>
-    <th class="text-right">Actions</th>
-    </tr>
-    </thead>
-    <tbody>
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Voucher Code</th>
+                  <th>Customer</th>
+                  <th class="admin-col-primary">Eligible Product</th>
+                  <th>Discount</th>
+                  <th>Status</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 ${state.vouchers
                   .map((v) => {
                     const isPct = v.discountType === 'percentage' || Number(v.discountPercent || 0) > 0;
@@ -5299,33 +5531,35 @@ function renderDashboardContent() {
                       ? `${Number(v.discountPercent ?? v.discountValue ?? 0)}% OFF (-${usd(v.discountAmount)})`
                       : `-${usd(v.discountAmount)}`;
                     return `
-    <tr>
-    <td class="font-mono-tech text-xs font-bold text-slate-900 whitespace-nowrap">${esc(v.code)}</td>
-    <td class="text-xs text-slate-600 whitespace-nowrap">${esc(v.customerEmail)}</td>
-    <td class="admin-col-primary">
-    <p class="admin-table-title">${esc(v.furnitureName || v.productName)}</p>
-    <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || '')}</p>
-    </td>
-    <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">${esc(discountText)}</td>
-    <td class="whitespace-nowrap">
-    <span class="admin-status-dot ${v.status === 'Active' ? 'text-emerald-700' : 'text-slate-500'}">${esc(v.status)}</span>
-    <span class="text-xs text-slate-400 ml-1">· Exp ${esc(v.expiryDate || '2026-12-31')}</span>
-    </td>
-    <td class="text-right whitespace-nowrap">
-    <button type="button" data-revoke-voucher="${esc(v.id)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
-                        Revoke
-    </button>
-    </td>
-    </tr>
-                `;
+                      <tr>
+                        <td class="font-mono-tech text-xs font-bold text-slate-900 whitespace-nowrap">${esc(v.code)}</td>
+                        <td class="text-xs text-slate-600 whitespace-nowrap">${esc(v.customerEmail)}</td>
+                        <td class="admin-col-primary">
+                          <p class="admin-table-title">${esc(v.furnitureName || v.productName)}</p>
+                          <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || '')}</p>
+                        </td>
+                        <td class="font-mono-tech text-xs font-bold text-[#0284C7] whitespace-nowrap">${esc(discountText)}</td>
+                        <td class="whitespace-nowrap">
+                          <span class="admin-status-badge ${v.status === 'Active' ? 'admin-status-in-stock' : 'bg-slate-100 text-slate-600'}">
+                            <span class="admin-status-badge-dot"></span>${esc(v.status)}
+                          </span>
+                          <span class="text-xs text-slate-400 ml-1">Exp ${esc(v.expiryDate || '2026-12-31')}</span>
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                          <button type="button" data-revoke-voucher="${esc(v.id)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
+                            Revoke
+                          </button>
+                        </td>
+                      </tr>
+                    `;
                   })
                   .join('')}
-    </tbody>
-    </table>
-    </div>
+              </tbody>
+            </table>
+          </div>
         `
         }
-    </div>
+      </div>
     `;
 
     adminVouchersEl.querySelectorAll('[data-revoke-voucher]').forEach((btn) => {
@@ -5362,6 +5596,11 @@ function renderDashboardContent() {
 
     const ordQuery = (state.adminOrderSearch || '').trim().toLowerCase();
     const stageFilter = state.adminOrderStage || 'all';
+    const hasActiveOrdFilters = Boolean(ordQuery) || stageFilter !== 'all';
+
+    const confirmedCount = state.orders.filter((o) => /Confirmed|Inquiry|Timber/i.test(o.status)).length;
+    const inProdCount = state.orders.filter((o) => /Joinery|Finishing|Millwork|Quality/i.test(o.status)).length;
+    const deliveredCount = state.orders.filter((o) => /Dispatched|Delivered/i.test(o.status)).length;
 
     const filteredOrders = state.orders.filter((o) => {
       const matchesQuery =
@@ -5382,107 +5621,158 @@ function renderDashboardContent() {
     });
 
     adminOrdersEl.innerHTML = `
-    <div class="admin-card overflow-hidden">
-    <div class="admin-toolbar">
-    <div class="admin-toolbar-filters">
-    <input id="admin-orders-search" type="search" value="${esc(state.adminOrderSearch)}" placeholder="Search order #, customer, product, or material..." aria-label="Search customer orders" class="admin-input admin-search-input" />
-    <select id="admin-orders-stage-filter" aria-label="Filter orders by production stage" class="admin-select admin-filter-select">
-    <option value="all" ${stageFilter === 'all' ? 'selected' : ''}>All Stages (${state.orders.length})</option>
-    <option value="confirmed" ${stageFilter === 'confirmed' ? 'selected' : ''}>Confirmed &amp; Timber Prep</option>
-    <option value="production" ${stageFilter === 'production' ? 'selected' : ''}>In Production &amp; Finishing</option>
-    <option value="quality" ${stageFilter === 'quality' ? 'selected' : ''}>Quality Check</option>
-    <option value="delivered" ${stageFilter === 'delivered' ? 'selected' : ''}>Dispatched / Delivered</option>
-    </select>
-    </div>
-    <span class="text-xs font-medium text-slate-500">Showing ${filteredOrders.length} of ${state.orders.length} orders · Updates sync live to Customer Dashboard</span>
-    </div>
+      <div class="space-y-5">
+        <div class="admin-summary-grid-4">
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Total Orders</span>
+            <span class="admin-summary-value">${state.orders.length}</span>
+            <span class="admin-summary-sub">All client commissions</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Confirmed &amp; Prep</span>
+            <span class="admin-summary-value is-blue">${confirmedCount}</span>
+            <span class="admin-summary-sub">Timber selection</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">In Production</span>
+            <span class="admin-summary-value is-orange">${inProdCount}</span>
+            <span class="admin-summary-sub">Joinery &amp; finishing</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Dispatched / Delivered</span>
+            <span class="admin-summary-value is-green">${deliveredCount}</span>
+            <span class="admin-summary-sub">Completed fulfillment</span>
+          </div>
+        </div>
 
-        ${
-          filteredOrders.length === 0
-            ? `
-    <div class="admin-empty-state space-y-3">
-    <p class="text-base font-bold text-slate-900">No orders match your filter</p>
-    <p class="text-xs text-slate-500 max-w-sm mx-auto">Try searching for a different customer name or resetting the stage filter.</p>
-    <div>
-    <button type="button" id="admin-reset-order-filters" class="admin-btn admin-btn-sm admin-btn-secondary">
+        <div class="admin-card overflow-hidden">
+          <div class="admin-toolbar">
+            <div class="admin-toolbar-filters">
+              <input
+                id="admin-orders-search"
+                type="search"
+                value="${esc(state.adminOrderSearch)}"
+                placeholder="Search order #, customer, product, or material..."
+                aria-label="Search customer orders"
+                class="admin-input admin-search-input"
+              />
+              <select id="admin-orders-stage-filter" aria-label="Filter orders by production stage" class="admin-select admin-filter-select">
+                <option value="all" ${stageFilter === 'all' ? 'selected' : ''}>All Stages (${state.orders.length})</option>
+                <option value="confirmed" ${stageFilter === 'confirmed' ? 'selected' : ''}>Confirmed &amp; Timber Prep</option>
+                <option value="production" ${stageFilter === 'production' ? 'selected' : ''}>In Production &amp; Finishing</option>
+                <option value="quality" ${stageFilter === 'quality' ? 'selected' : ''}>Quality Check</option>
+                <option value="delivered" ${stageFilter === 'delivered' ? 'selected' : ''}>Dispatched / Delivered</option>
+              </select>
+              <button
+                type="button"
+                id="admin-reset-order-filters"
+                class="admin-btn admin-btn-sm admin-btn-secondary ${hasActiveOrdFilters ? '' : 'opacity-60'}"
+              >
                 Reset Filters
-    </button>
-    </div>
-    </div>
-        `
-            : `
-    <div class="overflow-x-auto">
-    <table class="admin-table">
-    <thead>
-    <tr>
-    <th>Order</th>
-    <th>Customer</th>
-    <th class="admin-col-primary">Product</th>
-    <th>Stage</th>
-    <th class="text-right">Total</th>
-    </tr>
-    </thead>
-    <tbody>
-                ${filteredOrders
-                  .map((o) => {
-                    const realIdx = state.orders.findIndex((item) => item.orderNumber === o.orderNumber);
-                    const totalAmt = Number(o.totalAmount || 0);
-                    const paidAmt = Number(o.depositPaid ?? totalAmt);
-                    const balanceDue = Math.max(0, totalAmt - paidAmt);
-                    return `
-    <tr>
-    <td class="whitespace-nowrap">
-    <div class="flex items-center gap-1.5">
-    <p class="font-mono-tech text-xs font-bold text-[#0284C7]">#${esc(o.orderNumber)}</p>
-                        ${
-                          o.itemType === 'Custom'
-                            ? `<span class="px-1.5 py-0.5 rounded bg-sky-50 text-[#0284C7] border border-sky-200 font-mono-tech text-[10px] font-bold">Custom</span>`
-                            : ''
-                        }
-    </div>
-    <p class="admin-table-sub mt-0.5">${esc(o.orderDate || '2026-10-28')}</p>
-    </td>
-    <td class="whitespace-nowrap">
-    <p class="admin-table-title">${esc(o.clientName)}</p>
-    <p class="admin-table-sub">${esc(o.clientEmail)}</p>
-    </td>
-    <td class="admin-col-primary">
-    <p class="admin-table-title">${esc(o.furnitureName)}</p>
-    <p class="admin-table-sub mt-0.5">
-                        ${esc(o.selectedFinish)} · ${esc(o.materialName || 'FAS Hardwood')}
-    </p>
-    </td>
-    <td class="whitespace-nowrap">
-    <select aria-label="Update status for order ${esc(o.orderNumber)}" data-admin-order-idx="${realIdx}" class="admin-select admin-order-status-select text-xs" style="width: 190px; padding: 0.35rem 0.5rem;">
-                        ${statusOptions
-                          .map(
-                            (st) =>
-                              `<option value="${esc(st)}" ${o.status === st ? 'selected' : ''}>${esc(st)}</option>`
-                          )
-                          .join('')}
-                        ${
-                          !statusOptions.includes(o.status)
-                            ? `<option value="${esc(o.status)}" selected>${esc(o.status)}</option>`
-                            : ''
-                        }
-    </select>
-    </td>
-    <td class="text-right whitespace-nowrap">
-    <p class="font-mono-tech text-sm font-bold text-slate-900">${usd(totalAmt)}</p>
-    <p class="text-[11px] font-semibold ${balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'} mt-0.5">
-                        ${balanceDue > 0 ? `50% Deposit` : 'Paid in Full'}
-    </p>
-    </td>
-    </tr>
-                `;
-                  })
-                  .join('')}
-    </tbody>
-    </table>
-    </div>
-        `
-        }
-    </div>
+              </button>
+            </div>
+            <span class="text-xs font-medium text-slate-500">Showing ${filteredOrders.length} of ${state.orders.length} orders</span>
+          </div>
+
+          ${
+            filteredOrders.length === 0
+              ? `
+            <div class="admin-empty-state space-y-3">
+              <p class="text-base font-bold text-slate-900">No orders match your filter</p>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto">Try searching for a different customer name or resetting the stage filter.</p>
+              <div>
+                <button type="button" id="admin-reset-order-filters-empty" class="admin-btn admin-btn-sm admin-btn-secondary">
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          `
+              : `
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th class="admin-col-primary">Product &amp; Finish</th>
+                    <th>Order Stage</th>
+                    <th>Payment Status</th>
+                    <th class="text-right">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filteredOrders
+                    .map((o) => {
+                      const realIdx = state.orders.findIndex((item) => item.orderNumber === o.orderNumber);
+                      const totalAmt = Number(o.totalAmount || 0);
+                      const paidAmt = Number(o.depositPaid ?? totalAmt);
+                      const balanceDue = Math.max(0, totalAmt - paidAmt);
+                      return `
+                        <tr>
+                          <td class="whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                              <p class="font-mono-tech text-xs font-bold text-[#0284C7]">#${esc(o.orderNumber)}</p>
+                              ${
+                                o.itemType === 'Custom'
+                                  ? `<span class="px-1.5 py-0.5 rounded bg-sky-50 text-[#0284C7] border border-sky-200 font-mono-tech text-[10px] font-bold">Custom</span>`
+                                  : ''
+                              }
+                            </div>
+                            <p class="admin-table-sub mt-0.5">${esc(o.orderDate || '2026-10-28')}</p>
+                          </td>
+                          <td class="whitespace-nowrap">
+                            <p class="admin-table-title">${esc(o.clientName)}</p>
+                            <p class="admin-table-sub">${esc(o.clientEmail)}</p>
+                          </td>
+                          <td class="admin-col-primary">
+                            <p class="admin-table-title">${esc(o.furnitureName)}</p>
+                            <p class="admin-table-sub mt-0.5">
+                              ${esc(o.selectedFinish)} · ${esc(o.materialName || 'FAS Hardwood')}
+                            </p>
+                          </td>
+                          <td class="whitespace-nowrap">
+                            <select
+                              aria-label="Update status for order ${esc(o.orderNumber)}"
+                              data-admin-order-idx="${realIdx}"
+                              class="admin-select admin-order-status-select"
+                            >
+                              ${statusOptions
+                                .map(
+                                  (st) =>
+                                    `<option value="${esc(st)}" ${o.status === st ? 'selected' : ''}>${esc(st)}</option>`
+                                )
+                                .join('')}
+                              ${
+                                !statusOptions.includes(o.status)
+                                  ? `<option value="${esc(o.status)}" selected>${esc(o.status)}</option>`
+                                  : ''
+                              }
+                            </select>
+                          </td>
+                          <td class="whitespace-nowrap">
+                            <span class="admin-status-badge ${balanceDue > 0 ? 'admin-status-low-stock' : 'admin-status-in-stock'}">
+                              <span class="admin-status-badge-dot"></span>${balanceDue > 0 ? '50% Deposit Paid' : 'Paid in Full'}
+                            </span>
+                          </td>
+                          <td class="text-right whitespace-nowrap">
+                            <p class="font-mono-tech text-sm font-bold text-slate-900">${usd(totalAmt)}</p>
+                            ${
+                              balanceDue > 0
+                                ? `<p class="text-[11px] text-slate-500 font-mono-tech">Bal: ${usd(balanceDue)}</p>`
+                                : ''
+                            }
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+          `
+          }
+        </div>
+      </div>
     `;
 
     bindLiveSearchInput('admin-orders-search', 'adminOrderSearch', renderDashboardContent);
@@ -5495,14 +5785,16 @@ function renderDashboardContent() {
       });
     }
 
-    const resetOrdBtn = document.getElementById('admin-reset-order-filters');
-    if (resetOrdBtn) {
-      resetOrdBtn.addEventListener('click', () => {
-        state.adminOrderSearch = '';
-        state.adminOrderStage = 'all';
-        renderDashboardContent();
-      });
-    }
+    ['admin-reset-order-filters', 'admin-reset-order-filters-empty'].forEach((btnId) => {
+      const resetOrdBtn = document.getElementById(btnId);
+      if (resetOrdBtn) {
+        resetOrdBtn.addEventListener('click', () => {
+          state.adminOrderSearch = '';
+          state.adminOrderStage = 'all';
+          renderDashboardContent();
+        });
+      }
+    });
 
     adminOrdersEl.querySelectorAll('[data-admin-order-idx]').forEach((sel) => {
       sel.addEventListener('change', (e) => {
@@ -5522,6 +5814,157 @@ function renderDashboardContent() {
           );
           renderDashboardContent();
         }
+      });
+    });
+  }
+
+  // 9. Admin Customer Management Directory (#admin-tab-customers)
+  const adminCustomersEl = document.getElementById('admin-tab-customers');
+  if (adminCustomersEl) {
+    const custQuery = (state.adminCustomerSearch || '').trim().toLowerCase();
+    const filteredCustomers = customerDirectory.filter((c) => {
+      if (!custQuery) return true;
+      return (
+        c.name.toLowerCase().includes(custQuery) ||
+        c.email.toLowerCase().includes(custQuery) ||
+        (c.phone || '').toLowerCase().includes(custQuery) ||
+        (c.address || '').toLowerCase().includes(custQuery)
+      );
+    });
+
+    const activeBuyersCount = customerDirectory.filter((c) => c.orderCount > 0).length;
+    const totalCustomerSpend = customerDirectory.reduce((sum, c) => sum + Number(c.totalSpent || 0), 0);
+
+    adminCustomersEl.innerHTML = `
+      <div class="space-y-5">
+        <div class="admin-summary-grid-4">
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Registered Customers</span>
+            <span class="admin-summary-value">${customerDirectory.length}</span>
+            <span class="admin-summary-sub">Client accounts</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Active Buyers</span>
+            <span class="admin-summary-value is-green">${activeBuyersCount}</span>
+            <span class="admin-summary-sub">With 1+ orders</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Total Orders Placed</span>
+            <span class="admin-summary-value is-blue">${state.orders.length}</span>
+            <span class="admin-summary-sub">Across all clients</span>
+          </div>
+          <div class="admin-summary-card">
+            <span class="admin-summary-label">Total Customer Spend</span>
+            <span class="admin-summary-value font-mono-tech">${usd(totalCustomerSpend)}</span>
+            <span class="admin-summary-sub">Lifetime order value</span>
+          </div>
+        </div>
+
+        <div class="admin-card overflow-hidden">
+          <div class="admin-toolbar">
+            <div class="admin-toolbar-filters">
+              <input
+                id="admin-customers-search"
+                type="search"
+                value="${esc(state.adminCustomerSearch)}"
+                placeholder="Search customer name, email, phone, or city..."
+                aria-label="Search customers"
+                class="admin-input admin-search-input"
+              />
+              <button
+                type="button"
+                id="admin-reset-customer-filters"
+                class="admin-btn admin-btn-sm admin-btn-secondary ${custQuery ? '' : 'opacity-60'}"
+              >
+                Reset Filters
+              </button>
+            </div>
+            <span class="text-xs font-medium text-slate-500">Showing ${filteredCustomers.length} of ${customerDirectory.length} customers</span>
+          </div>
+
+          ${
+            filteredCustomers.length === 0
+              ? `
+            <div class="admin-empty-state space-y-3">
+              <p class="text-base font-bold text-slate-900">No matching customers found</p>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto">Try clearing your search filter.</p>
+            </div>
+          `
+              : `
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th class="admin-col-primary">Customer Name</th>
+                    <th>Email Address</th>
+                    <th>Phone</th>
+                    <th>Delivery Address</th>
+                    <th>Orders</th>
+                    <th>Total Spent</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filteredCustomers
+                    .map(
+                      (c) => `
+                      <tr>
+                        <td class="admin-col-primary">
+                          <p class="admin-table-title">${esc(c.name)}</p>
+                          <p class="admin-table-sub">Last order: ${esc(c.lastOrderDate)}</p>
+                        </td>
+                        <td class="text-xs text-slate-600 whitespace-nowrap">${esc(c.email)}</td>
+                        <td class="font-mono-tech text-xs text-slate-600 whitespace-nowrap">${esc(c.phone)}</td>
+                        <td class="text-xs text-slate-600">
+                          <p class="admin-table-sub">${esc(c.address)}</p>
+                        </td>
+                        <td class="font-mono-tech font-semibold text-slate-900 whitespace-nowrap">
+                          ${c.orderCount} ${c.orderCount === 1 ? 'order' : 'orders'}
+                        </td>
+                        <td class="font-mono-tech font-semibold text-[#0284C7] whitespace-nowrap">
+                          ${usd(c.totalSpent)}
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            data-view-customer-orders="${esc(c.email)}"
+                            class="admin-btn admin-btn-sm admin-btn-secondary"
+                          >
+                            View Orders
+                          </button>
+                        </td>
+                      </tr>
+                    `
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+          `
+          }
+        </div>
+      </div>
+    `;
+
+    bindLiveSearchInput('admin-customers-search', 'adminCustomerSearch', renderDashboardContent);
+
+    const resetCustBtn = document.getElementById('admin-reset-customer-filters');
+    if (resetCustBtn) {
+      resetCustBtn.addEventListener('click', () => {
+        state.adminCustomerSearch = '';
+        renderDashboardContent();
+      });
+    }
+
+    adminCustomersEl.querySelectorAll('[data-view-customer-orders]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const email = btn.getAttribute('data-view-customer-orders') || '';
+        state.adminOrderSearch = email;
+        state.adminOrderStage = 'all';
+        if (window.__switchAdminTab) {
+          window.__switchAdminTab('orders');
+        }
+        renderDashboardContent();
       });
     });
   }
