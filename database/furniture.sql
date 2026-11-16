@@ -84,8 +84,9 @@ CREATE TABLE `Voucher` (
     `Code`           VARCHAR(50) NOT NULL UNIQUE,
     `DiscountValue`  DECIMAL(10,2) NOT NULL CHECK (`DiscountValue` > 0),
     `ExpiryDate`     DATE DEFAULT NULL,
+    `ExpiresAt`      DATETIME DEFAULT NULL,
     `Status`         VARCHAR(20) NOT NULL DEFAULT 'Active'
-                     CHECK (`Status` IN ('Active','Used','Expired','Cancelled')),
+                     CHECK (`Status` IN ('Active','Expiring Soon','Used','Expired','Revoked','Cancelled')),
     `IssuedAt`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (`VoucherID`, `ProductID`),
     FOREIGN KEY (`CustomerID`) REFERENCES `Customer`(`CustomerID`),
@@ -268,15 +269,22 @@ CREATE PROCEDURE `check_voucher_use`(
     IN p_check_status BOOLEAN
 )
 BEGIN
-    DECLARE v_customer INT;
-    DECLARE v_status   VARCHAR(20);
-    DECLARE v_expiry   DATE;
-    DECLARE o_customer INT;
+    DECLARE v_customer   INT;
+    DECLARE v_product    INT;
+    DECLARE v_discount   DECIMAL(10,2);
+    DECLARE v_status     VARCHAR(20);
+    DECLARE v_expiry     DATE;
+    DECLARE v_expires_at DATETIME;
+    DECLARE p_base_price DECIMAL(10,2);
+    DECLARE o_customer   INT;
 
     IF p_voucher_id IS NOT NULL THEN
-        SELECT CustomerID, Status, ExpiryDate
-          INTO v_customer, v_status, v_expiry
+        SELECT CustomerID, ProductID, DiscountValue, Status, ExpiryDate, ExpiresAt
+          INTO v_customer, v_product, v_discount, v_status, v_expiry, v_expires_at
           FROM Voucher WHERE VoucherID = p_voucher_id;
+
+        SELECT BasePrice INTO p_base_price
+          FROM Product WHERE ProductID = v_product;
 
         SELECT CustomerID INTO o_customer
           FROM Customer_Order WHERE OrderID = p_order_id;
@@ -286,11 +294,19 @@ BEGIN
                 SET MESSAGE_TEXT = 'Voucher does not belong to the customer of this order';
         END IF;
 
+        IF v_discount <= 0 OR (p_base_price IS NOT NULL AND v_discount > p_base_price) THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Voucher discount amount is invalid or exceeds product price';
+        END IF;
+
         IF p_check_status THEN
-            IF v_status <> 'Active' THEN
+            IF v_status NOT IN ('Active', 'Expiring Soon') THEN
                 SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Voucher is not active';
             END IF;
-            IF v_expiry IS NOT NULL AND v_expiry < CURDATE() THEN
+            IF v_expires_at IS NOT NULL AND v_expires_at <= NOW() THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Voucher has expired';
+            END IF;
+            IF v_expires_at IS NULL AND v_expiry IS NOT NULL AND v_expiry < CURDATE() THEN
                 SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Voucher has expired';
             END IF;
         END IF;

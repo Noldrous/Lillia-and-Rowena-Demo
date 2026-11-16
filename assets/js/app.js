@@ -7,20 +7,27 @@ import {
   buildMaterialRecord,
   buildProductRecord,
   buildRequestDesignMessengerUrl,
+  calculateExpirationFromInput,
   calculateOrderPricing,
   computeCustomerDirectory,
   computeInventoryMetrics,
   computeMaterialInventoryMetrics,
   computeVariantPricing,
+  computeVoucherStatusInfo,
   createCustomOrderRequest,
   describeMaterialStockPreview,
   filterCatalogPageItems,
+  filterCustomerVouchers,
   filterFurnitureItems,
   filterInventoryMaterials,
   findMatchingColorVariant,
   formatCustomerProductDisplay,
+  formatRemainingTime,
   formatVoucherBenefitLabel,
+  formatVoucherExpiryDisplay,
+  formatVoucherIssuedDisplay,
   getColorFilterCounts,
+  getManilaDateInputDefaults,
   getMaterialCategories,
   getMaterialStockStatus,
   getProductStockStatus,
@@ -30,7 +37,9 @@ import {
   removeMaterialFromInventory,
   removeProductFromCatalog,
   resolveAuthNavigationState,
+  revokeVoucherInList,
   validateAndBuildOfferProposal,
+  validateAndCreateVoucher,
   validateMaterialInput,
   validateNewFurnitureInput,
   validateVoucherForOrder,
@@ -535,20 +544,51 @@ function bindCartDrawerAndVoucher() {
 
   const applyVoucherBtn = document.getElementById('apply-voucher-btn');
   if (applyVoucherBtn) {
-    applyVoucherBtn.addEventListener('click', () => {
+    applyVoucherBtn.addEventListener('click', async () => {
       const codeInput = document.getElementById('voucher-code-input');
       const feedback = document.getElementById('voucher-feedback');
-      const code = codeInput ? codeInput.value : '';
+      const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
       const activeEmail = state.sessionUser
         ? state.sessionUser.email
-        : 'rowena.vance@vancearchitects.com';
-      const check = validateVoucherForOrder(
+        : state.customerProfile?.email || '';
+
+      let check = validateVoucherForOrder(
         state.vouchers,
         code,
         activeEmail,
         state.cartItems,
         state.catalog
       );
+
+      if (check.valid) {
+        try {
+          const resp = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              action: 'validate_voucher',
+              voucherCode: code,
+              customerEmail: activeEmail,
+              cartItems: state.cartItems.map((c) => ({
+                productId: c.product.id,
+                quantity: c.quantity,
+              })),
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok || !data.valid) {
+            check = {
+              valid: false,
+              discountAmount: 0,
+              voucher: null,
+              errorMessage: data.error || 'Voucher validation failed on server.',
+            };
+          }
+        } catch (_err) {
+          // Offline fallback uses check result
+        }
+      }
 
       if (feedback) {
         feedback.classList.remove('hidden', 'text-emerald-700', 'text-rose-600');
@@ -2060,21 +2100,52 @@ function initDashboardPage() {
     });
   }
 
-  // Customer Cart Voucher Apply Button
+  // Customer Cart Voucher Apply Button (Authoritative PHP/Server + Store Validation)
   const clientApplyVoucherBtn = document.getElementById('client-cart-apply-voucher-btn');
   const clientVoucherInput = document.getElementById('client-cart-voucher-input');
   const clientVoucherFeedback = document.getElementById('client-cart-voucher-feedback');
   if (clientApplyVoucherBtn && clientVoucherInput) {
-    clientApplyVoucherBtn.addEventListener('click', () => {
+    clientApplyVoucherBtn.addEventListener('click', async () => {
       const code = clientVoucherInput.value.trim().toUpperCase();
       const email = state.customerProfile.email || state.sessionUser?.email || '';
-      const result = validateVoucherForOrder(
+      let result = validateVoucherForOrder(
         state.vouchers,
         code,
         email,
         state.cartItems,
         state.catalog
       );
+
+      if (result.valid) {
+        try {
+          const resp = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              action: 'validate_voucher',
+              voucherCode: code,
+              customerEmail: email,
+              cartItems: state.cartItems.map((c) => ({
+                productId: c.product.id,
+                quantity: c.quantity,
+              })),
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok || !data.valid) {
+            result = {
+              valid: false,
+              discountAmount: 0,
+              voucher: null,
+              errorMessage: data.error || 'Voucher validation failed on server.',
+            };
+          }
+        } catch (_err) {
+          // Offline fallback uses local store validation
+        }
+      }
+
       if (clientVoucherFeedback) {
         clientVoucherFeedback.classList.remove('hidden');
         if (result.valid) {
@@ -2752,135 +2823,325 @@ function initDashboardPage() {
     });
   }
 
-  // Admin Voucher Discount Type Selector & Generate Code Helper Button
-  const vchDiscountTypeSelect = document.getElementById('vch-discount-type');
+  // Admin Create Discount Voucher Form (Fixed Amount $, Expiration Method, Quick Durations & Live Preview)
+  const vchProductSelect = document.getElementById('vch-product');
   const vchDiscountInput = document.getElementById('vch-discount');
-  const vchDiscountLabel = document.getElementById('vch-discount-label');
-  if (vchDiscountTypeSelect && vchDiscountInput) {
-    vchDiscountTypeSelect.addEventListener('change', () => {
-      const isPct = vchDiscountTypeSelect.value === 'percentage';
-      if (vchDiscountLabel) {
-        vchDiscountLabel.textContent = isPct ? 'Discount (%)' : 'Discount Value ($)';
+  const vchDiscountMaxHint = document.getElementById('vch-discount-max-hint');
+  const vchExpMethodInput = document.getElementById('vch-expiration-method');
+  const vchDurationPanel = document.getElementById('vch-duration-panel');
+  const vchCustomExpiryPanel = document.getElementById('vch-custom-expiry-panel');
+  const vchDurationValueInput = document.getElementById('vch-duration-value');
+  const vchDurationUnitSelect = document.getElementById('vch-duration-unit');
+  const vchExpiryDateInput = document.getElementById('vch-expiry-date');
+  const vchExpiryTimeInput = document.getElementById('vch-expiry-time');
+  const vchPreviewBox = document.getElementById('vch-expiration-preview');
+  const vchPreviewText = document.getElementById('vch-expiration-preview-text');
+  const vchPreviewBadge = document.getElementById('vch-expiration-preview-badge');
+
+  const syncVoucherProductMaxPriceHint = () => {
+    const pid = vchProductSelect ? vchProductSelect.value : '';
+    const selectedProd = state.catalog.find((p) => p.id === pid) || state.catalog[0];
+    if (selectedProd) {
+      const maxPrice = Number(selectedProd.effectivePrice ?? selectedProd.price ?? 0);
+      if (vchDiscountMaxHint) {
+        vchDiscountMaxHint.textContent = `Max: ${usd(maxPrice)}`;
       }
-      if (isPct && Number(vchDiscountInput.value) > 90) {
-        vchDiscountInput.value = '20';
-      } else if (!isPct && Number(vchDiscountInput.value) <= 20) {
-        vchDiscountInput.value = '300';
+      if (vchDiscountInput) {
+        vchDiscountInput.max = String(maxPrice);
       }
+    }
+  };
+
+  const initVoucherCustomDateDefaults = () => {
+    const defaults = getManilaDateInputDefaults(Date.now());
+    if (vchExpiryDateInput) {
+      vchExpiryDateInput.min = defaults.minDate;
+      if (!vchExpiryDateInput.value) {
+        vchExpiryDateInput.value = defaults.defaultDate;
+      }
+    }
+    if (vchExpiryTimeInput) {
+      if (!vchExpiryTimeInput.value) {
+        vchExpiryTimeInput.value = defaults.defaultTime;
+      }
+      if (vchExpiryDateInput && vchExpiryDateInput.value === defaults.minDate) {
+        vchExpiryTimeInput.min = defaults.minTime;
+      } else {
+        vchExpiryTimeInput.removeAttribute('min');
+      }
+    }
+  };
+
+  const syncQuickDurationChipHighlight = () => {
+    const method = vchExpMethodInput ? vchExpMethodInput.value : 'duration';
+    const val = String(vchDurationValueInput?.value || '').trim();
+    const unit = String(vchDurationUnitSelect?.value || 'hours').trim();
+    const key = `${val}|${unit}`;
+    document.querySelectorAll('[data-vch-quick-duration]').forEach((chip) => {
+      const chipKey = chip.getAttribute('data-vch-quick-duration') || '';
+      chip.classList.toggle('is-selected', method === 'duration' && chipKey === key);
+    });
+  };
+
+  const syncVoucherExpirationPreview = () => {
+    if (!vchPreviewBox || !vchPreviewText || !vchPreviewBadge) return;
+    initVoucherCustomDateDefaults();
+    const method = vchExpMethodInput ? vchExpMethodInput.value : 'duration';
+    const calc = calculateExpirationFromInput(
+      {
+        expirationMethod: method,
+        durationValue: vchDurationValueInput?.value,
+        durationUnit: vchDurationUnitSelect?.value,
+        expiryDate: vchExpiryDateInput?.value,
+        expiryTime: vchExpiryTimeInput?.value,
+      },
+      Date.now()
+    );
+
+    if (!calc.ok) {
+      vchPreviewBox.classList.add('is-invalid');
+      vchPreviewText.textContent = calc.errorMessage || 'Invalid expiration settings.';
+      vchPreviewBadge.textContent = 'Invalid Expiry';
+      vchPreviewBadge.className = 'vch-remaining-badge vch-remaining-inactive';
+      return;
+    }
+
+    vchPreviewBox.classList.remove('is-invalid');
+    vchPreviewText.textContent = `Expires ${calc.formattedManila} (Asia/Manila)`;
+    vchPreviewBadge.textContent = calc.remainingLabel;
+    vchPreviewBadge.className =
+      calc.remainingMs <= 3600 * 1000
+        ? 'vch-remaining-badge vch-remaining-expiring'
+        : 'vch-remaining-badge vch-remaining-active';
+  };
+
+  document.querySelectorAll('[data-vch-exp-method]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const method = btn.getAttribute('data-vch-exp-method') || 'duration';
+      if (vchExpMethodInput) vchExpMethodInput.value = method;
+      document.querySelectorAll('[data-vch-exp-method]').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-vch-exp-method') === method);
+      });
+      if (vchDurationPanel) vchDurationPanel.classList.toggle('hidden', method !== 'duration');
+      if (vchCustomExpiryPanel) vchCustomExpiryPanel.classList.toggle('hidden', method !== 'custom');
+      syncQuickDurationChipHighlight();
+      syncVoucherExpirationPreview();
+    });
+  });
+
+  document.querySelectorAll('[data-vch-quick-duration]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const raw = chip.getAttribute('data-vch-quick-duration') || '24|hours';
+      const [val, unit] = raw.split('|');
+      if (vchExpMethodInput) vchExpMethodInput.value = 'duration';
+      document.querySelectorAll('[data-vch-exp-method]').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-vch-exp-method') === 'duration');
+      });
+      if (vchDurationPanel) vchDurationPanel.classList.remove('hidden');
+      if (vchCustomExpiryPanel) vchCustomExpiryPanel.classList.add('hidden');
+      if (vchDurationValueInput && val) vchDurationValueInput.value = val;
+      if (vchDurationUnitSelect && unit) vchDurationUnitSelect.value = unit;
+      syncQuickDurationChipHighlight();
+      syncVoucherExpirationPreview();
+    });
+  });
+
+  if (vchProductSelect) {
+    vchProductSelect.addEventListener('change', () => {
+      syncVoucherProductMaxPriceHint();
+    });
+  }
+  if (vchDurationValueInput) {
+    vchDurationValueInput.addEventListener('input', () => {
+      syncQuickDurationChipHighlight();
+      syncVoucherExpirationPreview();
+    });
+  }
+  if (vchDurationUnitSelect) {
+    vchDurationUnitSelect.addEventListener('change', () => {
+      syncQuickDurationChipHighlight();
+      syncVoucherExpirationPreview();
+    });
+  }
+  if (vchExpiryDateInput) {
+    vchExpiryDateInput.addEventListener('change', () => {
+      syncVoucherExpirationPreview();
+    });
+  }
+  if (vchExpiryTimeInput) {
+    vchExpiryTimeInput.addEventListener('change', () => {
+      syncVoucherExpirationPreview();
     });
   }
 
   const genVoucherBtn = document.getElementById('admin-generate-voucher-btn');
   if (genVoucherBtn) {
     genVoucherBtn.addEventListener('click', () => {
-      const discountType = document.getElementById('vch-discount-type')?.value || 'fixed';
-      const discountVal = Number(document.getElementById('vch-discount')?.value) || (discountType === 'percentage' ? 20 : 300);
+      const discountVal = Math.max(1, Math.round(Number(document.getElementById('vch-discount')?.value) || 300));
       const randomDigits = Math.floor(100 + Math.random() * 900);
       const codeInput = document.getElementById('vch-code');
       if (codeInput) {
-        codeInput.value =
-          discountType === 'percentage'
-            ? `SAVE${discountVal}-${randomDigits}`
-            : `SAVE-${discountVal}-${randomDigits}`;
+        codeInput.value = `SAVE-${discountVal}-${randomDigits}`;
       }
     });
   }
 
-  // Admin Issue Single-Product Voucher Form
+  // Admin Issue Fixed-Amount Single-Product Voucher Form
   const vchForm = document.getElementById('admin-voucher-form');
   const vchErrorEl = document.getElementById('admin-voucher-form-error');
+  const vchSubmitBtn = document.getElementById('admin-create-voucher-submit-btn');
   if (vchForm) {
     vchForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const customerEmail = document.getElementById('vch-email').value.trim();
-      const furnitureId = document.getElementById('vch-product').value;
-      const code = document.getElementById('vch-code').value.trim().toUpperCase();
-      const discountType = document.getElementById('vch-discount-type')?.value || 'fixed';
-      const rawDiscountVal = Number(document.getElementById('vch-discount').value);
+      const customerEmail = document.getElementById('vch-email')?.value.trim() || '';
+      const furnitureId = document.getElementById('vch-product')?.value || '';
+      const code = document.getElementById('vch-code')?.value.trim().toUpperCase() || '';
+      const rawDiscountVal = Number(document.getElementById('vch-discount')?.value);
+      const expirationMethod = vchExpMethodInput ? vchExpMethodInput.value : 'duration';
+      const durationValue = Number(vchDurationValueInput?.value);
+      const durationUnit = vchDurationUnitSelect?.value || 'hours';
+      const expiryDate = vchExpiryDateInput?.value || '';
+      const expiryTime = vchExpiryTimeInput?.value || '';
 
-      if (customerEmail && !customerEmail.includes('@')) {
-        if (vchErrorEl) {
-          vchErrorEl.textContent = 'Please enter a valid customer email address.';
-          vchErrorEl.classList.remove('hidden');
-        }
-        return;
-      }
-      if (!code) {
-        if (vchErrorEl) {
-          vchErrorEl.textContent = 'Please enter a voucher code or click Generate.';
-          vchErrorEl.classList.remove('hidden');
-        }
-        return;
-      }
-      if (discountType === 'percentage') {
-        if (!Number.isFinite(rawDiscountVal) || rawDiscountVal < 1 || rawDiscountVal > 90) {
-          if (vchErrorEl) {
-            vchErrorEl.textContent = 'Please enter a percentage discount between 1% and 90%.';
-            vchErrorEl.classList.remove('hidden');
-          }
-          return;
-        }
-      } else if (!Number.isFinite(rawDiscountVal) || rawDiscountVal < 1) {
-        if (vchErrorEl) {
-          vchErrorEl.textContent = 'Please enter a valid discount amount of at least $1.';
-          vchErrorEl.classList.remove('hidden');
-        }
-        return;
-      }
+      const matchedCustomer = (state.customers || []).find(
+        (c) => String(c.email || '').trim().toLowerCase() === customerEmail.toLowerCase()
+      );
+      const customerName = matchedCustomer
+        ? matchedCustomer.fullName || matchedCustomer.name
+        : '';
 
-      const prod = state.catalog.find((p) => p.id === furnitureId);
-      if (!prod) {
-        if (vchErrorEl) {
-          vchErrorEl.textContent = 'Please select a valid eligible product for this voucher.';
-          vchErrorEl.classList.remove('hidden');
-        }
-        return;
-      }
-      if (vchErrorEl) vchErrorEl.classList.add('hidden');
-
-      const estimatedDollarDiscount =
-        discountType === 'percentage'
-          ? Math.round(prod.effectivePrice * (rawDiscountVal / 100))
-          : Math.min(prod.effectivePrice, Math.round(rawDiscountVal));
-
-      const normalizedEmail = customerEmail || 'rowena.vance@vancearchitects.com';
-
-      const newVoucher = {
-        id: `vch-${Date.now()}`,
+      const payloadInput = {
+        customerEmail,
+        customerName,
+        furnitureId,
         code,
-        customerEmail: normalizedEmail,
-        customerName: normalizedEmail.split('@')[0],
-        furnitureId: prod.id,
-        productId: prod.id,
-        furnitureSku: prod.sku,
-        furnitureName: prod.name,
-        productName: prod.name,
-        discountType,
-        discountPercent: discountType === 'percentage' ? rawDiscountVal : 0,
-        discountValue: rawDiscountVal,
-        discountAmount: estimatedDollarDiscount,
-        status: 'Active',
-        issuedByAdmin: 'Lillia Mercier',
-        createdAt: new Date().toISOString().slice(0, 10),
-        expiryDate: '2026-12-31',
-        messengerPlaceholderLink: `${ADMIN_MESSENGER_PLACEHOLDER_URL}?voucher=${encodeURIComponent(code)}&client=${encodeURIComponent(normalizedEmail)}&sku=${encodeURIComponent(prod.sku)}`,
+        discountAmount: rawDiscountVal,
+        expirationMethod,
+        durationValue,
+        durationUnit,
+        expiryDate,
+        expiryTime,
+        issuedByAdmin: state.sessionUser?.name || 'Lillia Mercier',
       };
 
-      state.vouchers = [
-        newVoucher,
-        ...state.vouchers.filter((v) => String(v.code || '').toUpperCase() !== code),
-      ];
-      syncDatabaseStore('sync_store');
-      document.getElementById('vch-code').value = '';
-      showAdminBanner(
-        `Created voucher ${code} (${formatVoucherBenefitLabel(newVoucher)} on "${prod.name}") for ${normalizedEmail}.`
+      const localCheck = validateAndCreateVoucher(
+        payloadInput,
+        state.catalog,
+        state.vouchers,
+        Date.now()
       );
-      renderDashboardContent();
+
+      if (!localCheck.ok) {
+        if (vchErrorEl) {
+          vchErrorEl.textContent = localCheck.errorMessage;
+          vchErrorEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (vchErrorEl) vchErrorEl.classList.add('hidden');
+
+      if (vchSubmitBtn) {
+        vchSubmitBtn.disabled = true;
+        vchSubmitBtn.textContent = 'Creating Voucher...';
+      }
+
+      try {
+        let createdVoucher = localCheck.voucher;
+        try {
+          const response = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              action: 'create_voucher',
+              voucher: payloadInput,
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error || 'Could not create voucher.');
+          }
+          if (data.voucher) {
+            createdVoucher = data.voucher;
+          }
+          if (Array.isArray(data.vouchers)) {
+            state.vouchers = data.vouchers;
+          } else {
+            state.vouchers = [createdVoucher, ...state.vouchers];
+          }
+        } catch (err) {
+          if (err && err.message && !/fetch|network/i.test(err.message)) {
+            if (vchErrorEl) {
+              vchErrorEl.textContent = err.message;
+              vchErrorEl.classList.remove('hidden');
+            }
+            return;
+          }
+          state.vouchers = [createdVoucher, ...state.vouchers];
+          syncDatabaseStore('sync_store');
+        }
+
+        const codeEl = document.getElementById('vch-code');
+        if (codeEl) codeEl.value = '';
+        syncVoucherExpirationPreview();
+        showAdminBanner(
+          `Voucher ${createdVoucher.code} (${usd(createdVoucher.discountAmount)} OFF "${createdVoucher.furnitureName}") issued to ${createdVoucher.customerEmail}.`
+        );
+        renderDashboardContent();
+      } finally {
+        if (vchSubmitBtn) {
+          vchSubmitBtn.disabled = false;
+          vchSubmitBtn.textContent = 'Create Voucher';
+        }
+      }
     });
   }
 
   switchAdminTab(state.activeAdminTab || 'overview');
   renderDashboardContent();
+  syncVoucherProductMaxPriceHint();
+  syncVoucherExpirationPreview();
+  startVoucherCountdownTicker();
+}
+
+let voucherCountdownTimerId = null;
+
+function startVoucherCountdownTicker() {
+  if (voucherCountdownTimerId) {
+    clearInterval(voucherCountdownTimerId);
+  }
+  voucherCountdownTimerId = setInterval(() => {
+    const nowMs = Date.now();
+    let statusChanged = false;
+
+    if (Array.isArray(state.vouchers) && state.vouchers.length > 0) {
+      state.vouchers.forEach((v) => {
+        const info = computeVoucherStatusInfo(v, nowMs);
+        if (v.status !== info.status) {
+          v.status = info.status;
+          statusChanged = true;
+        }
+      });
+    }
+
+    if (statusChanged) {
+      renderDashboardContent();
+      return;
+    }
+
+    document.querySelectorAll('[data-voucher-countdown]').forEach((el) => {
+      const key = el.getAttribute('data-voucher-countdown') || '';
+      const matched = (state.vouchers || []).find(
+        (v) =>
+          String(v.id || '') === key ||
+          String(v.code || '').toUpperCase() === key.toUpperCase()
+      );
+      if (!matched) return;
+      const info = computeVoucherStatusInfo(matched, nowMs);
+      el.textContent = info.remainingLabel;
+    });
+  }, 1000);
 }
 
 let pendingConfirmAction = null;
@@ -2948,10 +3209,11 @@ function renderDashboardContent() {
     );
   const displayOrders = myOrders.length > 0 ? myOrders : state.orders.slice(0, 2);
 
-  const myVouchers = state.vouchers.filter(
-    (v) => v.customerEmail.toLowerCase() === userEmail.toLowerCase()
+  // Strictly show ONLY vouchers assigned to the logged-in customer's email address
+  const displayVouchers = filterCustomerVouchers(state.vouchers, userEmail);
+  const usableCustomerVouchers = displayVouchers.filter(
+    (v) => computeVoucherStatusInfo(v).isUsable
   );
-  const displayVouchers = myVouchers.length > 0 ? myVouchers : state.vouchers.slice(0, 2);
 
   // Update Summary KPI Cards & Sidebar Badges
   const statOrders = document.getElementById('user-stat-orders');
@@ -2963,11 +3225,11 @@ function renderDashboardContent() {
   const cartQty = state.cartItems.reduce((sum, c) => sum + c.quantity, 0);
 
   if (statOrders) statOrders.textContent = `${displayOrders.length} Active Orders`;
-  if (statVouchers) statVouchers.textContent = `${displayVouchers.length} Ready to Use`;
+  if (statVouchers) statVouchers.textContent = `${usableCustomerVouchers.length} Ready to Use`;
   if (statCart) statCart.textContent = `${cartQty} ${cartQty === 1 ? 'Item' : 'Items'}`;
   if (badgeOrders) badgeOrders.textContent = String(displayOrders.length);
   if (badgeCart) badgeCart.textContent = String(cartQty);
-  if (badgeVouchers) badgeVouchers.textContent = String(displayVouchers.length);
+  if (badgeVouchers) badgeVouchers.textContent = String(usableCustomerVouchers.length);
 
   // Populate Home Tab Previews (Latest Order + Address Preview + Live Catalog Feed)
   const homeOrderPreview = document.getElementById('client-home-order-preview');
@@ -3667,47 +3929,194 @@ function renderDashboardContent() {
       }
       if (deliveryEl) deliveryEl.textContent = usd(totals.whiteGloveDeliveryFee);
       if (totalEl) totalEl.textContent = usd(totals.totalAmount);
+
+      // Display Customer's Eligible Vouchers right inside Checkout (#client-tab-cart)
+      const voucherInputEl = document.getElementById('client-cart-voucher-input');
+      const voucherCardParent = voucherInputEl ? voucherInputEl.closest('.space-y-2') : null;
+      if (voucherCardParent) {
+        let quickWalletEl = document.getElementById('client-cart-available-vouchers');
+        if (!quickWalletEl) {
+          quickWalletEl = document.createElement('div');
+          quickWalletEl.id = 'client-cart-available-vouchers';
+          quickWalletEl.className = 'pt-2 space-y-2';
+          voucherCardParent.appendChild(quickWalletEl);
+        }
+        if (displayVouchers.length === 0) {
+          quickWalletEl.innerHTML = `<p class="text-[11px] text-[#64748B]">No vouchers are currently assigned to ${esc(userEmail)}.</p>`;
+        } else {
+          quickWalletEl.innerHTML = `
+            <p class="text-[11px] font-bold uppercase tracking-wider text-[#0077CC]">Your Assigned Vouchers (${displayVouchers.length})</p>
+            <div class="space-y-2">
+              ${displayVouchers
+                .map((v) => {
+                  const statusInfo = computeVoucherStatusInfo(v);
+                  const expInfo = formatVoucherExpiryDisplay(v);
+                  const isInCart = state.cartItems.some(
+                    (c) => c.product.id === (v.furnitureId || v.productId)
+                  );
+                  const isApplied =
+                    state.appliedVoucher &&
+                    String(state.appliedVoucher.code).toUpperCase() === String(v.code).toUpperCase();
+                  return `
+                    <div class="p-2.5 rounded-xl border border-[#BCE3FF] bg-white flex flex-col gap-1.5 text-xs">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="vch-code-chip">${esc(v.code)}</span>
+                        <span class="admin-status-badge ${statusInfo.badgeClass}">
+                          <span class="admin-status-badge-dot"></span>${esc(statusInfo.status)}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="font-semibold text-[#0D1015] truncate">${esc(v.furnitureName || v.productName)}</span>
+                        <span class="font-mono-tech font-bold text-[#0095FF] shrink-0">-${usd(v.discountAmount)}</span>
+                      </div>
+                      <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#64748B]">
+                        <span>Exp: ${esc(expInfo.full)}</span>
+                        ${
+                          statusInfo.isUsable && statusInfo.expiresAtMs
+                            ? `<span data-voucher-countdown="${esc(v.id)}" data-voucher-expires="${statusInfo.expiresAtMs}" data-voucher-status="${esc(statusInfo.status)}" class="font-mono-tech font-semibold ${statusInfo.isExpiringSoon ? 'text-amber-700' : 'text-emerald-700'}">${esc(statusInfo.remainingLabel)}</span>`
+                            : `<span>${esc(statusInfo.remainingLabel)}</span>`
+                        }
+                      </div>
+                      ${
+                        statusInfo.isUsable
+                          ? `<button type="button" data-cart-quick-apply="${esc(v.code)}" data-cart-quick-product="${esc(v.furnitureId || v.productId)}" class="mt-0.5 w-full py-1.5 px-2.5 rounded-lg ${isApplied ? 'bg-emerald-600 text-white' : 'bg-[#EBF6FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white'} text-xs font-semibold transition-colors cursor-pointer">
+                              ${isApplied ? '✓ Applied to Order' : isInCart ? 'Apply Voucher Now' : 'Add Eligible Product & Apply'}
+                            </button>`
+                          : ''
+                      }
+                    </div>
+                  `;
+                })
+                .join('')}
+            </div>
+          `;
+
+          quickWalletEl.querySelectorAll('[data-cart-quick-apply]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const vCode = btn.getAttribute('data-cart-quick-apply') || '';
+              const pid = btn.getAttribute('data-cart-quick-product') || '';
+              const inCart = state.cartItems.some((c) => c.product.id === pid);
+              if (!inCart) {
+                const prod = state.catalog.find((p) => p.id === pid);
+                if (prod && Number(prod.inStockCount ?? 0) > 0) {
+                  const finish = prod.defaultFinish || 'Natural Finish';
+                  state.cartItems.push({ product: prod, finish, quantity: 1 });
+                  saveCartToStorage();
+                }
+              }
+              if (voucherInputEl) voucherInputEl.value = vCode;
+              const applyBtn = document.getElementById('client-cart-apply-voucher-btn');
+              if (applyBtn) applyBtn.click();
+            });
+          });
+        }
+      }
     }
   }
 
-  // 4. User-Friendly Voucher Wallet (With 1-Click Copy & Add to Cart Button)
+  // 4. Customer Voucher Wallet (#client-vouchers-friendly-list) with Live Countdown & Complete Details
   const friendlyVouchersEl = document.getElementById('client-vouchers-friendly-list');
   if (friendlyVouchersEl) {
-    friendlyVouchersEl.innerHTML = displayVouchers
-      .map(
-        (v) => `
-    <div class="p-5 rounded-3xl border border-[#BCE3FF] bg-white space-y-4 shadow-2xs">
-    <div class="flex items-start justify-between gap-2">
-    <div>
-    <p class="font-mono-tech text-xs font-bold text-[#0095FF]">
-                  SAVE ${esc(formatVoucherBenefitLabel(v))} ON SELECTED ITEM
-    </p>
-    <p class="font-serif-display text-base font-bold text-[#0D1015] mt-1">
-                  ${esc(v.furnitureName || v.productName)}
-    </p>
-    </div>
-    <span class="font-mono-tech text-xs font-bold text-emerald-700">
-                ${esc(v.status)}
-    </span>
-    </div>
+    if (displayVouchers.length === 0) {
+      friendlyVouchersEl.innerHTML = `
+        <div class="col-span-full p-8 rounded-3xl border border-[#BCE3FF] bg-[#F8FBFF] text-center space-y-2">
+          <p class="font-serif-display text-lg font-bold text-[#0D1015]">No Vouchers Assigned Yet</p>
+          <p class="text-xs text-[#475569] max-w-md mx-auto">
+            Personal fixed-amount discount vouchers issued to <strong>${esc(userEmail)}</strong> by our showroom administrator will appear here automatically.
+          </p>
+        </div>
+      `;
+    } else {
+      friendlyVouchersEl.innerHTML = displayVouchers
+        .map((v) => {
+          const statusInfo = computeVoucherStatusInfo(v);
+          const issuedInfo = formatVoucherIssuedDisplay(v);
+          const expiryInfo = formatVoucherExpiryDisplay(v);
+          const discountAmt = Number(v.discountAmount ?? v.discountValue ?? 0);
+          const matchedProd = state.catalog.find((p) => p.id === (v.furnitureId || v.productId));
+          const prodPrice = Number(matchedProd?.effectivePrice ?? matchedProd?.price ?? v.productPrice ?? 0);
 
-    <div class="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#F8FBFF] border border-[#BCE3FF]">
-    <code class="font-mono-tech text-xs font-bold text-[#0D1015]">${esc(v.code)}</code>
-    <button type="button" data-copy-voucher="${esc(v.code)}" class="px-3 py-1.5 rounded-lg bg-[#EBF6FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white text-xs font-semibold transition-colors cursor-pointer">
-                Copy Code
-    </button>
-    </div>
+          const remainingPillClass = !statusInfo.isUsable
+            ? 'vch-remaining-inactive'
+            : statusInfo.isExpiringSoon
+            ? 'vch-remaining-expiring'
+            : 'vch-remaining-active';
 
-    <div class="flex items-center justify-between text-xs text-[#64748B]">
-    <span>Expires ${esc(v.expiryDate)}</span>
-    <button type="button" data-use-voucher-product="${esc(v.furnitureId || v.productId)}" data-use-voucher-code="${esc(v.code)}" class="font-semibold text-[#0095FF] hover:underline cursor-pointer">
-                Add Product to Cart →
-    </button>
-    </div>
-    </div>
-        `
-      )
-      .join('');
+          return `
+            <div class="p-5 sm:p-6 rounded-3xl border border-[#BCE3FF] bg-white space-y-4 shadow-2xs flex flex-col justify-between ${!statusInfo.isUsable ? 'opacity-75' : ''}">
+              <div class="space-y-3.5">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#EBF6FF] border border-[#BCE3FF] font-mono-tech text-xs font-bold text-[#0077CC]">
+                      ${usd(discountAmt)} OFF FIXED DISCOUNT
+                    </span>
+                    <h3 class="font-serif-display text-base sm:text-lg font-bold text-[#0D1015] mt-2">
+                      ${esc(v.furnitureName || v.productName)}
+                    </h3>
+                    <p class="text-xs text-[#64748B] font-mono-tech mt-0.5">
+                      Eligible Product · ${esc(v.furnitureSku || 'LR-ITEM')}${prodPrice > 0 ? ` · Listed ${usd(prodPrice)}` : ''}
+                    </p>
+                  </div>
+                  <span class="admin-status-badge ${statusInfo.badgeClass}">
+                    <span class="admin-status-badge-dot"></span>${esc(statusInfo.status)}
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#F8FBFF] border border-[#BCE3FF]">
+                  <div>
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-[#64748B]">Voucher Code</span>
+                    <code class="font-mono-tech text-sm font-bold text-[#0D1015]">${esc(v.code)}</code>
+                  </div>
+                  <button
+                    type="button"
+                    data-copy-voucher="${esc(v.code)}"
+                    class="px-3 py-1.5 rounded-lg bg-[#EBF6FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Copy Code
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div>
+                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Issued (PHT)</span>
+                    <span class="font-semibold text-slate-800 block mt-0.5">${esc(issuedInfo.primary)}</span>
+                    <span class="text-[11px] text-slate-500">${esc(issuedInfo.secondary)}</span>
+                  </div>
+                  <div>
+                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Expires (PHT)</span>
+                    <span class="font-semibold text-slate-800 block mt-0.5">${esc(expiryInfo.primary)}</span>
+                    <span class="text-[11px] text-slate-500">${esc(expiryInfo.secondary)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Remaining Time</span>
+                  ${
+                    statusInfo.isUsable && statusInfo.expiresAtMs
+                      ? `<span data-voucher-countdown="${esc(v.id)}" data-voucher-expires="${statusInfo.expiresAtMs}" data-voucher-status="${esc(statusInfo.status)}" class="vch-remaining-badge ${remainingPillClass}">${esc(statusInfo.remainingLabel)}</span>`
+                      : `<span class="vch-remaining-badge ${remainingPillClass}">${esc(statusInfo.remainingLabel)}</span>`
+                  }
+                </div>
+                ${
+                  statusInfo.isUsable
+                    ? `<button
+                        type="button"
+                        data-use-voucher-product="${esc(v.furnitureId || v.productId)}"
+                        data-use-voucher-code="${esc(v.code)}"
+                        class="px-3.5 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Use in Checkout →
+                      </button>`
+                    : `<span class="text-xs font-semibold text-slate-400 cursor-not-allowed">Unavailable (${esc(statusInfo.status)})</span>`
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
 
     friendlyVouchersEl.querySelectorAll('[data-copy-voucher]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -3726,6 +4135,14 @@ function renderDashboardContent() {
       btn.addEventListener('click', () => {
         const pid = btn.getAttribute('data-use-voucher-product');
         const vCode = btn.getAttribute('data-use-voucher-code') || '';
+        const matchedVoucher = state.vouchers.find(
+          (v) => String(v.code || '').toUpperCase() === vCode.toUpperCase()
+        );
+        if (matchedVoucher && !computeVoucherStatusInfo(matchedVoucher).isUsable) {
+          showClientBanner(`Voucher "${vCode}" is no longer usable.`);
+          renderDashboardContent();
+          return;
+        }
         const product = state.catalog.find((p) => p.id === pid);
         if (product) {
           const availableStock = Math.max(0, Math.floor(Number(product.inStockCount ?? 0)));
@@ -3733,27 +4150,29 @@ function renderDashboardContent() {
             showClientBanner(`"${product.name}" is currently Out of Stock.`);
             return;
           }
-          const currentQty = state.cartItems
-            .filter((c) => c.product.id === product.id)
-            .reduce((sum, c) => sum + c.quantity, 0);
-          if (currentQty >= availableStock) {
-            showClientBanner(`Cannot add more "${product.name}": only ${availableStock} available in stock.`);
-            return;
-          }
           const finish = product.defaultFinish || 'Natural Finish';
           const existing = state.cartItems.find((c) => c.product.id === product.id && c.finish === finish);
-          if (existing) {
-            existing.quantity += 1;
-          } else {
+          if (!existing) {
             state.cartItems.push({ product, finish, quantity: 1 });
           }
           saveCartToStorage();
           const vInput = document.getElementById('client-cart-voucher-input');
           if (vInput && vCode) vInput.value = vCode;
-          showClientBanner(`Added "${product.name}" to your Cart.`);
+          const check = validateVoucherForOrder(
+            state.vouchers,
+            vCode,
+            userEmail,
+            state.cartItems,
+            state.catalog
+          );
+          if (check.valid) {
+            state.appliedVoucher = check.voucher;
+          }
+          showClientBanner(`Added "${product.name}" and applied voucher ${vCode} to your Cart.`);
         }
         const cartTabBtn = document.querySelector('[data-client-tab="cart"]');
         if (cartTabBtn) cartTabBtn.click();
+        renderDashboardContent();
       });
     });
   }
@@ -3775,7 +4194,9 @@ function renderDashboardContent() {
   const navCountCustomers = document.getElementById('admin-nav-count-customers');
 
   const discountedCount = state.catalog.filter((p) => Number(p.discountPercent || 0) > 0).length;
-  const activeVoucherCount = state.vouchers.filter((v) => v.status === 'Active').length;
+  const activeVoucherCount = state.vouchers.filter(
+    (v) => computeVoucherStatusInfo(v).isUsable
+  ).length;
   const totalOrderRevenue = state.orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
   const invMetrics = computeMaterialInventoryMetrics(state.materials);
   const customerDirectory = computeCustomerDirectory(
@@ -5501,16 +5922,42 @@ function renderDashboardContent() {
     if (prevSelectedProduct && state.catalog.some((p) => p.id === prevSelectedProduct)) {
       vchSelect.value = prevSelectedProduct;
     }
+    const maxHintEl = document.getElementById('vch-discount-max-hint');
+    const selectedProd =
+      state.catalog.find((p) => p.id === vchSelect.value) || state.catalog[0];
+    if (selectedProd && maxHintEl) {
+      maxHintEl.textContent = `Max: ${usd(selectedProd.effectivePrice)}`;
+    }
   }
 
   const adminVouchersEl = document.getElementById('admin-vouchers-list');
   if (adminVouchersEl) {
+    const nowMs = Date.now();
+    const activeCount = state.vouchers.filter((v) => computeVoucherStatusInfo(v, nowMs).status === 'Active').length;
+    const expiringSoonCount = state.vouchers.filter(
+      (v) => computeVoucherStatusInfo(v, nowMs).status === 'Expiring Soon'
+    ).length;
+
     adminVouchersEl.innerHTML = `
       <div class="admin-card overflow-hidden">
-        <div class="p-5 sm:p-6 border-b border-slate-200 flex items-center justify-between gap-2">
+        <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-base font-bold text-slate-900">Issued Vouchers (${state.vouchers.length})</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Personal single-product discount codes issued to customers</p>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Fixed-amount single-product vouchers · All timestamps displayed in Asia/Manila (PHT)
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="admin-status-badge admin-status-voucher-active">
+              <span class="admin-status-badge-dot"></span>${activeCount} Active
+            </span>
+            ${
+              expiringSoonCount > 0
+                ? `<span class="admin-status-badge admin-status-voucher-expiring">
+                    <span class="admin-status-badge-dot"></span>${expiringSoonCount} Expiring Soon
+                  </span>`
+                : ''
+            }
           </div>
         </div>
         ${
@@ -5518,18 +5965,21 @@ function renderDashboardContent() {
             ? `
           <div class="admin-empty-state">
             <p class="text-sm font-bold text-slate-900">No vouchers created yet</p>
-            <p class="text-xs text-slate-500 mt-1">Use the form above to issue a discount code for a customer.</p>
+            <p class="text-xs text-slate-500 mt-1">Use the form above to issue a fixed-amount discount voucher for a customer.</p>
           </div>
         `
             : `
           <div class="overflow-x-auto">
-            <table class="admin-table">
+            <table class="admin-table vch-table">
               <thead>
                 <tr>
                   <th>Voucher Code</th>
                   <th>Customer</th>
                   <th class="admin-col-primary">Eligible Product</th>
-                  <th>Discount</th>
+                  <th>Discount Amount</th>
+                  <th>Issued Date &amp; Time</th>
+                  <th>Expiration Date &amp; Time</th>
+                  <th>Remaining Time</th>
                   <th>Status</th>
                   <th class="text-right">Actions</th>
                 </tr>
@@ -5537,29 +5987,97 @@ function renderDashboardContent() {
               <tbody>
                 ${state.vouchers
                   .map((v) => {
-                    const isPct = v.discountType === 'percentage' || Number(v.discountPercent || 0) > 0;
-                    const discountText = isPct
-                      ? `${Number(v.discountPercent ?? v.discountValue ?? 0)}% OFF (-${usd(v.discountAmount)})`
-                      : `-${usd(v.discountAmount)}`;
+                    const statusInfo = computeVoucherStatusInfo(v, nowMs);
+                    const issuedInfo = formatVoucherIssuedDisplay(v);
+                    const expiryInfo = formatVoucherExpiryDisplay(v);
+                    const discountAmt = Number(v.discountAmount ?? v.discountValue ?? 0);
+                    const matchedProd = state.catalog.find((p) => p.id === (v.furnitureId || v.productId));
+                    const prodPrice = Number(matchedProd?.effectivePrice ?? matchedProd?.price ?? v.productPrice ?? 0);
+                    const menuId = `vch-menu-${v.id}`;
+                    const isMenuOpen = state.adminOpenActionMenuId === menuId;
+                    const canRevoke = statusInfo.status !== 'Revoked' && statusInfo.status !== 'Used';
+
+                    const remainingPillClass = !statusInfo.isUsable
+                      ? 'vch-remaining-inactive'
+                      : statusInfo.isExpiringSoon
+                      ? 'vch-remaining-expiring'
+                      : 'vch-remaining-active';
+
                     return `
                       <tr>
-                        <td class="font-mono-tech text-xs font-bold text-slate-900 whitespace-nowrap">${esc(v.code)}</td>
-                        <td class="text-xs text-slate-600 whitespace-nowrap">${esc(v.customerEmail)}</td>
+                        <td class="whitespace-nowrap">
+                          <span class="vch-code-chip">${esc(v.code)}</span>
+                        </td>
+                        <td>
+                          <p class="admin-table-title">${esc(v.customerName || 'Showroom Client')}</p>
+                          <p class="admin-table-sub font-mono-tech">${esc(v.customerEmail)}</p>
+                        </td>
                         <td class="admin-col-primary">
                           <p class="admin-table-title">${esc(v.furnitureName || v.productName)}</p>
-                          <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || '')}</p>
+                          <p class="admin-table-sub font-mono-tech">${esc(v.furnitureSku || 'LR-ITEM')}${prodPrice > 0 ? ` · ${usd(prodPrice)}` : ''}</p>
                         </td>
-                        <td class="font-mono-tech text-xs font-bold text-[#0095FF] whitespace-nowrap">${esc(discountText)}</td>
+                        <td class="font-mono-tech text-xs font-bold text-[#0095FF] whitespace-nowrap">
+                          -${usd(discountAmt)}
+                        </td>
                         <td class="whitespace-nowrap">
-                          <span class="admin-status-badge ${v.status === 'Active' ? 'admin-status-in-stock' : 'bg-slate-100 text-slate-600'}">
-                            <span class="admin-status-badge-dot"></span>${esc(v.status)}
+                          <p class="text-xs font-semibold text-slate-800">${esc(issuedInfo.primary)}</p>
+                          <p class="text-[11px] text-slate-500 font-mono-tech">${esc(issuedInfo.secondary)}</p>
+                        </td>
+                        <td class="whitespace-nowrap">
+                          <p class="text-xs font-semibold text-slate-800">${esc(expiryInfo.primary)}</p>
+                          <p class="text-[11px] text-slate-500 font-mono-tech">${esc(expiryInfo.secondary)}</p>
+                        </td>
+                        <td class="whitespace-nowrap">
+                          ${
+                            statusInfo.isUsable && statusInfo.expiresAtMs
+                              ? `<span data-voucher-countdown="${esc(v.id)}" data-voucher-expires="${statusInfo.expiresAtMs}" data-voucher-status="${esc(statusInfo.status)}" class="vch-remaining-badge ${remainingPillClass}">${esc(statusInfo.remainingLabel)}</span>`
+                              : `<span class="vch-remaining-badge ${remainingPillClass}">${esc(statusInfo.remainingLabel)}</span>`
+                          }
+                        </td>
+                        <td class="whitespace-nowrap">
+                          <span class="admin-status-badge ${statusInfo.badgeClass}">
+                            <span class="admin-status-badge-dot"></span>${esc(statusInfo.status)}
                           </span>
-                          <span class="text-xs text-slate-400 ml-1">Exp ${esc(v.expiryDate || '2026-12-31')}</span>
                         </td>
                         <td class="text-right whitespace-nowrap">
-                          <button type="button" data-revoke-voucher="${esc(v.id)}" class="admin-btn admin-btn-sm admin-btn-danger-ghost">
-                            Revoke
-                          </button>
+                          <div class="admin-action-menu">
+                            <button
+                              type="button"
+                              data-vch-menu-trigger="${esc(menuId)}"
+                              aria-label="Actions for voucher ${esc(v.code)}"
+                              aria-expanded="${isMenuOpen ? 'true' : 'false'}"
+                              class="admin-action-trigger"
+                            >
+                              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <circle cx="12" cy="5" r="1.8" />
+                                <circle cx="12" cy="12" r="1.8" />
+                                <circle cx="12" cy="19" r="1.8" />
+                              </svg>
+                            </button>
+                            <div class="admin-action-dropdown ${isMenuOpen ? '' : 'hidden'}" role="menu">
+                              <button
+                                type="button"
+                                data-vch-copy-code="${esc(v.code)}"
+                                class="admin-action-item"
+                                role="menuitem"
+                              >
+                                Copy Code
+                              </button>
+                              ${
+                                canRevoke
+                                  ? `<div class="admin-action-divider"></div>
+                                    <button
+                                      type="button"
+                                      data-revoke-voucher="${esc(v.id)}"
+                                      class="admin-action-item is-danger"
+                                      role="menuitem"
+                                    >
+                                      Revoke Voucher
+                                    </button>`
+                                  : ''
+                              }
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     `;
@@ -5573,19 +6091,69 @@ function renderDashboardContent() {
       </div>
     `;
 
+    adminVouchersEl.querySelectorAll('[data-vch-menu-trigger]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menuId = btn.getAttribute('data-vch-menu-trigger') || '';
+        state.adminOpenActionMenuId = state.adminOpenActionMenuId === menuId ? '' : menuId;
+        renderDashboardContent();
+      });
+    });
+
+    adminVouchersEl.querySelectorAll('[data-vch-copy-code]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const code = btn.getAttribute('data-vch-copy-code') || '';
+        state.adminOpenActionMenuId = '';
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(code).catch(() => {});
+        }
+        showAdminBanner(`Copied voucher code "${code}" to clipboard.`);
+        renderDashboardContent();
+      });
+    });
+
     adminVouchersEl.querySelectorAll('[data-revoke-voucher]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const vid = btn.getAttribute('data-revoke-voucher');
+        const vid = btn.getAttribute('data-revoke-voucher') || '';
         const vch = state.vouchers.find((v) => v.id === vid);
+        state.adminOpenActionMenuId = '';
         if (!vch) return;
+        renderDashboardContent();
         openAdminConfirmModal({
           title: 'Revoke Voucher',
-          message: `Are you sure you want to revoke voucher "${vch.code}" for ${vch.customerEmail}?`,
+          message: `Are you sure you want to revoke voucher "${vch.code}" (${usd(vch.discountAmount)} OFF "${vch.furnitureName}") assigned to ${vch.customerEmail}? It will immediately become unusable.`,
           confirmLabel: 'Revoke Voucher',
-          onConfirm: () => {
-            state.vouchers = state.vouchers.filter((v) => v.id !== vid);
-            syncDatabaseStore('sync_store');
-            showAdminBanner(`Revoked voucher ${vch.code}.`);
+          onConfirm: async () => {
+            try {
+              const resp = await fetch(API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                  action: 'revoke_voucher',
+                  voucherId: vid,
+                }),
+              });
+              const data = await resp.json();
+              if (resp.ok && data.ok && Array.isArray(data.vouchers)) {
+                state.vouchers = data.vouchers;
+              } else {
+                const fallback = revokeVoucherInList(state.vouchers, vid, Date.now());
+                if (fallback.ok) state.vouchers = fallback.vouchers;
+                syncDatabaseStore('sync_store');
+              }
+            } catch (_err) {
+              const fallback = revokeVoucherInList(state.vouchers, vid, Date.now());
+              if (fallback.ok) state.vouchers = fallback.vouchers;
+              syncDatabaseStore('sync_store');
+            }
+            if (
+              state.appliedVoucher &&
+              String(state.appliedVoucher.id) === String(vid)
+            ) {
+              state.appliedVoucher = null;
+            }
+            showAdminBanner(`Voucher ${vch.code} has been revoked.`);
             renderDashboardContent();
           },
         });

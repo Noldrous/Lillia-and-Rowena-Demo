@@ -114,6 +114,7 @@ class Database
                 `Code` VARCHAR(50) NOT NULL UNIQUE,
                 `DiscountValue` DECIMAL(10,2) NOT NULL,
                 `ExpiryDate` DATE DEFAULT NULL,
+                `ExpiresAt` DATETIME DEFAULT NULL,
                 `Status` VARCHAR(20) NOT NULL DEFAULT 'Active',
                 `IssuedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (`VoucherID`, `ProductID`),
@@ -121,6 +122,7 @@ class Database
                 FOREIGN KEY (`ProductID`) REFERENCES `Product`(`ProductID`),
                 FOREIGN KEY (`AdminID`) REFERENCES `Admin`(`AdminID`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "ALTER TABLE `Voucher` ADD COLUMN `ExpiresAt` DATETIME DEFAULT NULL AFTER `ExpiryDate`",
             "CREATE TABLE IF NOT EXISTS `Customer_Order` (
                 `OrderID` INT AUTO_INCREMENT PRIMARY KEY,
                 `CustomerID` INT NOT NULL,
@@ -491,7 +493,7 @@ class Database
                 }
 
                 // Sync Voucher Status from PDO MySQL Voucher table
-                $dbVouchers = $this->fetchAll('SELECT Code, DiscountValue, ExpiryDate, Status FROM Voucher');
+                $dbVouchers = $this->fetchAll('SELECT Code, DiscountValue, ExpiryDate, ExpiresAt, Status FROM Voucher');
                 if (!empty($dbVouchers) && isset($decoded['vouchers']) && is_array($decoded['vouchers'])) {
                     $vByCode = [];
                     foreach ($dbVouchers as $row) {
@@ -502,6 +504,10 @@ class Database
                         if (isset($vByCode[$codeKey])) {
                             $v['status'] = (string) $vByCode[$codeKey]['Status'];
                             $v['discountValue'] = (float) $vByCode[$codeKey]['DiscountValue'];
+                            $v['discountAmount'] = (float) $vByCode[$codeKey]['DiscountValue'];
+                            if (!empty($vByCode[$codeKey]['ExpiresAt'])) {
+                                $v['expiresAt'] = (string) $vByCode[$codeKey]['ExpiresAt'];
+                            }
                         }
                     }
                     unset($v);
@@ -656,31 +662,42 @@ class Database
                     if ($code === '') {
                         continue;
                     }
-                    $discount = max(1.0, (float) ($voucher['discountAmount'] ?? $voucher['discountValue'] ?? $voucher['discountPercent'] ?? 50));
-                    $status = in_array(($voucher['status'] ?? 'Active'), ['Active', 'Used', 'Expired', 'Cancelled'], true)
+                    $discount = max(1.0, (float) ($voucher['discountAmount'] ?? $voucher['discountValue'] ?? 50));
+                    $allowedStatuses = ['Active', 'Expiring Soon', 'Used', 'Expired', 'Revoked', 'Cancelled'];
+                    $status = in_array(($voucher['status'] ?? 'Active'), $allowedStatuses, true)
                         ? (string) $voucher['status']
                         : 'Active';
                     $expiry = !empty($voucher['expiryDate']) ? (string) $voucher['expiryDate'] : null;
+                    $expiresAtSql = null;
+                    if (!empty($voucher['expiresAt'])) {
+                        $ts = strtotime((string) $voucher['expiresAt']);
+                        if ($ts !== false) {
+                            $dt = (new \DateTimeImmutable('@' . $ts))->setTimezone(new \DateTimeZone('Asia/Manila'));
+                            $expiresAtSql = $dt->format('Y-m-d H:i:s');
+                        }
+                    }
 
                     $existing = $this->fetch('SELECT VoucherID FROM Voucher WHERE Code = :code LIMIT 1', [':code' => $code]);
                     if ($existing !== null) {
                         $this->query(
-                            'UPDATE Voucher SET DiscountValue = :val, ExpiryDate = :exp, Status = :status WHERE VoucherID = :id',
+                            'UPDATE Voucher SET DiscountValue = :val, ExpiryDate = :exp, ExpiresAt = :expat, Status = :status WHERE VoucherID = :id',
                             [
                                 ':val'    => $discount,
                                 ':exp'    => $expiry,
+                                ':expat'  => $expiresAtSql,
                                 ':status' => $status,
                                 ':id'     => (int) $existing['VoucherID'],
                             ]
                         );
                     } else {
                         $this->query(
-                            'INSERT IGNORE INTO Voucher (CustomerID, ProductID, AdminID, Code, DiscountValue, ExpiryDate, Status)
-                             VALUES (1, 1, 1, :code, :val, :exp, :status)',
+                            'INSERT IGNORE INTO Voucher (CustomerID, ProductID, AdminID, Code, DiscountValue, ExpiryDate, ExpiresAt, Status)
+                             VALUES (1, 1, 1, :code, :val, :exp, :expat, :status)',
                             [
                                 ':code'   => $code,
                                 ':val'    => $discount,
                                 ':exp'    => $expiry,
+                                ':expat'  => $expiresAtSql,
                                 ':status' => $status,
                             ]
                         );
@@ -1381,11 +1398,14 @@ class Database
                     'furnitureId' => 'furn-lv-01',
                     'furnitureSku' => 'LR-LV-014',
                     'furnitureName' => 'Rowena Curved Bouclé Lounge Sofa',
+                    'discountType' => 'fixed',
                     'discountAmount' => 400,
                     'status' => 'Active',
                     'issuedByAdmin' => 'Lillia Mercier',
                     'createdAt' => '2026-11-10',
+                    'issuedAt' => null,
                     'expiryDate' => '2026-12-31',
+                    'expiresAt' => null,
                 ],
                 [
                     'id' => 'vch-102',
@@ -1395,11 +1415,14 @@ class Database
                     'furnitureId' => 'furn-dn-01',
                     'furnitureSku' => 'LR-DN-108',
                     'furnitureName' => 'Lillia Monolith Solid Walnut Dining Table',
+                    'discountType' => 'fixed',
                     'discountAmount' => 350,
                     'status' => 'Active',
                     'issuedByAdmin' => 'Lillia Mercier',
                     'createdAt' => '2026-11-11',
+                    'issuedAt' => null,
                     'expiryDate' => '2026-12-31',
+                    'expiresAt' => null,
                 ],
                 [
                     'id' => 'vch-103',
@@ -1409,11 +1432,14 @@ class Database
                     'furnitureId' => 'furn-bd-01',
                     'furnitureSku' => 'LR-BD-204',
                     'furnitureName' => 'Serene Belgian Linen Platform Bed (King)',
+                    'discountType' => 'fixed',
                     'discountAmount' => 250,
                     'status' => 'Active',
                     'issuedByAdmin' => 'Lillia Mercier',
                     'createdAt' => '2026-11-09',
+                    'issuedAt' => null,
                     'expiryDate' => '2026-12-15',
+                    'expiresAt' => null,
                 ],
             ],
             'orders' => [

@@ -101,6 +101,281 @@ class Product
     }
 
     /**
+     * Resolve the authoritative status of a voucher using Asia/Manila server time.
+     *
+     * @param array<string, mixed> $voucher
+     */
+    public function resolveVoucherStatus(array $voucher, ?int $nowTs = null): string
+    {
+        $rawStatus = trim((string) ($voucher['status'] ?? 'Active'));
+        if ($rawStatus === 'Used') {
+            return 'Used';
+        }
+        if ($rawStatus === 'Revoked' || $rawStatus === 'Cancelled') {
+            return 'Revoked';
+        }
+        if ($rawStatus === 'Expired') {
+            return 'Expired';
+        }
+
+        $manilaTz = new \DateTimeZone('Asia/Manila');
+        $now = $nowTs ?? (new \DateTimeImmutable('now', $manilaTz))->getTimestamp();
+        $expTs = $this->resolveVoucherExpirationTimestamp($voucher, $manilaTz);
+
+        if ($expTs !== null) {
+            $remainingSec = $expTs - $now;
+            if ($remainingSec <= 0) {
+                return 'Expired';
+            }
+            if ($remainingSec <= 3600) {
+                return 'Expiring Soon';
+            }
+        }
+
+        return 'Active';
+    }
+
+    /**
+     * Resolve the Unix timestamp of a voucher's expiration in Asia/Manila timezone.
+     *
+     * @param array<string, mixed> $voucher
+     */
+    public function resolveVoucherExpirationTimestamp(array $voucher, ?\DateTimeZone $manilaTz = null): ?int
+    {
+        $tz = $manilaTz ?? new \DateTimeZone('Asia/Manila');
+        $expiresAt = trim((string) ($voucher['expiresAt'] ?? ''));
+        if ($expiresAt !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiresAt)) {
+            try {
+                $dt = new \DateTimeImmutable($expiresAt, $tz);
+                return $dt->getTimestamp();
+            } catch (\Throwable) {
+                // Fall back to expiryDate
+            }
+        }
+
+        $expiryDate = trim((string) ($voucher['expiryDate'] ?? $expiresAt));
+        if ($expiryDate !== '') {
+            try {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiryDate)) {
+                    $dt = new \DateTimeImmutable($expiryDate . ' 23:59:59', $tz);
+                } else {
+                    $dt = new \DateTimeImmutable($expiryDate, $tz);
+                }
+                return $dt->getTimestamp();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize all voucher statuses dynamically based on current server time.
+     *
+     * @param array<int, array<string, mixed>> $vouchers
+     * @return array<int, array<string, mixed>>
+     */
+    public function normalizeVouchersStatus(array $vouchers): array
+    {
+        $manilaTz = new \DateTimeZone('Asia/Manila');
+        $nowTs = (new \DateTimeImmutable('now', $manilaTz))->getTimestamp();
+
+        foreach ($vouchers as &$v) {
+            if (is_array($v)) {
+                $v['discountType'] = 'fixed';
+                $v['status'] = $this->resolveVoucherStatus($v, $nowTs);
+            }
+        }
+        unset($v);
+
+        return $vouchers;
+    }
+
+    /**
+     * Validate and create a fixed-amount discount voucher with server-side issuance timestamp
+     * and Asia/Manila expiration handling.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     * @throws ValidationException
+     */
+    public function createVoucher(array $input): array
+    {
+        $store = $this->db->readStore();
+        $products = isset($store['products']) && is_array($store['products']) ? $store['products'] : [];
+        $vouchers = isset($store['vouchers']) && is_array($store['vouchers']) ? $store['vouchers'] : [];
+
+        $customerEmail = strtolower(trim((string) ($input['customerEmail'] ?? '')));
+        if ($customerEmail === '' || filter_var($customerEmail, FILTER_VALIDATE_EMAIL) === false) {
+            throw new ValidationException('Enter a valid customer email address.');
+        }
+
+        $furnitureId = trim((string) ($input['furnitureId'] ?? $input['productId'] ?? ''));
+        $matchedProduct = null;
+        foreach ($products as $prod) {
+            if ((string) ($prod['id'] ?? '') === $furnitureId) {
+                $matchedProduct = $prod;
+                break;
+            }
+        }
+
+        if ($furnitureId === '' || $matchedProduct === null) {
+            throw new ValidationException('Select a valid eligible product from the catalog.');
+        }
+
+        $code = strtoupper(preg_replace('/\s+/', '-', trim((string) ($input['code'] ?? ''))) ?? '');
+        if (strlen($code) < 3) {
+            throw new ValidationException('Enter or generate a valid voucher code (at least 3 characters).');
+        }
+
+        foreach ($vouchers as $existing) {
+            if (strtoupper(trim((string) ($existing['code'] ?? ''))) === $code) {
+                throw new ValidationException('Voucher code "' . $code . '" already exists. Please generate or enter a unique code.');
+            }
+        }
+
+        $discountAmount = round((float) ($input['discountAmount'] ?? $input['discountValue'] ?? 0), 2);
+        if ($discountAmount <= 0) {
+            throw new ValidationException('Discount Amount ($) must be greater than $0.');
+        }
+
+        $maxProductPrice = (float) ($matchedProduct['effectivePrice'] ?? $matchedProduct['price'] ?? 0);
+        if ($maxProductPrice > 0 && $discountAmount > $maxProductPrice) {
+            throw new ValidationException(
+                sprintf(
+                    'Discount Amount ($%s) cannot exceed the eligible product\'s price ($%s for %s).',
+                    number_format($discountAmount, 0),
+                    number_format($maxProductPrice, 0),
+                    (string) ($matchedProduct['name'] ?? 'Selected Product')
+                )
+            );
+        }
+
+        $manilaTz = new \DateTimeZone('Asia/Manila');
+        $issuedNow = new \DateTimeImmutable('now', $manilaTz);
+        $issuedTs = $issuedNow->getTimestamp();
+
+        $expirationMethod = strtolower(trim((string) ($input['expirationMethod'] ?? 'duration')));
+        if ($expirationMethod !== 'custom' && $expirationMethod !== 'duration') {
+            throw new ValidationException('Select a valid expiration method (Custom Date & Time or Set Duration).');
+        }
+
+        if ($expirationMethod === 'custom') {
+            $expiryDate = trim((string) ($input['expiryDate'] ?? ''));
+            $expiryTime = trim((string) ($input['expiryTime'] ?? ''));
+            if ($expiryDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiryDate)) {
+                throw new ValidationException('Select a valid expiration date.');
+            }
+            if ($expiryTime === '' || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $expiryTime)) {
+                throw new ValidationException('Select a valid expiration time.');
+            }
+            $timeNormalized = strlen($expiryTime) === 5 ? $expiryTime . ':00' : $expiryTime;
+            try {
+                $expiresDt = new \DateTimeImmutable($expiryDate . ' ' . $timeNormalized, $manilaTz);
+            } catch (\Throwable) {
+                throw new ValidationException('Invalid expiration date and time.');
+            }
+            if ($expiresDt->getTimestamp() <= $issuedTs) {
+                throw new ValidationException('Expiration date and time cannot be in the past. Please choose a future time (Asia/Manila).');
+            }
+        } else {
+            $durationValue = (float) ($input['durationValue'] ?? 0);
+            $durationUnit = strtolower(trim((string) ($input['durationUnit'] ?? 'hours')));
+            if ($durationValue <= 0) {
+                throw new ValidationException('Duration must be greater than 0.');
+            }
+            $unitSeconds = match ($durationUnit) {
+                'minutes', 'minute' => 60,
+                'hours', 'hour'     => 3600,
+                'days', 'day'       => 86400,
+                default             => throw new ValidationException('Select a valid duration unit (Minutes, Hours, or Days).'),
+            };
+            $expiresTs = $issuedTs + (int) round($durationValue * $unitSeconds);
+            $expiresDt = (new \DateTimeImmutable('@' . $expiresTs))->setTimezone($manilaTz);
+        }
+
+        $emailPrefix = explode('@', $customerEmail)[0] ?: 'Showroom Client';
+        $defaultName = ucwords(str_replace(['.', '_', '-'], ' ', $emailPrefix));
+        $customerName = trim((string) ($input['customerName'] ?? '')) ?: $defaultName;
+        $issuedByAdmin = trim((string) ($input['issuedByAdmin'] ?? '')) ?: 'Lillia Mercier';
+
+        $voucher = [
+            'id'               => (string) ($input['id'] ?? ('vch-' . (int) round(microtime(true) * 1000))),
+            'code'             => $code,
+            'customerEmail'    => $customerEmail,
+            'customerName'     => $customerName,
+            'furnitureId'      => (string) $matchedProduct['id'],
+            'furnitureSku'     => (string) ($matchedProduct['sku'] ?? 'LR-ITEM'),
+            'furnitureName'    => (string) ($matchedProduct['name'] ?? 'Eligible Piece'),
+            'productPrice'     => $maxProductPrice,
+            'discountType'     => 'fixed',
+            'discountPercent'  => null,
+            'discountAmount'   => $discountAmount,
+            'discountValue'    => $discountAmount,
+            'status'           => 'Active',
+            'issuedByAdmin'    => $issuedByAdmin,
+            'createdAt'        => $issuedNow->format('Y-m-d'),
+            'issuedAt'         => $issuedNow->format(\DateTimeInterface::ATOM),
+            'expiryDate'       => $expiresDt->format('Y-m-d'),
+            'expiresAt'        => $expiresDt->format(\DateTimeInterface::ATOM),
+            'expirationMethod' => $expirationMethod,
+        ];
+        $voucher['status'] = $this->resolveVoucherStatus($voucher, $issuedTs);
+
+        array_unshift($vouchers, $voucher);
+        $store['vouchers'] = $this->normalizeVouchersStatus($vouchers);
+        $this->db->writeStore($store);
+
+        return $voucher;
+    }
+
+    /**
+     * Revoke an issued voucher by ID or Code.
+     *
+     * @return array<string, mixed>
+     * @throws ValidationException
+     */
+    public function revokeVoucher(string $voucherId): array
+    {
+        $cleanId = trim($voucherId);
+        if ($cleanId === '') {
+            throw new ValidationException('Voucher ID is required.');
+        }
+
+        $store = $this->db->readStore();
+        $vouchers = isset($store['vouchers']) && is_array($store['vouchers']) ? $store['vouchers'] : [];
+        $manilaTz = new \DateTimeZone('Asia/Manila');
+        $revokedAt = (new \DateTimeImmutable('now', $manilaTz))->format(\DateTimeInterface::ATOM);
+
+        $revokedVoucher = null;
+        foreach ($vouchers as &$v) {
+            $matchesId = (string) ($v['id'] ?? '') === $cleanId;
+            $matchesCode = strcasecmp((string) ($v['code'] ?? ''), $cleanId) === 0;
+            if (!$matchesId && !$matchesCode) {
+                continue;
+            }
+            if (($v['status'] ?? '') === 'Used') {
+                throw new ValidationException('Cannot revoke a voucher that has already been redeemed.');
+            }
+            $v['status'] = 'Revoked';
+            $v['revokedAt'] = $revokedAt;
+            $revokedVoucher = $v;
+            break;
+        }
+        unset($v);
+
+        if ($revokedVoucher === null) {
+            throw new ValidationException('Voucher not found.');
+        }
+
+        $store['vouchers'] = $this->normalizeVouchersStatus($vouchers);
+        $this->db->writeStore($store);
+
+        return $revokedVoucher;
+    }
+
+    /**
      * Validate a single-customer, single-product Voucher matching the MySQL stored procedure
      * `check_voucher_use(p_voucher_id, p_order_id, p_check_status)` in `database/furniture.sql`.
      *
@@ -121,6 +396,7 @@ class Product
 
         $store = $this->db->readStore();
         $vouchers = isset($store['vouchers']) && is_array($store['vouchers']) ? $store['vouchers'] : [];
+        $products = isset($store['products']) && is_array($store['products']) ? $store['products'] : [];
 
         foreach ($vouchers as $voucher) {
             if (strtoupper((string) ($voucher['code'] ?? '')) !== $normalizedCode) {
@@ -128,10 +404,12 @@ class Product
             }
 
             $voucherEmail = strtolower(trim((string) ($voucher['customerEmail'] ?? '')));
-            if ($voucherEmail !== '' && $voucherEmail !== 'all' && $voucherEmail !== '*' && $voucherEmail !== $normalizedEmail) {
-                throw new ValidationException(
-                    'SQLSTATE[45000]: Voucher does not belong to the customer of this order (' . $voucher['customerEmail'] . ' only).'
-                );
+            if ($voucherEmail !== '' && $voucherEmail !== 'all' && $voucherEmail !== '*') {
+                if ($normalizedEmail === '' || $voucherEmail !== $normalizedEmail) {
+                    throw new ValidationException(
+                        'SQLSTATE[45000]: Voucher does not belong to the customer of this order (' . $voucher['customerEmail'] . ' only).'
+                    );
+                }
             }
 
             $targetProductId = (string) ($voucher['furnitureId'] ?? $voucher['productId'] ?? '');
@@ -142,14 +420,33 @@ class Product
                 );
             }
 
-            if (($voucher['status'] ?? '') !== 'Active') {
-                throw new ValidationException('SQLSTATE[45000]: Voucher is not active (Status: ' . ($voucher['status'] ?? 'Unknown') . ').');
+            $effectiveStatus = $this->resolveVoucherStatus($voucher);
+            if ($effectiveStatus === 'Expired') {
+                throw new ValidationException('SQLSTATE[45000]: Voucher "' . $normalizedCode . '" has expired.');
+            }
+            if ($effectiveStatus === 'Revoked') {
+                throw new ValidationException('SQLSTATE[45000]: Voucher "' . $normalizedCode . '" has been revoked.');
+            }
+            if ($effectiveStatus !== 'Active' && $effectiveStatus !== 'Expiring Soon') {
+                throw new ValidationException('SQLSTATE[45000]: Voucher is not active (Status: ' . $effectiveStatus . ').');
             }
 
-            if (!empty($voucher['expiryDate']) && (string) $voucher['expiryDate'] < date('Y-m-d')) {
-                throw new ValidationException('SQLSTATE[45000]: Voucher has expired.');
+            $discountAmount = (float) ($voucher['discountAmount'] ?? $voucher['discountValue'] ?? 0);
+            if ($discountAmount <= 0) {
+                throw new ValidationException('Voucher discount amount must be greater than $0.');
             }
 
+            foreach ($products as $prod) {
+                if ((string) ($prod['id'] ?? '') === $targetProductId) {
+                    $maxPrice = (float) ($prod['effectivePrice'] ?? $prod['price'] ?? 0);
+                    if ($maxPrice > 0 && $discountAmount > $maxPrice) {
+                        throw new ValidationException('Voucher discount amount exceeds the eligible product price.');
+                    }
+                    break;
+                }
+            }
+
+            $voucher['status'] = $effectiveStatus;
             return $voucher;
         }
 
@@ -201,16 +498,26 @@ class Product
                 throw new ValidationException('Voucher code "' . $normalizedCode . '" was not found.');
             }
 
-            if (($matchedVoucher['status'] ?? '') !== 'Active') {
-                throw new ValidationException('Voucher "' . $normalizedCode . '" is no longer active.');
+            $effectiveStatus = $this->resolveVoucherStatus($matchedVoucher);
+            if ($effectiveStatus === 'Expired') {
+                throw new ValidationException('Voucher "' . $normalizedCode . '" has expired.');
             }
+            if ($effectiveStatus === 'Revoked') {
+                throw new ValidationException('Voucher "' . $normalizedCode . '" has been revoked and is no longer valid.');
+            }
+            if ($effectiveStatus !== 'Active' && $effectiveStatus !== 'Expiring Soon') {
+                throw new ValidationException('Voucher "' . $normalizedCode . '" is no longer active (' . $effectiveStatus . ').');
+            }
+            $matchedVoucher['status'] = $effectiveStatus;
 
             $voucherEmail = strtolower(trim((string) ($matchedVoucher['customerEmail'] ?? '')));
             $normalizedEmail = strtolower(trim($customerEmail));
-            if ($voucherEmail !== '' && $voucherEmail !== 'all' && $voucherEmail !== '*' && $voucherEmail !== $normalizedEmail) {
-                throw new ValidationException(
-                    'SQLSTATE[45000]: Voucher does not belong to the customer of this order.'
-                );
+            if ($voucherEmail !== '' && $voucherEmail !== 'all' && $voucherEmail !== '*') {
+                if ($normalizedEmail === '' || $voucherEmail !== $normalizedEmail) {
+                    throw new ValidationException(
+                        'SQLSTATE[45000]: Voucher does not belong to the customer of this order.'
+                    );
+                }
             }
 
             $targetProductId = (string) ($matchedVoucher['furnitureId'] ?? $matchedVoucher['productId'] ?? '');
@@ -228,6 +535,19 @@ class Product
                 throw new ValidationException(
                     'This voucher is only valid for the selected product (' . $targetName . ').'
                 );
+            }
+
+            $discountVal = (float) ($matchedVoucher['discountAmount'] ?? $matchedVoucher['discountValue'] ?? 0);
+            if ($discountVal <= 0) {
+                throw new ValidationException('Voucher "' . $normalizedCode . '" has an invalid discount amount.');
+            }
+            if (isset($productMap[$targetProductId])) {
+                $maxProdPrice = (float) ($productMap[$targetProductId]['effectivePrice'] ?? $productMap[$targetProductId]['price'] ?? 0);
+                if ($maxProdPrice > 0 && $discountVal > $maxProdPrice) {
+                    throw new ValidationException(
+                        'Voucher "' . $normalizedCode . '" discount ($' . $discountVal . ') exceeds the eligible product price ($' . $maxProdPrice . ').'
+                    );
+                }
             }
         }
 

@@ -11,18 +11,25 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/bootstrap.php';
 
+use App\Models\Product;
 use App\Models\User;
 use Library\Database;
+
+date_default_timezone_set('Asia/Manila');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 $db = Database::getInstance();
+$productModel = new Product($db);
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
 try {
     if ($method === 'GET') {
         $store = $db->readStore();
+        if (isset($store['vouchers']) && is_array($store['vouchers'])) {
+            $store['vouchers'] = $productModel->normalizeVouchersStatus($store['vouchers']);
+        }
         if (isset($_SESSION['user']) && is_array($_SESSION['user'])) {
             $store['sessionUser'] = $_SESSION['user'];
         } elseif (!isset($store['sessionUser'])) {
@@ -37,7 +44,8 @@ try {
             'driver'         => 'pdo_mysql',
             'endpoint'       => 'src/api.php',
             'mysqlConnected' => $db->isMySqlConnected(),
-            'timestamp'      => gmdate('c'),
+            'timezone'       => 'Asia/Manila',
+            'timestamp'      => (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))->format(\DateTimeInterface::ATOM),
         ];
         echo json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
@@ -54,6 +62,57 @@ try {
         $store = $db->readStore();
 
         switch ($action) {
+            case 'create_voucher':
+                $voucherInput = isset($payload['voucher']) && is_array($payload['voucher']) ? $payload['voucher'] : $payload;
+                $createdVoucher = $productModel->createVoucher($voucherInput);
+                $updatedStore = $db->readStore();
+                echo json_encode([
+                    'ok'             => true,
+                    'action'         => 'create_voucher',
+                    'voucher'        => $createdVoucher,
+                    'vouchers'       => $updatedStore['vouchers'] ?? [],
+                    'mysqlConnected' => $db->isMySqlConnected(),
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit;
+
+            case 'revoke_voucher':
+                $voucherId = (string) ($payload['voucherId'] ?? $payload['id'] ?? $payload['code'] ?? '');
+                $revokedVoucher = $productModel->revokeVoucher($voucherId);
+                $updatedStore = $db->readStore();
+                echo json_encode([
+                    'ok'             => true,
+                    'action'         => 'revoke_voucher',
+                    'voucher'        => $revokedVoucher,
+                    'vouchers'       => $updatedStore['vouchers'] ?? [],
+                    'mysqlConnected' => $db->isMySqlConnected(),
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                exit;
+
+            case 'validate_voucher':
+                $voucherCode = (string) ($payload['voucherCode'] ?? $payload['code'] ?? '');
+                $customerEmail = (string) ($payload['customerEmail'] ?? '');
+                $cartItems = isset($payload['cartItems']) && is_array($payload['cartItems']) ? $payload['cartItems'] : [];
+                if (!empty($cartItems)) {
+                    $pricing = $productModel->calculateCartOrderWithVoucher($cartItems, $voucherCode, $customerEmail);
+                    echo json_encode([
+                        'ok'             => true,
+                        'valid'          => true,
+                        'voucher'        => $pricing['validatedVoucher'],
+                        'discountAmount' => $pricing['voucherDiscountAmount'],
+                        'pricing'        => $pricing,
+                    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                } else {
+                    $productId = (string) ($payload['productId'] ?? $payload['furnitureId'] ?? '');
+                    $validated = $productModel->validateVoucherForCustomerAndProduct($voucherCode, $customerEmail, $productId);
+                    echo json_encode([
+                        'ok'             => true,
+                        'valid'          => true,
+                        'voucher'        => $validated,
+                        'discountAmount' => (float) ($validated['discountAmount'] ?? $validated['discountValue'] ?? 0),
+                    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                }
+                exit;
+
             case 'sync_store':
                 if (isset($payload['products']) && is_array($payload['products'])) {
                     $store['products'] = $payload['products'];
@@ -65,7 +124,7 @@ try {
                     $store['inventoryTransactions'] = $payload['inventoryTransactions'];
                 }
                 if (isset($payload['vouchers']) && is_array($payload['vouchers'])) {
-                    $store['vouchers'] = $payload['vouchers'];
+                    $store['vouchers'] = $productModel->normalizeVouchersStatus($payload['vouchers']);
                 }
                 if (isset($payload['orders']) && is_array($payload['orders'])) {
                     $store['orders'] = $payload['orders'];
@@ -163,7 +222,7 @@ try {
                         static fn(array $p): bool => (string) ($p['id'] ?? '') !== $productId
                     ));
                     if (isset($payload['vouchers']) && is_array($payload['vouchers'])) {
-                        $store['vouchers'] = $payload['vouchers'];
+                        $store['vouchers'] = $productModel->normalizeVouchersStatus($payload['vouchers']);
                     }
                     if ($db->isMySqlConnected() && $removedName !== null && $removedName !== '') {
                         try {

@@ -39,6 +39,13 @@ import {
   validateNewFurnitureInput,
   validateVoucherForOrder,
   verifyAndCreateOrder,
+  calculateExpirationFromInput,
+  computeVoucherStatusInfo,
+  filterCustomerVouchers,
+  formatVoucherExpiryDisplay,
+  formatVoucherIssuedDisplay,
+  revokeVoucherInList,
+  validateAndCreateVoucher,
 } from './store.js';
 
 function loadSeedFromPhp() {
@@ -539,7 +546,156 @@ describe('Pure JavaScript & Server Store Logic Tests', () => {
     assert.ok(loggedInDesignReq.messageText.includes('Rowena Vance'));
     assert.ok(loggedInDesignReq.messageText.includes('request a custom furniture design'));
   });
+
+  it('enforces fixed-amount-only voucher creation, product price cap validation, and automatic issuance timestamps', () => {
+    const nowMs = Date.parse('2026-11-16T02:00:00Z'); // 10:00 AM Asia/Manila
+    // Sofafurn-lv-01 has effectivePrice = 4365
+    const overPriceRes = validateAndCreateVoucher(
+      {
+        customerEmail: 'rowena.vance@vancearchitects.com',
+        furnitureId: 'furn-lv-01',
+        code: 'OVER-PRICE-5000',
+        discountAmount: 5000,
+        expirationMethod: 'duration',
+        durationValue: 24,
+        durationUnit: 'hours',
+      },
+      INITIAL_FURNITURE_ITEMS,
+      INITIAL_VOUCHERS,
+      nowMs
+    );
+    assert.equal(overPriceRes.ok, false);
+    assert.ok(overPriceRes.errorMessage.includes("cannot exceed the eligible product's price"));
+
+    const zeroRes = validateAndCreateVoucher(
+      {
+        customerEmail: 'rowena.vance@vancearchitects.com',
+        furnitureId: 'furn-lv-01',
+        code: 'ZERO-AMT',
+        discountAmount: 0,
+        expirationMethod: 'duration',
+        durationValue: 24,
+        durationUnit: 'hours',
+      },
+      INITIAL_FURNITURE_ITEMS,
+      INITIAL_VOUCHERS,
+      nowMs
+    );
+    assert.equal(zeroRes.ok, false);
+
+    // Valid creation with 30 minutes duration -> automatically Expiring Soon (<= 1 hour)
+    const validRes = validateAndCreateVoucher(
+      {
+        customerEmail: 'rowena.vance@vancearchitects.com',
+        furnitureId: 'furn-lv-01',
+        code: 'SAVE-350-NOW',
+        discountAmount: 350,
+        expirationMethod: 'duration',
+        durationValue: 30,
+        durationUnit: 'minutes',
+      },
+      INITIAL_FURNITURE_ITEMS,
+      INITIAL_VOUCHERS,
+      nowMs
+    );
+    assert.equal(validRes.ok, true);
+    assert.equal(validRes.voucher.discountType, 'fixed');
+    assert.equal(validRes.voucher.discountAmount, 350);
+    assert.equal(validRes.voucher.status, 'Expiring Soon');
+    assert.ok(validRes.voucher.issuedAt);
+    assert.ok(validRes.voucher.expiresAt);
+    const issuedDisplay = formatVoucherIssuedDisplay(validRes.voucher);
+    assert.equal(issuedDisplay.hasExactTime, true);
+    assert.ok(issuedDisplay.secondary.includes('PHT'));
+  });
+
+  it('preserves older voucher records without fabricating issuance timestamps and manages Active, Expiring Soon, Expired, Used, and Revoked statuses', () => {
+    const legacyVoucher = INITIAL_VOUCHERS[0]; // vch-101 has createdAt '2026-11-10' and issuedAt: null
+    const legacyIssued = formatVoucherIssuedDisplay(legacyVoucher);
+    assert.equal(legacyIssued.hasExactTime, false);
+    assert.equal(legacyIssued.secondary, 'Time not recorded');
+
+    const nowMs = Date.parse('2026-11-16T04:00:00Z');
+    // 1. Active (> 1 hour remaining)
+    const activeVch = {
+      code: 'VCH-ACTIVE',
+      customerEmail: 'rowena.vance@vancearchitects.com',
+      furnitureId: 'furn-lv-01',
+      discountType: 'fixed',
+      discountAmount: 300,
+      status: 'Active',
+      expiresAt: new Date(nowMs + 4 * 3600 * 1000).toISOString(),
+    };
+    const activeInfo = computeVoucherStatusInfo(activeVch, nowMs);
+    assert.equal(activeInfo.status, 'Active');
+    assert.equal(activeInfo.badgeClass, 'admin-status-voucher-active');
+    assert.equal(activeInfo.isUsable, true);
+
+    // 2. Expiring Soon (<= 1 hour remaining)
+    const expiringVch = {
+      ...activeVch,
+      code: 'VCH-EXPIRING',
+      expiresAt: new Date(nowMs + 45 * 60 * 1000).toISOString(),
+    };
+    const expiringInfo = computeVoucherStatusInfo(expiringVch, nowMs);
+    assert.equal(expiringInfo.status, 'Expiring Soon');
+    assert.equal(expiringInfo.badgeClass, 'admin-status-voucher-expiring');
+    assert.equal(expiringInfo.isUsable, true);
+
+    // 3. Expired (<= 0 remaining)
+    const expiredVch = {
+      ...activeVch,
+      code: 'VCH-EXPIRED',
+      expiresAt: new Date(nowMs - 60 * 1000).toISOString(),
+    };
+    const expiredInfo = computeVoucherStatusInfo(expiredVch, nowMs);
+    assert.equal(expiredInfo.status, 'Expired');
+    assert.equal(expiredInfo.badgeClass, 'admin-status-voucher-expired');
+    assert.equal(expiredInfo.isUsable, false);
+
+    // Expired voucher is rejected during order validation even if stored status was 'Active'
+    const expiredOrderCheck = validateVoucherForOrder(
+      [expiredVch],
+      'VCH-EXPIRED',
+      'rowena.vance@vancearchitects.com',
+      ['furn-lv-01'],
+      [{ id: 'furn-lv-01', price: 4365, effectivePrice: 4365 }],
+      nowMs
+    );
+    assert.equal(expiredOrderCheck.valid, false);
+    assert.ok(expiredOrderCheck.errorMessage.includes('expired'));
+
+    // 4. Revoked voucher transitions to Revoked and becomes unusable immediately
+    const revokeRes = revokeVoucherInList([activeVch], 'VCH-ACTIVE', nowMs);
+    assert.equal(revokeRes.ok, true);
+    assert.equal(revokeRes.voucher.status, 'Revoked');
+    const revokedInfo = computeVoucherStatusInfo(revokeRes.voucher, nowMs);
+    assert.equal(revokedInfo.status, 'Revoked');
+    assert.equal(revokedInfo.badgeClass, 'admin-status-voucher-revoked');
+    assert.equal(revokedInfo.isUsable, false);
+
+    const revokedOrderCheck = validateVoucherForOrder(
+      revokeRes.vouchers,
+      'VCH-ACTIVE',
+      'rowena.vance@vancearchitects.com',
+      ['furn-lv-01'],
+      [{ id: 'furn-lv-01', price: 4365, effectivePrice: 4365 }],
+      nowMs
+    );
+    assert.equal(revokedOrderCheck.valid, false);
+    assert.ok(revokedOrderCheck.errorMessage.includes('revoked'));
+
+    // 5. Customer voucher visibility strictly isolates vouchers by customer email
+    const rowenaVouchers = filterCustomerVouchers(INITIAL_VOUCHERS, 'rowena.vance@vancearchitects.com');
+    assert.ok(rowenaVouchers.length >= 2);
+    assert.ok(
+      rowenaVouchers.every(
+        (v) => v.customerEmail.toLowerCase() === 'rowena.vance@vancearchitects.com'
+      )
+    );
+  });
 });
+
 
 
 

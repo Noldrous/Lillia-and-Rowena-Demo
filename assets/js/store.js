@@ -253,6 +253,262 @@ export function resolveAuthoritativeLinePrice(item, catalog = null) {
   return Math.max(0, Number(item?.unitPrice ?? item?.effectivePrice ?? item?.price ?? 0));
 }
 
+export const VOUCHER_QUICK_DURATIONS = [
+  { label: '30 minutes', shortLabel: '30m', value: 30, unit: 'minutes' },
+  { label: '1 hour', shortLabel: '1h', value: 1, unit: 'hours' },
+  { label: '6 hours', shortLabel: '6h', value: 6, unit: 'hours' },
+  { label: '12 hours', shortLabel: '12h', value: 12, unit: 'hours' },
+  { label: '24 hours', shortLabel: '24h', value: 24, unit: 'hours' },
+  { label: '3 days', shortLabel: '3d', value: 3, unit: 'days' },
+  { label: '7 days', shortLabel: '7d', value: 7, unit: 'days' },
+];
+
+export function isDateOnlyString(val) {
+  return typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
+}
+
+export function formatManilaDateOnly(dateStr) {
+  if (!dateStr) return '—';
+  const clean = String(dateStr).trim();
+  const iso = isDateOnlyString(clean) ? `${clean}T12:00:00+08:00` : clean;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return clean;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed);
+}
+
+export function formatManilaDateTimeParts(isoStr) {
+  if (!isoStr) return { datePart: '—', timePart: '', full: '—' };
+  const clean = String(isoStr).trim();
+  if (isDateOnlyString(clean)) {
+    const datePart = formatManilaDateOnly(clean);
+    return { datePart, timePart: '', full: datePart };
+  }
+  const parsed = new Date(clean);
+  if (Number.isNaN(parsed.getTime())) {
+    return { datePart: clean, timePart: '', full: clean };
+  }
+  const datePart = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed);
+  const timePart =
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(parsed) + ' PHT';
+  return {
+    datePart,
+    timePart,
+    full: `${datePart}, ${timePart}`,
+  };
+}
+
+export function formatVoucherIssuedDisplay(voucher) {
+  if (!voucher || typeof voucher !== 'object') {
+    return { primary: '—', secondary: 'Not recorded', full: '—', hasExactTime: false };
+  }
+  if (voucher.issuedAt && !isDateOnlyString(voucher.issuedAt)) {
+    const parts = formatManilaDateTimeParts(voucher.issuedAt);
+    return {
+      primary: parts.datePart,
+      secondary: parts.timePart,
+      full: parts.full,
+      hasExactTime: true,
+    };
+  }
+  if (voucher.createdAt) {
+    const datePart = formatManilaDateOnly(voucher.createdAt);
+    return {
+      primary: datePart,
+      secondary: 'Time not recorded',
+      full: `${datePart} (Time not recorded)`,
+      hasExactTime: false,
+    };
+  }
+  return { primary: '—', secondary: 'Time not recorded', full: '—', hasExactTime: false };
+}
+
+export function resolveVoucherExpirationTimestamp(voucher) {
+  if (!voucher || typeof voucher !== 'object') return null;
+  if (voucher.expiresAt && !isDateOnlyString(voucher.expiresAt)) {
+    const ms = new Date(voucher.expiresAt).getTime();
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const rawExpiry = voucher.expiresAt || voucher.expiryDate;
+  if (rawExpiry) {
+    const clean = String(rawExpiry).trim();
+    if (isDateOnlyString(clean)) {
+      const ms = new Date(`${clean}T23:59:59+08:00`).getTime();
+      if (!Number.isNaN(ms)) return ms;
+    }
+    const ms = new Date(clean).getTime();
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return null;
+}
+
+export function formatVoucherExpiryDisplay(voucher) {
+  if (!voucher || typeof voucher !== 'object') {
+    return { primary: '—', secondary: '', full: '—', expiresAtMs: null };
+  }
+  const expiresAtMs = resolveVoucherExpirationTimestamp(voucher);
+  if (voucher.expiresAt && !isDateOnlyString(voucher.expiresAt)) {
+    const parts = formatManilaDateTimeParts(voucher.expiresAt);
+    return {
+      primary: parts.datePart,
+      secondary: parts.timePart,
+      full: parts.full,
+      expiresAtMs,
+    };
+  }
+  if (voucher.expiryDate) {
+    const datePart = formatManilaDateOnly(voucher.expiryDate);
+    return {
+      primary: datePart,
+      secondary: '11:59 PM PHT',
+      full: `${datePart}, 11:59 PM PHT`,
+      expiresAtMs,
+    };
+  }
+  return { primary: '—', secondary: '', full: '—', expiresAtMs: null };
+}
+
+export function formatRemainingTime(remainingMs, options = {}) {
+  const { includeSeconds = true } = options;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+    return 'Expired';
+  }
+  const totalSeconds = Math.max(1, Math.floor(remainingMs / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m left`;
+  }
+  if (hours > 0) {
+    return includeSeconds
+      ? `${hours}h ${minutes}m ${String(seconds).padStart(2, '0')}s left`
+      : `${hours}h ${minutes}m left`;
+  }
+  if (minutes > 0) {
+    return includeSeconds
+      ? `${minutes}m ${String(seconds).padStart(2, '0')}s left`
+      : `${minutes}m left`;
+  }
+  return `${seconds}s left`;
+}
+
+export function computeVoucherStatusInfo(voucher, nowMs = Date.now()) {
+  if (!voucher || typeof voucher !== 'object') {
+    return {
+      status: 'Expired',
+      badgeClass: 'admin-status-voucher-expired',
+      isUsable: false,
+      isExpiringSoon: false,
+      remainingMs: 0,
+      remainingLabel: '—',
+      expiresAtMs: null,
+    };
+  }
+
+  const rawStatus = String(voucher.status || 'Active').trim();
+  const expiresAtMs = resolveVoucherExpirationTimestamp(voucher);
+
+  if (rawStatus === 'Used') {
+    return {
+      status: 'Used',
+      badgeClass: 'admin-status-voucher-used',
+      isUsable: false,
+      isExpiringSoon: false,
+      remainingMs: 0,
+      remainingLabel: 'Redeemed',
+      expiresAtMs,
+    };
+  }
+
+  if (rawStatus === 'Revoked' || rawStatus === 'Cancelled') {
+    return {
+      status: 'Revoked',
+      badgeClass: 'admin-status-voucher-revoked',
+      isUsable: false,
+      isExpiringSoon: false,
+      remainingMs: 0,
+      remainingLabel: 'Revoked',
+      expiresAtMs,
+    };
+  }
+
+  if (rawStatus === 'Expired') {
+    return {
+      status: 'Expired',
+      badgeClass: 'admin-status-voucher-expired',
+      isUsable: false,
+      isExpiringSoon: false,
+      remainingMs: 0,
+      remainingLabel: 'Expired',
+      expiresAtMs,
+    };
+  }
+
+  if (expiresAtMs !== null) {
+    const remainingMs = expiresAtMs - nowMs;
+    if (remainingMs <= 0) {
+      return {
+        status: 'Expired',
+        badgeClass: 'admin-status-voucher-expired',
+        isUsable: false,
+        isExpiringSoon: false,
+        remainingMs: 0,
+        remainingLabel: 'Expired',
+        expiresAtMs,
+      };
+    }
+
+    if (remainingMs <= 3600 * 1000) {
+      return {
+        status: 'Expiring Soon',
+        badgeClass: 'admin-status-voucher-expiring',
+        isUsable: true,
+        isExpiringSoon: true,
+        remainingMs,
+        remainingLabel: formatRemainingTime(remainingMs),
+        expiresAtMs,
+      };
+    }
+
+    return {
+      status: 'Active',
+      badgeClass: 'admin-status-voucher-active',
+      isUsable: true,
+      isExpiringSoon: false,
+      remainingMs,
+      remainingLabel: formatRemainingTime(remainingMs),
+      expiresAtMs,
+    };
+  }
+
+  return {
+    status: 'Active',
+    badgeClass: 'admin-status-voucher-active',
+    isUsable: true,
+    isExpiringSoon: false,
+    remainingMs: null,
+    remainingLabel: 'No expiry set',
+    expiresAtMs: null,
+  };
+}
+
 export function formatVoucherBenefitLabel(voucher) {
   if (!voucher || typeof voucher !== 'object') return '';
   if (voucher.discountType === 'percentage' || Number(voucher.discountPercent || 0) > 0) {
@@ -268,7 +524,8 @@ export function validateVoucherForOrder(
   voucherCode,
   customerEmail,
   cartProductIds = [],
-  catalog = null
+  catalog = null,
+  nowMs = Date.now()
 ) {
   const cleanCode = String(voucherCode || '').trim().toUpperCase();
   const cleanEmail = String(customerEmail || '').trim().toLowerCase();
@@ -290,45 +547,74 @@ export function validateVoucherForOrder(
     };
   }
 
-  if (matched.status !== 'Active') {
-    return {
-      valid: false,
-      discountAmount: 0,
-      voucher: matched,
-      errorMessage: `Voucher "${cleanCode}" is no longer active (${matched.status}).`,
-    };
-  }
-
-  if (matched.expiryDate) {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (String(matched.expiryDate) < todayStr) {
+  const statusInfo = computeVoucherStatusInfo(matched, nowMs);
+  if (!statusInfo.isUsable) {
+    if (statusInfo.status === 'Expired') {
+      const expDisplay = formatVoucherExpiryDisplay(matched);
       return {
         valid: false,
         discountAmount: 0,
         voucher: matched,
-        errorMessage: `Voucher "${cleanCode}" expired on ${matched.expiryDate}.`,
+        errorMessage: `Voucher "${cleanCode}" expired on ${expDisplay.full || matched.expiryDate || 'its expiration date'}.`,
       };
     }
-  }
-
-  const assignedEmail = String(matched.customerEmail || '').trim().toLowerCase();
-  if (
-    assignedEmail &&
-    assignedEmail !== 'all' &&
-    assignedEmail !== '*' &&
-    cleanEmail &&
-    assignedEmail !== cleanEmail
-  ) {
+    if (statusInfo.status === 'Revoked') {
+      return {
+        valid: false,
+        discountAmount: 0,
+        voucher: matched,
+        errorMessage: `Voucher "${cleanCode}" has been revoked and is no longer valid.`,
+      };
+    }
     return {
       valid: false,
       discountAmount: 0,
       voucher: matched,
-      errorMessage: `Voucher "${cleanCode}" is exclusively assigned to ${matched.customerEmail}.`,
+      errorMessage: `Voucher "${cleanCode}" is no longer active (${statusInfo.status}).`,
+    };
+  }
+
+  const assignedEmail = String(matched.customerEmail || '').trim().toLowerCase();
+  if (assignedEmail && assignedEmail !== 'all' && assignedEmail !== '*') {
+    if (!cleanEmail || assignedEmail !== cleanEmail) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        voucher: matched,
+        errorMessage: `Voucher "${cleanCode}" is exclusively assigned to ${matched.customerEmail}.`,
+      };
+    }
+  }
+
+  const isLegacyPercent =
+    matched.discountType === 'percentage' || Number(matched.discountPercent || 0) > 0;
+  const rawDiscountVal = Number(matched.discountAmount ?? matched.discountValue ?? 0);
+  if (!isLegacyPercent && (!Number.isFinite(rawDiscountVal) || rawDiscountVal <= 0)) {
+    return {
+      valid: false,
+      discountAmount: 0,
+      voucher: matched,
+      errorMessage: `Voucher "${cleanCode}" has an invalid discount amount.`,
     };
   }
 
   const targetProductId = matched.furnitureId || matched.productId || '';
   const targetProductName = matched.furnitureName || matched.productName || ' the selected product';
+
+  if (!isLegacyPercent && Array.isArray(catalog) && catalog.length > 0 && targetProductId) {
+    const eligibleCatalogItem = catalog.find((p) => p.id === targetProductId);
+    if (eligibleCatalogItem) {
+      const maxPrice = Number(eligibleCatalogItem.effectivePrice ?? eligibleCatalogItem.price ?? 0);
+      if (maxPrice > 0 && rawDiscountVal > maxPrice) {
+        return {
+          valid: false,
+          discountAmount: 0,
+          voucher: matched,
+          errorMessage: `Voucher "${cleanCode}" discount ($${rawDiscountVal}) exceeds the eligible product price ($${maxPrice}).`,
+        };
+      }
+    }
+  }
 
   if (Array.isArray(cartProductIds) && cartProductIds.length > 0) {
     const normalizedIds = cartProductIds.map((entry) =>
@@ -1972,5 +2258,406 @@ export function buildRequestDesignMessengerUrl(
     messageText,
   };
 }
+
+export function getManilaDateInputDefaults(nowMs = Date.now()) {
+  const dateObj = new Date(nowMs);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(dateObj);
+
+  const map = {};
+  for (const p of parts) {
+    map[p.type] = p.value;
+  }
+  const currentDate = `${map.year}-${map.month}-${map.day}`;
+  const currentHour = String(map.hour === '24' ? '00' : map.hour).padStart(2, '0');
+  const currentMinute = String(map.minute).padStart(2, '0');
+  const currentTime = `${currentHour}:${currentMinute}`;
+
+  // Default custom date/time: 24 hours from now in Asia/Manila
+  const tomorrowObj = new Date(nowMs + 24 * 3600 * 1000);
+  const tParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(tomorrowObj);
+  const tMap = {};
+  for (const p of tParts) {
+    tMap[p.type] = p.value;
+  }
+  const defaultFutureDate = `${tMap.year}-${tMap.month}-${tMap.day}`;
+  const defaultFutureHour = String(tMap.hour === '24' ? '00' : tMap.hour).padStart(2, '0');
+  const defaultFutureTime = `${defaultFutureHour}:${String(tMap.minute).padStart(2, '0')}`;
+
+  return {
+    minDate: currentDate,
+    minTime: currentTime,
+    defaultDate: defaultFutureDate,
+    defaultTime: defaultFutureTime,
+  };
+}
+
+export function calculateExpirationFromInput(input = {}, issuedAtMs = Date.now()) {
+  const method = String(input?.expirationMethod || 'duration').trim().toLowerCase();
+
+  if (method !== 'custom' && method !== 'duration') {
+    return {
+      ok: false,
+      errorMessage: 'Select a valid expiration method (Custom Date & Time or Set Duration).',
+      expiresAtIso: null,
+      expiryDateStr: null,
+      expiresAtMs: null,
+      formattedManila: '—',
+      remainingLabel: '—',
+    };
+  }
+
+  let expiresAtMs = null;
+
+  if (method === 'custom') {
+    const expiryDate = String(input?.expiryDate || '').trim();
+    const expiryTime = String(input?.expiryTime || '').trim();
+
+    if (!expiryDate) {
+      return {
+        ok: false,
+        errorMessage: 'Select an expiration date.',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    if (!expiryTime) {
+      return {
+        ok: false,
+        errorMessage: 'Select an expiration time.',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate) || !/^\d{2}:\d{2}(:\d{2})?$/.test(expiryTime)) {
+      return {
+        ok: false,
+        errorMessage: 'Enter a valid expiration date and time.',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    const timeWithSec = expiryTime.length === 5 ? `${expiryTime}:00` : expiryTime;
+    const manilaIso = `${expiryDate}T${timeWithSec}+08:00`;
+    const parsedMs = new Date(manilaIso).getTime();
+
+    if (Number.isNaN(parsedMs)) {
+      return {
+        ok: false,
+        errorMessage: 'Invalid expiration date or time.',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    if (parsedMs <= issuedAtMs) {
+      return {
+        ok: false,
+        errorMessage: 'Expiration date and time cannot be in the past. Please choose a future time (Asia/Manila).',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    expiresAtMs = parsedMs;
+  } else {
+    const durationValue = Number(input?.durationValue);
+    const durationUnit = String(input?.durationUnit || 'hours').trim().toLowerCase();
+
+    if (!Number.isFinite(durationValue) || durationValue <= 0) {
+      return {
+        ok: false,
+        errorMessage: 'Duration must be greater than 0.',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    const unitMultipliers = {
+      minutes: 60 * 1000,
+      minute: 60 * 1000,
+      hours: 3600 * 1000,
+      hour: 3600 * 1000,
+      days: 86400 * 1000,
+      day: 86400 * 1000,
+    };
+
+    const multiplier = unitMultipliers[durationUnit];
+    if (!multiplier) {
+      return {
+        ok: false,
+        errorMessage: 'Select a valid duration unit (Minutes, Hours, or Days).',
+        expiresAtIso: null,
+        expiryDateStr: null,
+        expiresAtMs: null,
+        formattedManila: '—',
+        remainingLabel: '—',
+      };
+    }
+
+    expiresAtMs = issuedAtMs + Math.round(durationValue * multiplier);
+  }
+
+  const expiresDateObj = new Date(expiresAtMs);
+  const expiresAtIso = expiresDateObj.toISOString();
+  const manilaParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(expiresDateObj);
+  const mMap = {};
+  for (const p of manilaParts) {
+    mMap[p.type] = p.value;
+  }
+  const expiryDateStr = `${mMap.year}-${mMap.month}-${mMap.day}`;
+  const formattedParts = formatManilaDateTimeParts(expiresAtIso);
+  const remainingMs = Math.max(0, expiresAtMs - issuedAtMs);
+
+  return {
+    ok: true,
+    errorMessage: null,
+    expirationMethod: method,
+    expiresAtIso,
+    expiryDateStr,
+    expiresAtMs,
+    formattedManila: formattedParts.full,
+    datePart: formattedParts.datePart,
+    timePart: formattedParts.timePart,
+    remainingMs,
+    remainingLabel: formatRemainingTime(remainingMs, { includeSeconds: false }),
+  };
+}
+
+export function validateAndCreateVoucher(
+  input = {},
+  catalog = [],
+  existingVouchers = [],
+  nowMs = Date.now()
+) {
+  const customerEmail = String(input?.customerEmail || '').trim().toLowerCase();
+  if (!customerEmail || !customerEmail.includes('@') || !customerEmail.includes('.')) {
+    return {
+      ok: false,
+      errorMessage: 'Enter a valid customer email address.',
+      voucher: null,
+    };
+  }
+
+  const furnitureId = String(input?.furnitureId || input?.productId || '').trim();
+  const matchedProduct = Array.isArray(catalog)
+    ? catalog.find((p) => String(p.id) === furnitureId)
+    : null;
+
+  if (!furnitureId || !matchedProduct) {
+    return {
+      ok: false,
+      errorMessage: 'Select a valid eligible product from the catalog.',
+      voucher: null,
+    };
+  }
+
+  const code = String(input?.code || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '-');
+  if (!code || code.length < 3) {
+    return {
+      ok: false,
+      errorMessage: 'Enter or generate a valid voucher code (at least 3 characters).',
+      voucher: null,
+    };
+  }
+
+  const duplicate = Array.isArray(existingVouchers)
+    ? existingVouchers.find((v) => String(v.code || '').trim().toUpperCase() === code)
+    : null;
+  if (duplicate) {
+    return {
+      ok: false,
+      errorMessage: `Voucher code "${code}" already exists. Please generate or enter a unique code.`,
+      voucher: null,
+    };
+  }
+
+  const rawDiscount = Number(input?.discountAmount ?? input?.discountValue);
+  if (!Number.isFinite(rawDiscount) || rawDiscount <= 0) {
+    return {
+      ok: false,
+      errorMessage: 'Discount Amount ($) must be greater than $0.',
+      voucher: null,
+    };
+  }
+
+  const discountAmount = Math.round(rawDiscount * 100) / 100;
+  const maxProductPrice = Number(matchedProduct.effectivePrice ?? matchedProduct.price ?? 0);
+
+  if (maxProductPrice > 0 && discountAmount > maxProductPrice) {
+    return {
+      ok: false,
+      errorMessage: `Discount Amount ($${discountAmount.toLocaleString('en-US')}) cannot exceed the eligible product's price ($${maxProductPrice.toLocaleString('en-US')} for ${matchedProduct.name}).`,
+      voucher: null,
+    };
+  }
+
+  const expResult = calculateExpirationFromInput(input, nowMs);
+  if (!expResult.ok) {
+    return {
+      ok: false,
+      errorMessage: expResult.errorMessage,
+      voucher: null,
+    };
+  }
+
+  const issuedDateObj = new Date(nowMs);
+  const issuedAtIso = issuedDateObj.toISOString();
+  const issuedManilaParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(issuedDateObj);
+  const iMap = {};
+  for (const p of issuedManilaParts) {
+    iMap[p.type] = p.value;
+  }
+  const createdAtDateStr = `${iMap.year}-${iMap.month}-${iMap.day}`;
+
+  const defaultName = customerEmail
+    .split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+
+  const customerName = String(input?.customerName || defaultName || 'Showroom Client').trim();
+  const issuedByAdmin = String(input?.issuedByAdmin || 'Lillia Mercier').trim();
+
+  const statusInfo = computeVoucherStatusInfo(
+    {
+      status: 'Active',
+      expiresAt: expResult.expiresAtIso,
+      expiryDate: expResult.expiryDateStr,
+    },
+    nowMs
+  );
+
+  const voucher = {
+    id: input?.id || `vch-${nowMs}`,
+    code,
+    customerEmail,
+    customerName,
+    furnitureId: matchedProduct.id,
+    furnitureSku: matchedProduct.sku || 'LR-ITEM',
+    furnitureName: matchedProduct.name,
+    productPrice: maxProductPrice,
+    discountType: 'fixed',
+    discountPercent: null,
+    discountAmount,
+    discountValue: discountAmount,
+    status: statusInfo.status,
+    issuedByAdmin,
+    createdAt: createdAtDateStr,
+    issuedAt: issuedAtIso,
+    expiryDate: expResult.expiryDateStr,
+    expiresAt: expResult.expiresAtIso,
+    expirationMethod: expResult.expirationMethod,
+  };
+
+  return {
+    ok: true,
+    errorMessage: null,
+    voucher,
+  };
+}
+
+export function revokeVoucherInList(vouchers = [], voucherId = '', nowMs = Date.now()) {
+  const cleanId = String(voucherId || '').trim();
+  if (!cleanId) {
+    return { ok: false, errorMessage: 'Missing voucher ID.', voucher: null, vouchers };
+  }
+
+  let updatedVoucher = null;
+  const revokedAt = new Date(nowMs).toISOString();
+
+  const nextVouchers = (Array.isArray(vouchers) ? vouchers : []).map((v) => {
+    if (String(v.id) !== cleanId && String(v.code).toUpperCase() !== cleanId.toUpperCase()) {
+      return v;
+    }
+    if (v.status === 'Used') {
+      updatedVoucher = { ...v, _cannotRevokeUsed: true };
+      return v;
+    }
+    updatedVoucher = {
+      ...v,
+      status: 'Revoked',
+      revokedAt,
+    };
+    return updatedVoucher;
+  });
+
+  if (!updatedVoucher) {
+    return { ok: false, errorMessage: 'Voucher not found.', voucher: null, vouchers };
+  }
+
+  if (updatedVoucher._cannotRevokeUsed) {
+    return {
+      ok: false,
+      errorMessage: 'Cannot revoke a voucher that has already been redeemed.',
+      voucher: null,
+      vouchers,
+    };
+  }
+
+  return {
+    ok: true,
+    errorMessage: null,
+    voucher: updatedVoucher,
+    vouchers: nextVouchers,
+  };
+}
+
+export function filterCustomerVouchers(vouchers = [], customerEmail = '') {
+  const cleanEmail = String(customerEmail || '').trim().toLowerCase();
+  if (!cleanEmail) return [];
+  return (Array.isArray(vouchers) ? vouchers : []).filter(
+    (v) => String(v?.customerEmail || '').trim().toLowerCase() === cleanEmail
+  );
+}
+
 
 

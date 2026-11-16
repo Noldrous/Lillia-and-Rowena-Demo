@@ -8,6 +8,13 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  computeVoucherStatusInfo,
+  validateAndCreateVoucher,
+  revokeVoucherInList,
+  validateVoucherForOrder,
+  calculateOrderPricing,
+} from './assets/js/store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,13 +71,32 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
+function normalizeServerVouchers(vouchers = []) {
+  const nowMs = Date.now();
+  return (Array.isArray(vouchers) ? vouchers : []).map((v) => {
+    const statusInfo = computeVoucherStatusInfo(v, nowMs);
+    return {
+      ...v,
+      discountType: 'fixed',
+      status: statusInfo.status,
+    };
+  });
+}
+
 function readStoreFile() {
-  return structuredClone(serverStoreState);
+  const clone = structuredClone(serverStoreState);
+  if (Array.isArray(clone.vouchers)) {
+    clone.vouchers = normalizeServerVouchers(clone.vouchers);
+  }
+  return clone;
 }
 
 function writeStoreFile(storeData) {
   const clean = { ...storeData };
   delete clean._dbMeta;
+  if (Array.isArray(clean.vouchers)) {
+    clean.vouchers = normalizeServerVouchers(clean.vouchers);
+  }
   serverStoreState = structuredClone(clean);
 }
 
@@ -96,6 +122,7 @@ function handleApiRequest(req, res, parsedUrl) {
       store._dbMeta = {
         driver: 'pdo_mysql',
         endpoint: 'src/api.php',
+        timezone: 'Asia/Manila',
         timestamp: new Date().toISOString(),
       };
       return sendJson(res, 200, store);
@@ -113,13 +140,88 @@ function handleApiRequest(req, res, parsedUrl) {
           const store = readStoreFile();
 
           switch (action) {
+            case 'create_voucher': {
+              const voucherInput =
+                payload.voucher && typeof payload.voucher === 'object' ? payload.voucher : payload;
+              const result = validateAndCreateVoucher(
+                voucherInput,
+                store.products || [],
+                store.vouchers || [],
+                Date.now()
+              );
+              if (!result.ok) {
+                return sendJson(res, 400, { ok: false, error: result.errorMessage });
+              }
+              const nextVouchers = [result.voucher, ...(store.vouchers || [])];
+              store.vouchers = normalizeServerVouchers(nextVouchers);
+              writeStoreFile(store);
+              return sendJson(res, 200, {
+                ok: true,
+                action: 'create_voucher',
+                voucher: result.voucher,
+                vouchers: store.vouchers,
+              });
+            }
+
+            case 'revoke_voucher': {
+              const voucherId = String(
+                payload.voucherId || payload.id || payload.code || ''
+              ).trim();
+              const result = revokeVoucherInList(store.vouchers || [], voucherId, Date.now());
+              if (!result.ok) {
+                return sendJson(res, 400, { ok: false, error: result.errorMessage });
+              }
+              store.vouchers = normalizeServerVouchers(result.vouchers);
+              writeStoreFile(store);
+              return sendJson(res, 200, {
+                ok: true,
+                action: 'revoke_voucher',
+                voucher: result.voucher,
+                vouchers: store.vouchers,
+              });
+            }
+
+            case 'validate_voucher': {
+              const voucherCode = String(payload.voucherCode || payload.code || '').trim();
+              const customerEmail = String(payload.customerEmail || '').trim();
+              const cartItems = Array.isArray(payload.cartItems) ? payload.cartItems : [];
+              const validation = validateVoucherForOrder(
+                store.vouchers || [],
+                voucherCode,
+                customerEmail,
+                cartItems,
+                store.products || [],
+                Date.now()
+              );
+              if (!validation.valid) {
+                return sendJson(res, 400, {
+                  ok: false,
+                  valid: false,
+                  error: validation.errorMessage,
+                });
+              }
+              const pricing =
+                cartItems.length > 0
+                  ? calculateOrderPricing(cartItems, validation.voucher, store.products || [])
+                  : null;
+              return sendJson(res, 200, {
+                ok: true,
+                valid: true,
+                voucher: validation.voucher,
+                discountAmount: validation.discountAmount,
+                pricing,
+              });
+            }
+
             case 'sync_store': {
               if (Array.isArray(payload.products)) store.products = payload.products;
               if (Array.isArray(payload.materials)) store.materials = payload.materials;
               if (Array.isArray(payload.inventoryTransactions)) {
                 store.inventoryTransactions = payload.inventoryTransactions;
               }
-              if (Array.isArray(payload.vouchers)) store.vouchers = payload.vouchers;
+              if (Array.isArray(payload.vouchers)) {
+                store.vouchers = normalizeServerVouchers(payload.vouchers);
+              }
               if (Array.isArray(payload.orders)) store.orders = payload.orders;
               if (payload.customerProfile && typeof payload.customerProfile === 'object') {
                 store.customerProfile = payload.customerProfile;
