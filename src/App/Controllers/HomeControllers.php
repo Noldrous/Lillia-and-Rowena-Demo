@@ -42,11 +42,22 @@ class HomeControllers
             $email = trim((string) ($_POST['email'] ?? ''));
             $password = (string) ($_POST['password'] ?? '');
             $role = trim((string) ($_POST['role'] ?? 'Customer'));
+            $mode = strtolower(trim((string) ($_POST['mode'] ?? 'signin')));
             $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
                 || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 
             try {
-                $authenticatedUser = $this->userModel->authenticate($email, $password, $role);
+                if ($mode === 'register' && strcasecmp($role, 'Admin') !== 0) {
+                    $authenticatedUser = $this->userModel->register([
+                        'fullName'    => trim((string) ($_POST['full_name'] ?? $_POST['fullName'] ?? '')),
+                        'email'       => $email,
+                        'password'    => $password,
+                        'phoneNumber' => trim((string) ($_POST['phone_number'] ?? $_POST['phoneNumber'] ?? '')),
+                        'address'     => trim((string) ($_POST['address'] ?? '')),
+                    ]);
+                } else {
+                    $authenticatedUser = $this->userModel->authenticate($email, $password, $role);
+                }
                 $_SESSION['user'] = $authenticatedUser;
                 $targetRole = strcasecmp((string) ($authenticatedUser['role'] ?? ''), 'Admin') === 0 ? 'admin' : 'client';
 

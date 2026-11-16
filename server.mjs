@@ -329,7 +329,7 @@ function handleApiRequest(req, res, parsedUrl) {
                 email: customerRecord.email,
                 phone: customerRecord.phoneNumber,
                 city: 'New York, NY 10013',
-                address: 'Suite 400, 118 Mercer St, SoHo',
+                address: customerRecord.address,
                 notes: 'Standard white-glove delivery instructions.',
               };
               writeStoreFile(store);

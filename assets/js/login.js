@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('lr-login-form');
   const nameGroup = document.getElementById('register-name-group');
   const nameInput = document.getElementById('register-name');
+  const phoneGroup = document.getElementById('register-phone-group');
+  const phoneInput = document.getElementById('register-phone');
+  const addressGroup = document.getElementById('register-address-group');
+  const addressInput = document.getElementById('register-address');
   const emailInput = document.getElementById('login-email');
   const passwordInput = document.getElementById('login-password');
   const roleInput = document.getElementById('login-role');
@@ -132,6 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (nameGroup) {
       nameGroup.style.display = isRegister ? 'block' : 'none';
     }
+    if (phoneGroup) {
+      phoneGroup.style.display = isRegister ? 'block' : 'none';
+    }
+    if (addressGroup) {
+      addressGroup.style.display = isRegister ? 'block' : 'none';
+    }
     if (demoBox) {
       demoBox.style.display = isRegister ? 'none' : 'flex';
     }
@@ -151,9 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (headingTitle) headingTitle.textContent = 'Create Your Account';
       if (headingSubtitle) {
         headingSubtitle.textContent =
-          'Register a customer account to save delivery details, redeem personal vouchers, and track your orders.';
+          'Enter your full name, email, password, phone number, and delivery address to create your customer account.';
       }
       if (nameInput && !nameInput.value) nameInput.value = '';
+      if (phoneInput && !phoneInput.value) phoneInput.value = '';
+      if (addressInput && !addressInput.value) addressInput.value = '';
       if (emailInput && emailInput.value === DEMO_CREDENTIALS.Admin.email) emailInput.value = '';
       if (passwordInput && passwordInput.value === DEMO_CREDENTIALS.Admin.password) passwordInput.value = '';
       if (submitButton) submitButton.textContent = 'Create Account & Continue →';
@@ -202,6 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideError() {
+    [nameInput, emailInput, passwordInput, phoneInput, addressInput].forEach((el) => {
+      if (el) el.classList.remove('has-error');
+    });
     if (!errorBanner) return;
     errorBanner.textContent = '';
     errorBanner.style.display = 'none';
@@ -250,6 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const role = roleInput ? roleInput.value : 'Customer';
       const isRegister = role !== 'Admin' && currentMode === 'register';
       const fullName = nameInput ? nameInput.value.trim() : '';
+      const phoneNumber = phoneInput ? phoneInput.value.trim() : '';
+      const address = addressInput ? addressInput.value.trim() : '';
 
       if (isRegister && fullName.length < 2) {
         event.preventDefault();
@@ -272,6 +289,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      if (isRegister && phoneNumber.length < 7) {
+        event.preventDefault();
+        if (phoneInput) phoneInput.classList.add('has-error');
+        showError('Please enter a valid phone number.');
+        return;
+      }
+
+      if (isRegister && address.length < 5) {
+        event.preventDefault();
+        if (addressInput) addressInput.classList.add('has-error');
+        showError('Please enter your complete delivery address.');
+        return;
+      }
+
       const formAction = (form.getAttribute('action') || '').toLowerCase();
       if (window.location.pathname.endsWith('.php') || formAction.includes('index.php')) {
         return;
@@ -282,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const targetRoleParam = role === 'Admin' ? 'admin' : 'client';
 
       try {
-        if (isRegister && fullName) {
+        if (isRegister) {
           const regRes = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -291,8 +322,8 @@ document.addEventListener('DOMContentLoaded', () => {
               fullName,
               email,
               password,
-              phoneNumber: '+1 (212) 555-0148',
-              address: 'Suite 400, 118 Mercer St, SoHo, New York, NY 10013',
+              phoneNumber,
+              address,
             }),
           });
           const regData = await regRes.json().catch(() => null);

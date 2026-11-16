@@ -233,6 +233,12 @@ class User
         if (strlen($password) < 6) {
             $errors['password'] = 'Password must be at least 6 characters.';
         }
+        if ($phoneNumber === '' || strlen($phoneNumber) < 7) {
+            $errors['phoneNumber'] = 'A valid phone number is required.';
+        }
+        if ($address === '' || strlen($address) < 5) {
+            $errors['address'] = 'A complete delivery address is required.';
+        }
 
         if (!empty($errors)) {
             throw new ValidationException(reset($errors), $errors);
@@ -268,9 +274,12 @@ class User
                 'id'           => $customerId,
                 'role'         => 'Customer',
                 'fullName'     => $fullName,
+                'name'         => $fullName,
                 'email'        => $email,
                 'passwordHash' => $passwordHash,
+                'passwordPlain'=> $password,
                 'phoneNumber'  => $phoneNumber,
+                'phone'        => $phoneNumber,
                 'address'      => $address,
             ];
             $customers[] = $newCustomer;

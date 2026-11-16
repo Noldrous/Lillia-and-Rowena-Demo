@@ -99,8 +99,34 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
               </button>
             </div>
 
+            <!-- Customer Auth Mode Toggle: Sign In vs Create Account -->
+            <div
+              id="customer-auth-mode-tabs"
+              style="display: <?= $activeRole === 'Admin' ? 'none' : 'flex' ?>; gap: 0.5rem; margin-bottom: 1.1rem; background: #F8FAFC; padding: 0.3rem; border-radius: 0.75rem; border: 1px solid #E2E8F0;"
+            >
+              <button
+                type="button"
+                id="auth-mode-signin"
+                data-auth-mode="signin"
+                style="flex: 1; padding: 0.45rem 0.75rem; border-radius: 0.5rem; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; background: #0F172A; color: #FFFFFF;"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                id="auth-mode-register"
+                data-auth-mode="register"
+                style="flex: 1; padding: 0.45rem 0.75rem; border-radius: 0.5rem; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; background: transparent; color: #475569;"
+              >
+                Create Account
+              </button>
+            </div>
+
             <!-- Demo Credentials Helper -->
-            <div style="background: rgba(224, 242, 254, 0.75); border: 1px solid #BAE6FD; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div
+              id="demo-credentials-box"
+              style="background: rgba(224, 242, 254, 0.75); border: 1px solid #BAE6FD; border-radius: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;"
+            >
               <div>
                 <div class="lr-mono" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: #0284C7;">
                   Quick Demo Credentials
@@ -127,9 +153,21 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
               <?= e($error ?? '') ?>
             </div>
 
-            <!-- Login Form -->
+            <!-- Login / Registration Form -->
             <form id="lr-login-form" method="post" action="src/index.php" novalidate>
               <input type="hidden" id="login-role" name="role" value="<?= e($activeRole) ?>" />
+              <input type="hidden" id="login-mode" name="mode" value="signin" />
+
+              <div id="register-name-group" class="form-group" style="display: none;">
+                <label class="form-label" for="register-name">Full Name</label>
+                <input
+                  id="register-name"
+                  name="full_name"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter your full name"
+                />
+              </div>
 
               <div class="form-group">
                 <label class="form-label" for="login-email">Email Address</label>
@@ -139,6 +177,7 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
                   type="email"
                   class="form-input <?= isset($fieldErrors['email']) ? 'has-error' : '' ?>"
                   value="<?= e($defaultEmail) ?>"
+                  placeholder="you@example.com"
                   required
                 />
               </div>
@@ -151,7 +190,30 @@ $defaultPass = $activeRole === 'Admin' ? 'MasterJoinery#01' : 'ClientPass2025!';
                   type="password"
                   class="form-input <?= isset($fieldErrors['password']) ? 'has-error' : '' ?>"
                   value="<?= e($defaultPass) ?>"
+                  placeholder="At least 6 characters"
                   required
+                />
+              </div>
+
+              <div id="register-phone-group" class="form-group" style="display: none;">
+                <label class="form-label" for="register-phone">Phone Number</label>
+                <input
+                  id="register-phone"
+                  name="phone_number"
+                  type="tel"
+                  class="form-input"
+                  placeholder="e.g. +1 (212) 555-0148"
+                />
+              </div>
+
+              <div id="register-address-group" class="form-group" style="display: none;">
+                <label class="form-label" for="register-address">Address</label>
+                <input
+                  id="register-address"
+                  name="address"
+                  type="text"
+                  class="form-input"
+                  placeholder="Enter your street address, city &amp; zip"
                 />
               </div>
 
