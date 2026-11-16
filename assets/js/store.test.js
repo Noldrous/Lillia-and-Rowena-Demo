@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
-  INITIAL_STORE_DATA,
   PRODUCT_TYPES,
   applyAdminOrderUpdate,
   applyMaterialStockMovement,
@@ -11,6 +12,7 @@ import {
   buildProductRecord,
   buildRequestDesignMessengerUrl,
   calculateOrderPricing,
+  computeCustomerDirectory,
   computeInventoryMetrics,
   computeMaterialInventoryMetrics,
   computeVariantPricing,
@@ -18,12 +20,15 @@ import {
   describeMaterialStockPreview,
   filterCatalogPageItems,
   filterFurnitureItems,
+  filterInventoryMaterials,
   findMatchingColorVariant,
   formatCustomerProductDisplay,
   getColorFilterCounts,
+  getMaterialCategories,
   getMaterialStockStatus,
   getProductStockStatus,
   getRecommendedBestSellers,
+  paginateItems,
   recordCustomerOrderPayment,
   removeMaterialFromInventory,
   removeProductFromCatalog,
@@ -36,10 +41,46 @@ import {
   verifyAndCreateOrder,
 } from './store.js';
 
-const INITIAL_CATEGORIES = INITIAL_STORE_DATA.categories;
-const INITIAL_FURNITURE_ITEMS = INITIAL_STORE_DATA.products;
-const INITIAL_VOUCHERS = INITIAL_STORE_DATA.vouchers;
-const INITIAL_MATERIALS = INITIAL_STORE_DATA.materials || [];
+function loadSeedFromPhp() {
+  const php = fs.readFileSync(path.resolve(process.cwd(), 'src/Library/Database.php'), 'utf8');
+  const start = php.indexOf('public static function getDefaultStore()');
+  const retIdx = php.indexOf('return [', start);
+  const body = php.slice(retIdx + 7, php.lastIndexOf('];') + 1);
+  const stack = [];
+  let out = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === "'") {
+      out += ch;
+      i++;
+      while (i < body.length && body[i] !== "'") {
+        if (body[i] === '\\') out += body[i++];
+        out += body[i++];
+      }
+      out += "'";
+    } else if (ch === '[') {
+      const rest = body.slice(i + 1);
+      const isObj = /^\s*'[^']*'\s*=>/.test(rest);
+      stack.push(isObj ? '}' : ']');
+      out += isObj ? '{' : '[';
+    } else if (ch === ']') {
+      out += stack.pop() || ']';
+    } else if (ch === '=' && body[i + 1] === '>') {
+      out += ':';
+      i++;
+    } else {
+      out += ch;
+    }
+  }
+  return Function(`"use strict"; return (${out});`)();
+}
+
+const storeData = loadSeedFromPhp();
+const INITIAL_STORE_DATA = storeData;
+const INITIAL_CATEGORIES = storeData.categories || [];
+const INITIAL_FURNITURE_ITEMS = storeData.products || [];
+const INITIAL_VOUCHERS = storeData.vouchers || [];
+const INITIAL_MATERIALS = storeData.materials || [];
 
 describe('Pure JavaScript & Server Store Logic Tests', () => {
   it('defines the 5 showroom categories: Living Room, Dining Room, Bedroom, Study/Work Desks, and Kitchen', () => {
@@ -198,9 +239,11 @@ describe('Pure JavaScript & Server Store Logic Tests', () => {
   it('computes Workshop Raw Material Inventory metrics and enforces Material Stock In and Stock Out', () => {
     const metrics = computeMaterialInventoryMetrics(INITIAL_MATERIALS);
     assert.equal(metrics.totalMaterials, 8);
+    assert.equal(metrics.inStockCount, 7);
     assert.ok(metrics.totalStockAvailable > 500);
     assert.equal(metrics.lowStockCount, 1); // mat-103 (28 bd ft <= min 35)
     assert.equal(metrics.outOfStockCount, 0);
+    assert.ok(metrics.totalInventoryValue > 20000);
 
     // 1. Material Stock In increases raw material StockQuantity
     const stockInRes = applyMaterialStockMovement({
@@ -241,6 +284,44 @@ describe('Pure JavaScript & Server Store Logic Tests', () => {
     });
     assert.equal(excessiveOut.ok, false);
     assert.ok(excessiveOut.errorMessage.includes('Cannot deduct 20 slabs'));
+  });
+
+  it('filters inventory materials by search query, category, and stock status, and paginates results', () => {
+    const categories = getMaterialCategories(INITIAL_MATERIALS);
+    assert.ok(categories.includes('Solid Timber'));
+    assert.ok(categories.includes('Upholstery Textile'));
+
+    const timberMaterials = filterInventoryMaterials(INITIAL_MATERIALS, {
+      category: 'Solid Timber',
+    });
+    assert.equal(timberMaterials.length, 3);
+
+    const lowStockMaterials = filterInventoryMaterials(INITIAL_MATERIALS, {
+      status: 'low_stock',
+    });
+    assert.equal(lowStockMaterials.length, 1);
+    assert.equal(lowStockMaterials[0].id, 'mat-103');
+
+    const searchWalnut = filterInventoryMaterials(INITIAL_MATERIALS, {
+      searchQuery: 'walnut',
+    });
+    assert.equal(searchWalnut.length, 1);
+    assert.equal(searchWalnut[0].id, 'mat-101');
+
+    const page1 = paginateItems(INITIAL_MATERIALS, 1, 5);
+    assert.equal(page1.items.length, 5);
+    assert.equal(page1.totalPages, 2);
+    assert.equal(page1.startIndex, 1);
+    assert.equal(page1.endIndex, 5);
+
+    const page2 = paginateItems(INITIAL_MATERIALS, 2, 5);
+    assert.equal(page2.items.length, 3);
+    assert.equal(page2.startIndex, 6);
+    assert.equal(page2.endIndex, 8);
+
+    const customerDir = computeCustomerDirectory(INITIAL_STORE_DATA.orders);
+    assert.ok(customerDir.length >= 4);
+    assert.ok(customerDir.some((c) => c.email === 'rowena.vance@vancearchitects.com'));
   });
 
   it('creates Custom Orders with workshop material allocation and syncs Admin order updates & customer payments', () => {
@@ -459,5 +540,6 @@ describe('Pure JavaScript & Server Store Logic Tests', () => {
     assert.ok(loggedInDesignReq.messageText.includes('request a custom furniture design'));
   });
 });
+
 
 

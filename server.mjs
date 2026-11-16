@@ -8,13 +8,46 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INITIAL_STORE_DATA } from './assets/js/store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 
-let serverStoreState = structuredClone(INITIAL_STORE_DATA);
+function loadSeedFromPhp() {
+  const php = fs.readFileSync(path.join(__dirname, 'src', 'Library', 'Database.php'), 'utf8');
+  const start = php.indexOf('public static function getDefaultStore()');
+  const retIdx = php.indexOf('return [', start);
+  const body = php.slice(retIdx + 7, php.lastIndexOf('];') + 1);
+  const stack = [];
+  let out = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === "'") {
+      out += ch;
+      i++;
+      while (i < body.length && body[i] !== "'") {
+        if (body[i] === '\\') out += body[i++];
+        out += body[i++];
+      }
+      out += "'";
+    } else if (ch === '[') {
+      const rest = body.slice(i + 1);
+      const isObj = /^\s*'[^']*'\s*=>/.test(rest);
+      stack.push(isObj ? '}' : ']');
+      out += isObj ? '{' : '[';
+    } else if (ch === ']') {
+      out += stack.pop() || ']';
+    } else if (ch === '=' && body[i + 1] === '>') {
+      out += ':';
+      i++;
+    } else {
+      out += ch;
+    }
+  }
+  return Function(`"use strict"; return (${out});`)();
+}
+
+let serverStoreState = loadSeedFromPhp();
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',

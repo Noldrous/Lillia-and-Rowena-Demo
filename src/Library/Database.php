@@ -36,13 +36,19 @@ class Database
         $password = $config['pass'] ?? (getenv('DB_PASS') ?: '');
 
         if ($host !== '' && extension_loaded('pdo_mysql')) {
-            $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $dbname);
             try {
-                $this->pdo = new PDO($dsn, $username, $password, [
+                // Connect to MySQL server first and auto-create database if it doesn't exist yet in phpMyAdmin
+                $serverDsn = sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $host, $port);
+                $pdoInit = new PDO($serverDsn, $username, $password, [
                     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES   => false,
                 ]);
+                $safeDb = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $dbname) ?: 'lillia_rowena_furniture';
+                $pdoInit->exec("CREATE DATABASE IF NOT EXISTS `{$safeDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $pdoInit->exec("USE `{$safeDb}`");
+                $this->pdo = $pdoInit;
+                $this->ensureSchemaTablesExist();
                 $this->seedMySqlIfEmpty();
             } catch (PDOException $e) {
                 if (!empty($config['strict_mysql'])) {
@@ -54,6 +60,129 @@ class Database
                     );
                 }
                 $this->pdo = null;
+            }
+        }
+    }
+
+    /**
+     * Automatically create the 12 InnoDB tables if they do not exist yet in phpMyAdmin.
+     */
+    private function ensureSchemaTablesExist(): void
+    {
+        if ($this->pdo === null) {
+            return;
+        }
+        $ddlStatements = [
+            "CREATE TABLE IF NOT EXISTS `Admin` (
+                `AdminID` INT AUTO_INCREMENT PRIMARY KEY,
+                `Email` VARCHAR(255) NOT NULL UNIQUE,
+                `PasswordHash` VARCHAR(255) NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Category` (
+                `CategoryID` INT AUTO_INCREMENT PRIMARY KEY,
+                `CategoryName` VARCHAR(100) NOT NULL UNIQUE,
+                `Description` TEXT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Customer` (
+                `CustomerID` INT AUTO_INCREMENT PRIMARY KEY,
+                `FullName` VARCHAR(150) NOT NULL,
+                `Email` VARCHAR(255) NOT NULL UNIQUE,
+                `PasswordHash` VARCHAR(255) NOT NULL,
+                `PhoneNumber` VARCHAR(30),
+                `Address` VARCHAR(255)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Product` (
+                `ProductID` INT AUTO_INCREMENT PRIMARY KEY,
+                `CategoryID` INT NOT NULL,
+                `ProductName` VARCHAR(150) NOT NULL,
+                `BasePrice` DECIMAL(10,2) NOT NULL,
+                FOREIGN KEY (`CategoryID`) REFERENCES `Category`(`CategoryID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Material` (
+                `MaterialID` INT AUTO_INCREMENT PRIMARY KEY,
+                `MaterialName` VARCHAR(150) NOT NULL,
+                `MaterialType` VARCHAR(100),
+                `Unit` VARCHAR(20) NOT NULL,
+                `UnitCost` DECIMAL(10,2) NOT NULL,
+                `StockQuantity` DECIMAL(12,2) NOT NULL DEFAULT 0
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Voucher` (
+                `VoucherID` INT AUTO_INCREMENT PRIMARY KEY,
+                `CustomerID` INT NOT NULL,
+                `ProductID` INT NOT NULL,
+                `AdminID` INT NOT NULL,
+                `Code` VARCHAR(50) NOT NULL UNIQUE,
+                `DiscountValue` DECIMAL(10,2) NOT NULL,
+                `ExpiryDate` DATE DEFAULT NULL,
+                `Status` VARCHAR(20) NOT NULL DEFAULT 'Active',
+                `IssuedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (`VoucherID`, `ProductID`),
+                FOREIGN KEY (`CustomerID`) REFERENCES `Customer`(`CustomerID`),
+                FOREIGN KEY (`ProductID`) REFERENCES `Product`(`ProductID`),
+                FOREIGN KEY (`AdminID`) REFERENCES `Admin`(`AdminID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Customer_Order` (
+                `OrderID` INT AUTO_INCREMENT PRIMARY KEY,
+                `CustomerID` INT NOT NULL,
+                `OrderDate` DATE NOT NULL,
+                `Status` VARCHAR(20) NOT NULL DEFAULT 'Pending',
+                FOREIGN KEY (`CustomerID`) REFERENCES `Customer`(`CustomerID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Order_Item` (
+                `OrderItemID` INT AUTO_INCREMENT PRIMARY KEY,
+                `OrderID` INT NOT NULL,
+                `ProductID` INT NOT NULL,
+                `VoucherID` INT UNIQUE DEFAULT NULL,
+                `ItemType` VARCHAR(20) NOT NULL DEFAULT 'Standard',
+                `Quantity` INT NOT NULL DEFAULT 1,
+                `UnitPrice` DECIMAL(10,2) NOT NULL,
+                FOREIGN KEY (`OrderID`) REFERENCES `Customer_Order`(`OrderID`) ON DELETE CASCADE,
+                FOREIGN KEY (`ProductID`) REFERENCES `Product`(`ProductID`),
+                FOREIGN KEY (`VoucherID`, `ProductID`) REFERENCES `Voucher`(`VoucherID`, `ProductID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Order_Item_Material` (
+                `OrderItemID` INT NOT NULL,
+                `MaterialID` INT NOT NULL,
+                `QuantityUsed` DECIMAL(12,2) NOT NULL,
+                PRIMARY KEY (`OrderItemID`, `MaterialID`),
+                FOREIGN KEY (`OrderItemID`) REFERENCES `Order_Item`(`OrderItemID`) ON DELETE CASCADE,
+                FOREIGN KEY (`MaterialID`) REFERENCES `Material`(`MaterialID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Customization` (
+                `CustomizationID` INT AUTO_INCREMENT PRIMARY KEY,
+                `OrderItemID` INT NOT NULL UNIQUE,
+                `MaterialID` INT DEFAULT NULL,
+                `Length` DECIMAL(8,2) DEFAULT NULL,
+                `Width` DECIMAL(8,2) DEFAULT NULL,
+                `Height` DECIMAL(8,2) DEFAULT NULL,
+                `ColorFinish` VARCHAR(100) DEFAULT NULL,
+                `Notes` TEXT DEFAULT NULL,
+                `ExtraCost` DECIMAL(10,2) NOT NULL DEFAULT 0,
+                FOREIGN KEY (`OrderItemID`) REFERENCES `Order_Item`(`OrderItemID`) ON DELETE CASCADE,
+                FOREIGN KEY (`MaterialID`) REFERENCES `Material`(`MaterialID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Payment` (
+                `PaymentID` INT AUTO_INCREMENT PRIMARY KEY,
+                `OrderID` INT NOT NULL,
+                `PaymentDate` DATE NOT NULL,
+                `Amount` DECIMAL(10,2) NOT NULL,
+                FOREIGN KEY (`OrderID`) REFERENCES `Customer_Order`(`OrderID`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS `Production_Task` (
+                `TaskID` INT AUTO_INCREMENT PRIMARY KEY,
+                `OrderItemID` INT NOT NULL,
+                `StartDate` DATE DEFAULT NULL,
+                `EndDate` DATE DEFAULT NULL,
+                `TaskStatus` VARCHAR(20) NOT NULL DEFAULT 'Todo',
+                FOREIGN KEY (`OrderItemID`) REFERENCES `Order_Item`(`OrderItemID`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ];
+
+        foreach ($ddlStatements as $sql) {
+            try {
+                $this->pdo->exec($sql);
+            } catch (\Throwable) {
+                // Continue if table already exists
             }
         }
     }
@@ -255,41 +384,110 @@ class Database
 
         if ($this->pdo !== null) {
             try {
-                // Sync Material StockQuantity & UnitCost from PDO MySQL Material table
+                $catIdToSlug = [
+                    1 => ['id' => 'living', 'name' => 'Living Room', 'image' => 'assets/images/category_living_lounge.jpg'],
+                    2 => ['id' => 'dining', 'name' => 'Dining Room', 'image' => 'assets/images/category_dining_tables.jpg'],
+                    3 => ['id' => 'bedroom', 'name' => 'Bedroom', 'image' => 'assets/images/category_bedroom_sanctuary.jpg'],
+                    4 => ['id' => 'office', 'name' => 'Study/Work Desks', 'image' => 'assets/images/category_office_storage.jpg'],
+                    5 => ['id' => 'kitchen', 'name' => 'Kitchen', 'image' => 'assets/images/category_kitchen_atelier.jpg'],
+                ];
+
+                // Sync Material StockQuantity & UnitCost (including new rows added in phpMyAdmin)
                 $dbMaterials = $this->fetchAll('SELECT MaterialID, MaterialName, MaterialType, Unit, UnitCost, StockQuantity FROM Material ORDER BY MaterialID ASC');
-                if (!empty($dbMaterials) && isset($decoded['materials']) && is_array($decoded['materials'])) {
-                    $byName = [];
-                    foreach ($dbMaterials as $row) {
-                        $byName[strtolower(trim((string) $row['MaterialName']))] = $row;
-                    }
-                    foreach ($decoded['materials'] as &$mat) {
+                if (!empty($dbMaterials)) {
+                    $existingMats = isset($decoded['materials']) && is_array($decoded['materials']) ? $decoded['materials'] : [];
+                    $matchedMatNames = [];
+                    foreach ($existingMats as &$mat) {
                         $key = strtolower(trim((string) ($mat['name'] ?? '')));
-                        if (isset($byName[$key])) {
-                            $mat['unitCost'] = (float) $byName[$key]['UnitCost'];
-                            $mat['stockQuantity'] = (float) $byName[$key]['StockQuantity'];
-                            $mat['unit'] = (string) $byName[$key]['Unit'];
-                            $mat['materialType'] = (string) $byName[$key]['MaterialType'];
+                        foreach ($dbMaterials as $row) {
+                            if (strtolower(trim((string) $row['MaterialName'])) === $key) {
+                                $mat['unitCost'] = (float) $row['UnitCost'];
+                                $mat['stockQuantity'] = (float) $row['StockQuantity'];
+                                $mat['unit'] = (string) $row['Unit'];
+                                $mat['materialType'] = (string) $row['MaterialType'];
+                                $matchedMatNames[$key] = true;
+                                break;
+                            }
                         }
                     }
                     unset($mat);
+
+                    foreach ($dbMaterials as $row) {
+                        $key = strtolower(trim((string) $row['MaterialName']));
+                        if (!isset($matchedMatNames[$key])) {
+                            $matId = (int) $row['MaterialID'];
+                            $existingMats[] = [
+                                'id'            => 'mat-sql-' . $matId,
+                                'code'          => sprintf('MAT-SQL-%02d', $matId),
+                                'name'          => (string) $row['MaterialName'],
+                                'materialType'  => (string) ($row['MaterialType'] ?: 'Solid Timber'),
+                                'unit'          => (string) ($row['Unit'] ?: 'bd ft'),
+                                'unitCost'      => (float) $row['UnitCost'],
+                                'stockQuantity' => (float) $row['StockQuantity'],
+                                'minStockLevel' => 15,
+                                'usedIn'        => 'Custom workshop joinery & catalog production',
+                            ];
+                        }
+                    }
+                    $decoded['materials'] = $existingMats;
                 }
 
-                // Sync Product BasePrice from PDO MySQL Product table
+                // Sync Product BasePrice (including new rows added in phpMyAdmin)
                 $dbProducts = $this->fetchAll('SELECT ProductID, CategoryID, ProductName, BasePrice FROM Product ORDER BY ProductID ASC');
-                if (!empty($dbProducts) && isset($decoded['products']) && is_array($decoded['products'])) {
-                    $prodByName = [];
-                    foreach ($dbProducts as $row) {
-                        $prodByName[strtolower(trim((string) $row['ProductName']))] = $row;
-                    }
-                    foreach ($decoded['products'] as &$prod) {
+                if (!empty($dbProducts)) {
+                    $existingProds = isset($decoded['products']) && is_array($decoded['products']) ? $decoded['products'] : [];
+                    $matchedProdNames = [];
+                    foreach ($existingProds as &$prod) {
                         $key = strtolower(trim((string) ($prod['name'] ?? '')));
-                        if (isset($prodByName[$key])) {
-                            $prod['price'] = (float) $prodByName[$key]['BasePrice'];
-                            $pct = (float) ($prod['discountPercent'] ?? 0);
-                            $prod['effectivePrice'] = round($prod['price'] * (1.0 - $pct / 100.0));
+                        foreach ($dbProducts as $row) {
+                            if (strtolower(trim((string) $row['ProductName'])) === $key) {
+                                $prod['price'] = (float) $row['BasePrice'];
+                                $pct = (float) ($prod['discountPercent'] ?? 0);
+                                $prod['effectivePrice'] = round($prod['price'] * (1.0 - $pct / 100.0));
+                                $matchedProdNames[$key] = true;
+                                break;
+                            }
                         }
                     }
                     unset($prod);
+
+                    foreach ($dbProducts as $row) {
+                        $key = strtolower(trim((string) $row['ProductName']));
+                        if (!isset($matchedProdNames[$key])) {
+                            $pid = (int) $row['ProductID'];
+                            $cid = (int) $row['CategoryID'];
+                            $catMeta = $catIdToSlug[$cid] ?? $catIdToSlug[2];
+                            $basePrice = (float) $row['BasePrice'];
+                            $existingProds[] = [
+                                'id'                   => 'furn-sql-' . $pid,
+                                'sku'                  => sprintf('LR-SQL-%03d', $pid),
+                                'name'                 => (string) $row['ProductName'],
+                                'categoryId'           => $catMeta['id'],
+                                'categoryName'         => $catMeta['name'],
+                                'isBestSeller'         => false,
+                                'price'                => $basePrice,
+                                'discountPercent'      => 0,
+                                'effectivePrice'       => round($basePrice),
+                                'dimensions'           => '200cm L × 95cm W × 75cm H',
+                                'leadTimeWeeks'        => 4,
+                                'inStockCount'         => 5,
+                                'minStockLevel'        => 2,
+                                'primaryMaterialId'    => 'mat-101',
+                                'defaultFinish'        => 'Hand-Rubbed Natural Walnut',
+                                'finishes'             => ['Hand-Rubbed Natural Walnut', 'Quarter-Sawn White Oak'],
+                                'colorVariants'        => [
+                                    ['name' => 'Hand-Rubbed Natural Walnut', 'hex' => '#5C3A21', 'priceDelta' => 0],
+                                    ['name' => 'Quarter-Sawn White Oak', 'hex' => '#C8AD88', 'priceDelta' => 0],
+                                ],
+                                'description'          => 'Handcrafted solid timber piece registered in the phpMyAdmin Product catalog.',
+                                'craftsmanshipNote'    => 'Built to order using kiln-dried hardwood and organic oil finish.',
+                                'image'                => $catMeta['image'],
+                                'isCustomClientDesign' => false,
+                                'customClientEmail'    => null,
+                            ];
+                        }
+                    }
+                    $decoded['products'] = $existingProds;
                 }
 
                 // Sync Voucher Status from PDO MySQL Voucher table
@@ -1491,6 +1689,53 @@ class Database
                     'adminName' => 'Mateo Cruz · Workshop Millwork',
                 ],
             ],
+            'customerProfile' => [
+                'name' => 'Rowena Vance',
+                'company' => 'Vance & Associates Spatial Design',
+                'email' => 'rowena.vance@vancearchitects.com',
+                'phone' => '+1 (212) 555-0148',
+                'city' => 'New York, NY 10013',
+                'address' => 'Suite 400, 118 Mercer St, SoHo',
+                'notes' => 'Freight elevator requires 24h advance certificate of insurance (COI).',
+            ],
+            'customers' => [
+                [
+                    'id' => 1,
+                    'role' => 'Customer',
+                    'fullName' => 'Rowena Vance',
+                    'email' => 'rowena.vance@vancearchitects.com',
+                    'phoneNumber' => '+1 (212) 555-0148',
+                    'address' => 'Suite 400, 118 Mercer St, SoHo, NY',
+                ],
+                [
+                    'id' => 2,
+                    'role' => 'Customer',
+                    'fullName' => 'Julian Mercier',
+                    'email' => 'j.mercier@mercierstudio.co',
+                    'phoneNumber' => '+1 (415) 555-0192',
+                    'address' => '742 Evergreen Terrace, Pacific Heights, SF',
+                ],
+                [
+                    'id' => 3,
+                    'role' => 'Customer',
+                    'fullName' => 'Elena Rostova',
+                    'email' => 'elena@rostovainteriors.com',
+                    'phoneNumber' => '+44 20 7946 0821',
+                    'address' => '29A Kensington Park Rd, Notting Hill',
+                ],
+                [
+                    'id' => 4,
+                    'role' => 'Customer',
+                    'fullName' => 'Marcus Sterling',
+                    'email' => 'm.sterling@sterlingcapital.io',
+                    'phoneNumber' => '+1 (312) 555-0174',
+                    'address' => '880 Lake Shore Drive, Apt 32B, Chicago',
+                ],
+            ],
+            'offers' => [],
+            'sessionUser' => null,
+            'cartItems' => [],
         ];
     }
 }
+
