@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lillia and Rowena Furniture — Handcrafted Solid Timber &amp; Custom Furniture</title>
+    <meta name="description" content="Lillia and Rowena Furniture showroom. Explore handcrafted solid walnut, white oak, bouclé, and travertine furniture, request custom designs, or make an offer on Messenger." />
+    <meta property="og:title" content="Lillia and Rowena Furniture — Handcrafted Solid Timber &amp; Custom Furniture" />
+    <meta property="og:description" content="Explore handcrafted solid walnut, white oak, bouclé, and travertine furniture, request custom designs, or make an offer on Messenger." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body id="top" class="bg-white text-[#0F172A] antialiased selection:bg-[#0095FF] selection:text-white min-h-screen flex flex-col">
+    <!-- Top Announcement Bar -->
+    <div id="top-promo-bar" class="bg-[#0D1015] text-white border-b border-slate-800 px-4 py-2 text-xs">
+      <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            data-request-design-trigger="true"
+            class="text-[#0095FF] font-semibold hover:underline cursor-pointer"
+          >
+            Request a Custom Design on Messenger
+          </button>
+          <span class="text-slate-500">·</span>
+          <span class="text-slate-300">
+            Select any furniture piece to view details, choose finishes, or generate a custom price offer
+          </span>
+        </div>
+        <div id="top-bar-user-status" class="flex items-center gap-3 text-slate-300">
+          <span>Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
+        <!-- Brand Logo Left -->
+        <a
+          href="index.html"
+          aria-label="Lillia and Rowena Furniture Homepage"
+          class="flex items-center gap-3 group shrink-0"
+        >
+          <div class="w-9 h-9 rounded-lg bg-[#0D1015] text-white flex items-center justify-center font-serif-display text-sm font-bold tracking-wider group-hover:bg-[#0095FF] transition-colors shadow-xs">
+            LR
+          </div>
+          <span class="font-serif-display text-lg sm:text-xl font-bold tracking-tight text-[#0D1015] leading-none">
+            Lillia and Rowena Furniture
+          </span>
+        </a>
+
+        <!-- Search Bar in the Middle -->
+        <div class="flex-1 max-w-xl mx-auto">
+          <label for="top-nav-search" class="sr-only">Search furniture by name, room, or finish</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0095FF] pointer-events-none flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </span>
+            <input
+              id="top-nav-search"
+              data-testid="top-nav-search"
+              type="search"
+              autocomplete="off"
+              placeholder="Search sofas, dining tables, walnut, bouclé, kitchen..."
+              class="w-full pl-10 pr-9 py-2.5 rounded-full bg-slate-50 border border-slate-200 text-xs sm:text-sm text-[#0D1015] placeholder:text-slate-500 focus:outline-none focus:border-[#0095FF] focus:bg-white transition-all"
+            />
+            <button
+              type="button"
+              id="top-nav-search-clear"
+              aria-label="Clear search"
+              class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-[#0095FF] text-slate-700 hover:text-white text-xs font-bold items-center justify-center cursor-pointer transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Cart Icon & Role-Aware Auth Navigation Right -->
+        <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            id="open-cart-btn"
+            data-testid="nav-cart-icon-button"
+            aria-label="Open Shopping Cart"
+            class="relative px-3.5 h-10 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[#0D1015] flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <svg class="w-4 h-4 text-[#0D1015]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            <span class="hidden sm:inline text-xs font-semibold">Cart</span>
+            <span
+              id="cart-count-badge"
+              class="hidden min-w-[20px] h-5 px-1.5 rounded-full bg-[#0095FF] text-white font-mono-tech text-[11px] font-bold items-center justify-center"
+            >
+              0
+            </span>
+          </button>
+
+          <div id="nav-auth-actions" class="flex items-center gap-2">
+            <!-- Guest Navigation (Shown ONLY when logged out) -->
+            <div id="nav-guest-actions" class="flex items-center gap-2">
+              <a
+                href="login.html"
+                id="nav-login-link"
+                data-testid="nav-login-button"
+                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#0D1015] text-white hover:bg-[#0095FF] shadow-xs whitespace-nowrap"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span id="nav-auth-label">Sign In</span>
+              </a>
+              <a
+                href="login.html?mode=register"
+                id="nav-register-link"
+                data-testid="nav-register-button"
+                class="inline-flex px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all items-center gap-1.5 bg-white text-[#0D1015] border border-slate-200 hover:border-[#0095FF] hover:text-[#0095FF] whitespace-nowrap"
+              >
+                <span>Register</span>
+              </a>
+            </div>
+
+            <!-- Logged-In Customer Navigation (Shown ONLY when a Customer is logged in) -->
+            <div id="nav-customer-actions" class="hidden items-center gap-2">
+              <a
+                href="dashboard.html?role=client&tab=orders"
+                id="nav-my-orders-link"
+                data-testid="nav-my-orders-link"
+                class="hidden sm:inline-flex px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:text-[#0095FF] hover:bg-slate-50 transition-colors whitespace-nowrap"
+              >
+                My Orders
+              </a>
+              <a
+                href="dashboard.html?role=client&tab=home"
+                id="nav-profile-pill"
+                data-testid="nav-dashboard-button"
+                aria-label="My Account"
+                title="My Account"
+                class="nav-profile-icon-btn overflow-hidden"
+              >
+                <img
+                  id="nav-profile-avatar-img"
+                  src=""
+                  alt="Customer profile picture"
+                  class="hidden w-full h-full object-cover"
+                />
+                <svg id="nav-profile-default-icon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span id="nav-profile-initials" class="sr-only">RV</span>
+                <span id="nav-profile-name" class="sr-only">My Account</span>
+              </a>
+              <button
+                type="button"
+                id="nav-logout-btn"
+                data-testid="nav-logout-button"
+                class="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-200 cursor-pointer transition-colors whitespace-nowrap"
+              >
+                Log Out
+              </button>
+            </div>
+
+            <!-- Logged-In Admin Navigation (Shown ONLY when an Admin is logged in) -->
+            <div id="nav-admin-actions" class="hidden items-center gap-2">
+              <a
+                href="dashboard.html?role=admin"
+                id="nav-admin-dashboard-link"
+                data-testid="nav-admin-dashboard-button"
+                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#0095FF] text-white hover:bg-[#0077CC] shadow-xs whitespace-nowrap"
+              >
+                <span>Admin Dashboard</span>
+              </a>
+              <button
+                type="button"
+                id="nav-admin-logout-btn"
+                data-testid="nav-admin-logout-button"
+                class="px-3 py-2.5 rounded-xl text-xs font-semibold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 cursor-pointer transition-colors whitespace-nowrap"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="bg-white text-[#0D1015]">
+      <!-- 1. STOREFRONT HERO SECTION -->
+      <section class="relative bg-[#0B0F17] text-white overflow-hidden border-b border-slate-800">
+        <div
+          class="absolute inset-0 opacity-25 pointer-events-none"
+          style="background-image: radial-gradient(circle at 80% 25%, rgba(0, 149, 255, 0.30), transparent 55%), radial-gradient(circle at 18% 80%, rgba(188, 227, 255, 0.14), transparent 50%);"
+        ></div>
+
+        <div class="relative max-w-[1440px] mx-auto px-4 sm:px-8 pt-6 pb-12 lg:py-14">
+          <!-- Room Collection Selector Tabs -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-6 mb-8 border-b border-slate-800/80">
+            <div
+              id="hero-tabs"
+              role="tablist"
+              aria-label="Hero Room Showcase Tabs"
+              class="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected="true"
+                data-hero-tab="flagship"
+                class="hero-tab-btn px-3.5 py-1.5 rounded-lg bg-[#0095FF] text-white text-xs font-semibold tracking-wide shrink-0 cursor-pointer transition-colors"
+              >
+                Featured Showroom
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-hero-tab="living"
+                class="hero-tab-btn px-3.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium shrink-0 cursor-pointer transition-colors"
+              >
+                Living Room
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-hero-tab="dining"
+                class="hero-tab-btn px-3.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium shrink-0 cursor-pointer transition-colors"
+              >
+                Dining Room
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-hero-tab="bedroom"
+                class="hero-tab-btn px-3.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium shrink-0 cursor-pointer transition-colors"
+              >
+                Bedroom
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-hero-tab="office"
+                class="hero-tab-btn px-3.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-medium shrink-0 cursor-pointer transition-colors"
+              >
+                Study/Work Desks
+              </button>
+            </div>
+
+            <div class="hidden lg:flex items-center gap-3 text-xs text-slate-300">
+              <span class="w-2 h-2 rounded-full bg-[#0095FF]"></span>
+              <span id="hero-lead-badge">Made-to-Order &amp; Ready-to-Ship Pieces · 15-Year Guarantee</span>
+            </div>
+          </div>
+
+          <!-- Hero Split Content -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            <!-- Left Text Column -->
+            <div class="lg:col-span-5 space-y-6">
+              <div class="space-y-3">
+                <p
+                  id="hero-eyebrow"
+                  class="text-xs uppercase tracking-[0.16em] text-[#38BDF8] font-semibold"
+                >
+                  Lillia and Rowena Furniture · Handcrafted Collection
+                </p>
+                <h1
+                  id="hero-headline"
+                  class="font-serif-display text-3xl sm:text-5xl lg:text-[50px] font-bold tracking-tight leading-[1.1] text-white"
+                >
+                  Handcrafted Solid Wood &amp; Custom Furniture for Every Room.
+                </h1>
+                <p id="hero-description" class="text-sm sm:text-base text-slate-300 leading-relaxed">
+                  Explore solid American black walnut tables, Belgian bouclé sofas, and honed Roman travertine pieces—or request a custom furniture design tailored to your space.
+                </p>
+              </div>
+
+              <!-- Price Anchor Box -->
+              <div class="space-y-4">
+                <div class="p-5 rounded-2xl bg-[#111927]/90 border border-[#1E3A5F] flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p id="hero-price-label" class="text-xs text-slate-400">Collection Starting At</p>
+                    <p id="hero-price" class="font-mono-tech text-3xl sm:text-4xl font-bold text-[#0095FF] mt-1">
+                      $1,180
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p id="hero-monthly" class="font-mono-tech text-xs font-semibold text-white">
+                      Flexible Custom Sizing Available
+                    </p>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                      Make an Offer on Any Piece for Personal Vouchers
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                  <a
+                    id="hero-primary-cta"
+                    href="catalog.html?category=living"
+                    data-filter-target="living"
+                    class="px-5 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 shadow-sm"
+                  >
+                    <span id="hero-primary-cta-text">Shop Living Room</span>
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+                  </a>
+                  <button
+                    type="button"
+                    data-request-design-trigger="true"
+                    data-testid="hero-custom-design-button"
+                    class="px-4 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <svg class="w-4 h-4 text-[#38BDF8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                    <span>Request a Design</span>
+                  </button>
+                  <a
+                    id="hero-track-order-link"
+                    href="login.html"
+                    class="px-4 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition-colors"
+                  >
+                    Track My Order →
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Showcase Card -->
+            <div class="lg:col-span-7">
+              <div class="relative rounded-2xl overflow-hidden border border-[#1E3A5F] bg-slate-900 shadow-2xl">
+                <div class="aspect-[16/11] relative overflow-hidden">
+                  <img
+                    id="hero-image"
+                    src="assets/images/hero_living_room_atelier.jpg"
+                    alt="Lillia and Rowena Furniture Flagship Room"
+                    class="w-full h-full object-cover object-center transition-all duration-500"
+                  />
+                  <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/90 via-[#0D1015]/20 to-transparent"></div>
+                  <div class="absolute bottom-5 left-5 right-5 flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <p id="hero-card-subtitle" class="text-xs font-medium text-[#BCE3FF]">
+                        Featured Room Collection · Solid Timber &amp; Tailored Upholstery · 3–6 Weeks Delivery
+                      </p>
+                      <h2 id="hero-card-title" class="font-serif-display text-2xl sm:text-3xl font-bold text-white mt-0.5">
+                        Living Room Collection
+                      </h2>
+                    </div>
+                    <a
+                      id="hero-card-cta"
+                      href="catalog.html?category=living"
+                      data-filter-target="living"
+                      class="px-4 py-2.5 rounded-xl bg-[#0095FF] text-white text-xs font-semibold hover:bg-[#0077CC] transition-colors shadow-md"
+                    >
+                      Browse Room Pieces →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. VALUE STRIP -->
+      <section class="bg-[#F0F8FF] border-b border-[#BCE3FF]">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div class="flex items-start gap-3">
+            <div class="p-2 rounded-lg bg-white text-[#0095FF] border border-[#BCE3FF] shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-[#0D1015]">Make an Offer on Any Piece</h3>
+              <p class="text-xs text-slate-600 mt-0.5">Generate an offer card inside Product Details and send it on Messenger</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="p-2 rounded-lg bg-white text-[#0095FF] border border-[#BCE3FF] shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-[#0D1015]">Custom Wood &amp; Fabric Finishes</h3>
+              <p class="text-xs text-slate-600 mt-0.5">Filter by 10 timber, stone &amp; upholstery finishes in our full catalog</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="p-2 rounded-lg bg-white text-[#0095FF] border border-[#BCE3FF] shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-[#0D1015]">Custom Furniture Designs</h3>
+              <p class="text-xs text-slate-600 mt-0.5">Message us on Messenger or submit a Custom Order in your dashboard</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="p-2 rounded-lg bg-white text-[#0095FF] border border-[#BCE3FF] shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-[#0D1015]">White-Glove Room Placement</h3>
+              <p class="text-xs text-slate-600 mt-0.5">In-home delivery, assembly, and live order tracking</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. SHOP BY CATEGORY SHOWCASE (5 Categories) -->
+      <section class="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 lg:py-16 border-b border-[#E2E8F0]">
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-6 mb-8 border-b border-[#E2E8F0]">
+          <div>
+            <p class="font-mono-tech text-xs uppercase tracking-[0.15em] text-[#0095FF] font-semibold">
+              01. Curated Collections
+            </p>
+            <h2 class="font-serif-display text-2xl sm:text-3xl font-bold text-[#0D1015] tracking-tight mt-1">
+              Shop by Category
+            </h2>
+            <p class="text-xs sm:text-sm text-[#475569] mt-1.5 max-w-2xl">
+              Select any category picture or button below to open our dedicated Catalog page with left-sidebar color and price filtering.
+            </p>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <a
+              href="catalog.html"
+              class="px-4 py-2 rounded-xl bg-[#F0F8FF] hover:bg-[#0095FF] text-[#0077CC] hover:text-white border border-[#BCE3FF] hover:border-[#0095FF] text-xs font-semibold transition-colors whitespace-nowrap"
+            >
+              View All 5 Collections →
+            </a>
+          </div>
+        </div>
+
+        <div id="categories-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          <!-- Category 1: Living Room -->
+          <article data-category-card-href="catalog.html?category=living" class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer">
+            <a href="catalog.html?category=living" data-filter-target="living" data-testid="category-image-link-living" aria-label="Explore Living Room" class="block flex-1 cursor-pointer focus:outline-none">
+              <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                <img src="assets/images/category_living_lounge.jpg" alt="Living Room" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+                <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                  <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From $1,680 · 3 Pieces</p>
+                  <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">Living Room</h3>
+                </div>
+              </div>
+              <div class="p-4 pt-3.5">
+                <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">Sculpted Bouclé Sofas, Solid Oak Lounge Chairs &amp; Travertine Plinths</p>
+              </div>
+            </a>
+            <div class="px-4 pb-4 pt-1">
+              <a href="catalog.html?category=living" data-filter-target="living" data-testid="category-card-link-living" class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between">
+                <span>Explore Living Room</span>
+                <span>→</span>
+              </a>
+            </div>
+          </article>
+
+          <!-- Category 2: Dining Room -->
+          <article data-category-card-href="catalog.html?category=dining" class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer">
+            <a href="catalog.html?category=dining" data-filter-target="dining" data-testid="category-image-link-dining" aria-label="Explore Dining Room" class="block flex-1 cursor-pointer focus:outline-none">
+              <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                <img src="assets/images/category_dining_tables.jpg" alt="Dining Room" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+                <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                  <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From $1,290 · 2 Pieces</p>
+                  <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">Dining Room</h3>
+                </div>
+              </div>
+              <div class="p-4 pt-3.5">
+                <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">Monolithic Black Walnut Slab Tables &amp; Woven Danish Cord Seating</p>
+              </div>
+            </a>
+            <div class="px-4 pb-4 pt-1">
+              <a href="catalog.html?category=dining" data-filter-target="dining" data-testid="category-card-link-dining" class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between">
+                <span>Explore Dining Room</span>
+                <span>→</span>
+              </a>
+            </div>
+          </article>
+
+          <!-- Category 3: Bedroom -->
+          <article data-category-card-href="catalog.html?category=bedroom" class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer">
+            <a href="catalog.html?category=bedroom" data-filter-target="bedroom" data-testid="category-image-link-bedroom" aria-label="Explore Bedroom" class="block flex-1 cursor-pointer focus:outline-none">
+              <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                <img src="assets/images/category_bedroom_sanctuary.jpg" alt="Bedroom" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+                <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                  <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From $1,180 · 2 Pieces</p>
+                  <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">Bedroom</h3>
+                </div>
+              </div>
+              <div class="p-4 pt-3.5">
+                <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">Tailored Belgian Linen Platform Beds &amp; Cantilevered Ash Nightstands</p>
+              </div>
+            </a>
+            <div class="px-4 pb-4 pt-1">
+              <a href="catalog.html?category=bedroom" data-filter-target="bedroom" data-testid="category-card-link-bedroom" class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between">
+                <span>Explore Bedroom</span>
+                <span>→</span>
+              </a>
+            </div>
+          </article>
+
+          <!-- Category 4: Study/Work Desks -->
+          <article data-category-card-href="catalog.html?category=office" class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer">
+            <a href="catalog.html?category=office" data-filter-target="office" data-testid="category-image-link-office" aria-label="Explore Study/Work Desks" class="block flex-1 cursor-pointer focus:outline-none">
+              <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                <img src="assets/images/category_office_storage.jpg" alt="Study/Work Desks" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+                <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                  <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From $2,150 · 2 Pieces</p>
+                  <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">Study/Work Desks</h3>
+                </div>
+              </div>
+              <div class="p-4 pt-3.5">
+                <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">Fluted Walnut Sideboards, Architect Work Desks &amp; Shelving Systems</p>
+              </div>
+            </a>
+            <div class="px-4 pb-4 pt-1">
+              <a href="catalog.html?category=office" data-filter-target="office" data-testid="category-card-link-office" class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between">
+                <span>Explore Study/Work Desks</span>
+                <span>→</span>
+              </a>
+            </div>
+          </article>
+
+          <!-- Category 5: Kitchen -->
+          <article data-category-card-href="catalog.html?category=kitchen" class="group rounded-2xl bg-white border border-slate-200 hover:border-[#0095FF] overflow-hidden shadow-2xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer">
+            <a href="catalog.html?category=kitchen" data-filter-target="kitchen" data-testid="category-image-link-kitchen" aria-label="Explore Kitchen" class="block flex-1 cursor-pointer focus:outline-none">
+              <div class="aspect-[4/3] relative overflow-hidden bg-slate-100">
+                <img src="assets/images/category_kitchen_atelier.jpg" alt="Kitchen" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0D1015]/85 via-[#0D1015]/20 to-transparent"></div>
+                <div class="absolute bottom-3.5 left-4 right-4 text-white">
+                  <p class="font-mono-tech text-[11px] text-[#BCE3FF]">From $1,450 · 2 Pieces</p>
+                  <h3 class="font-serif-display text-lg font-bold leading-snug mt-0.5">Kitchen</h3>
+                </div>
+              </div>
+              <div class="p-4 pt-3.5">
+                <p class="text-xs text-[#475569] leading-relaxed line-clamp-2">Monolithic Walnut Kitchen Islands, Travertine Prep Blocks &amp; Counter Stools</p>
+              </div>
+            </a>
+            <div class="px-4 pb-4 pt-1">
+              <a href="catalog.html?category=kitchen" data-filter-target="kitchen" data-testid="category-card-link-kitchen" class="w-full py-2.5 px-3.5 rounded-xl bg-[#EBF6FF] group-hover:bg-[#0095FF] text-[#0D1015] group-hover:text-white text-xs font-semibold transition-colors flex items-center justify-between">
+                <span>Explore Kitchen</span>
+                <span>→</span>
+              </a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 4. RECOMMENDED / BEST SELLERS SECTION -->
+      <section id="catalog-section" class="max-w-[1440px] mx-auto px-4 sm:px-8 py-14 lg:py-20">
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-8 border-b border-[#E2E8F0]">
+          <div>
+            <p id="catalog-section-eyebrow" class="font-mono-tech text-xs uppercase tracking-[0.15em] text-[#0095FF] font-semibold">
+              02. Most Commissioned Showroom Pieces
+            </p>
+            <h2 id="catalog-section-title" class="font-serif-display text-3xl sm:text-4xl font-bold text-[#0D1015] tracking-tight mt-1">
+              Recommended &amp; Best Sellers
+            </h2>
+            <p id="catalog-section-subtitle" class="text-sm text-[#475569] mt-1.5 max-w-2xl">
+              Our four signature client favorites—view details, customize finishes, make an offer, or open the full catalog page with color and price filtering.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <span id="catalog-count-label" class="font-mono-tech text-xs text-[#475569]">
+              Showing 4 Recommended Best Sellers
+            </span>
+            <a
+              href="catalog.html"
+              data-testid="browse-full-catalog-link"
+              class="px-4 py-2 rounded-xl bg-[#0D1015] hover:bg-[#0095FF] text-white text-xs font-semibold transition-colors whitespace-nowrap"
+            >
+              Browse Full Catalog &amp; Color Filter →
+            </a>
+            <button
+              type="button"
+              id="catalog-show-recommended-btn"
+              class="hidden px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap"
+            >
+              ← Back to Recommended &amp; Best Sellers (4)
+            </button>
+          </div>
+        </div>
+
+        <!-- Recommended / Best Sellers Grid (4 items) -->
+        <div id="product-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+          <!-- Populated from src/api.php by app.js -->
+        </div>
+      </section>
+
+      <!-- 5. CUSTOM DESIGN & MAKE OFFER CALLOUT BANNER -->
+      <section class="bg-[#0D1015] text-white border-t border-slate-800">
+        <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-14 lg:py-16">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div class="lg:col-span-8 space-y-3">
+              <p class="font-mono-tech text-xs uppercase tracking-[0.16em] text-[#0095FF] font-semibold">
+                Custom Furniture &amp; Exclusive Vouchers
+              </p>
+              <h2 class="font-serif-display text-2xl sm:text-3xl font-bold text-white leading-snug">
+                Want to request a custom design or negotiate an offer on any piece?
+              </h2>
+              <p class="text-sm text-slate-300 max-w-2xl leading-relaxed">
+                Open any product's details to generate an Offer Proposal image or click Request a Custom Design to message our workshop owner directly on Messenger.
+              </p>
+            </div>
+            <div class="lg:col-span-4 flex flex-wrap lg:justify-end gap-3">
+              <button
+                type="button"
+                data-request-design-trigger="true"
+                class="px-5 py-3.5 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-colors inline-flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <span>Request a Custom Design ↗</span>
+              </button>
+              <a
+                id="banner-customer-vouchers-link"
+                href="dashboard.html?role=client&tab=vouchers"
+                class="hidden px-5 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold transition-colors"
+              >
+                View My Vouchers →
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#F4F9FF] text-[#475569] border-t border-[#BCE3FF]">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-md bg-[#0095FF] text-white flex items-center justify-center font-serif-display text-xs font-bold">
+              LR
+            </div>
+            <span class="font-serif-display text-base font-bold text-[#0D1015]">Lillia and Rowena Furniture</span>
+          </div>
+          <p class="text-xs text-[#475569] leading-relaxed">
+            2240 Chino Roces Avenue Extension, Makati Flagship Showroom · Cebu Custom Millwork Foundry
+          </p>
+          <p class="font-mono-tech text-[11px] text-[#0095FF] font-medium">
+            Direct Owner Messenger Offers · Custom Furniture Designs · 15-Year Joinery Guarantee
+          </p>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="font-mono-tech text-[11px] uppercase tracking-widest text-[#0D1015] font-semibold">Shop by Category</p>
+          <ul class="space-y-1.5">
+            <li><a href="catalog.html?category=living" data-filter-target="living" class="hover:text-[#0095FF]">Living Room</a></li>
+            <li><a href="catalog.html?category=dining" data-filter-target="dining" class="hover:text-[#0095FF]">Dining Room</a></li>
+            <li><a href="catalog.html?category=bedroom" data-filter-target="bedroom" class="hover:text-[#0095FF]">Bedroom</a></li>
+            <li><a href="catalog.html?category=office" data-filter-target="office" class="hover:text-[#0095FF]">Study/Work Desks</a></li>
+            <li><a href="catalog.html?category=kitchen" data-filter-target="kitchen" class="hover:text-[#0095FF]">Kitchen</a></li>
+          </ul>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="text-xs uppercase tracking-wider text-[#0D1015] font-bold">Custom Orders &amp; Offers</p>
+          <ul class="space-y-1.5">
+            <li><a href="catalog.html" class="hover:text-[#0095FF]">Browse Full Catalog &amp; Color Filter</a></li>
+            <li><a href="#catalog-section" class="hover:text-[#0095FF]">Select a Product to Make an Offer</a></li>
+            <li><button type="button" data-request-design-trigger="true" class="hover:text-[#0095FF] cursor-pointer text-left">Request a Custom Furniture Design</button></li>
+          </ul>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="text-xs uppercase tracking-wider text-[#0D1015] font-bold">Account &amp; Service</p>
+          <ul id="footer-guest-links" class="space-y-1.5">
+            <li><a href="login.html" id="footer-login-link" class="hover:text-[#0095FF] font-medium text-[#0D1015]">Sign In</a></li>
+            <li><a href="login.html?mode=register" id="footer-register-link" class="hover:text-[#0095FF]">Create Account</a></li>
+            <li class="text-slate-500">Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</li>
+          </ul>
+          <ul id="footer-customer-links" class="hidden space-y-1.5">
+            <li><a href="dashboard.html?role=client&tab=home" id="footer-my-account-link" class="hover:text-[#0095FF] font-semibold text-[#0D1015]">My Account</a></li>
+            <li><a href="dashboard.html?role=client&tab=orders" id="footer-my-orders-link" class="hover:text-[#0095FF]">My Orders</a></li>
+            <li><button type="button" id="footer-logout-btn" class="hover:text-rose-600 text-rose-600 font-semibold cursor-pointer">Log Out</button></li>
+            <li class="text-slate-500">Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</li>
+          </ul>
+          <ul id="footer-admin-links" class="hidden space-y-1.5">
+            <li><a href="dashboard.html?role=admin" id="footer-admin-dashboard-link" class="hover:text-[#0095FF] font-semibold text-[#0D1015]">Admin Dashboard</a></li>
+            <li><button type="button" id="footer-admin-logout-btn" class="hover:text-rose-600 text-rose-600 font-semibold cursor-pointer">Log Out</button></li>
+            <li class="text-slate-500">Showroom Hours: Mon–Sun 10:00 AM – 8:00 PM</li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Customer Product Details Modal (Zero Technical / Internal Codes) -->
+    <div
+      id="product-detail-modal"
+      class="fixed inset-0 z-50 bg-[#0D1015]/60 backdrop-blur-xs hidden items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="product-modal-title"
+    >
+      <div class="bg-white w-full max-w-3xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden my-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+          <p id="product-modal-category" class="text-xs font-semibold uppercase tracking-wider text-[#0095FF]">
+            Furniture Details
+          </p>
+          <button
+            type="button"
+            id="close-product-modal-btn"
+            aria-label="Close product details"
+            class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+        <div id="product-detail-modal-body" class="p-6 sm:p-8">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Make Offer Modal (Opened from inside Product Details) -->
+    <div
+      id="make-offer-modal"
+      class="fixed inset-0 z-50 bg-[#0D1015]/70 backdrop-blur-xs hidden items-center justify-center p-3 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="make-offer-modal-title"
+    >
+      <div class="offer-modal-panel">
+        <!-- Fixed Modal Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-[#0095FF]">
+              Product Offer &amp; Customization Proposal
+            </p>
+            <h2 id="make-offer-modal-title" class="font-serif-display text-xl sm:text-2xl font-bold text-[#0D1015]">
+              Make an Offer on This Piece
+            </h2>
+          </div>
+          <button
+            type="button"
+            id="close-make-offer-modal-btn"
+            aria-label="Close Make Offer modal"
+            class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Scrollable Modal Body -->
+        <div class="offer-modal-scroll-body">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <!-- Left Column: Make Offer Form -->
+            <form id="make-offer-form" class="lg:col-span-6 space-y-4">
+              <div class="p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 flex items-center gap-3.5">
+                <img
+                  id="offer-product-image"
+                  src="assets/images/category_living_lounge.jpg"
+                  alt="Selected product"
+                  class="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                />
+                <div class="min-w-0 flex-1">
+                  <p id="offer-product-category" class="text-[11px] font-semibold uppercase tracking-wider text-[#0095FF]">
+                    Showroom Collection
+                  </p>
+                  <p id="offer-product-name" class="font-serif-display text-base font-bold text-[#0D1015] truncate">
+                    Selected Furniture Piece
+                  </p>
+                  <p class="text-xs text-slate-600 mt-0.5">
+                    Finish: <strong id="offer-product-finish" class="text-[#0D1015]">Natural Finish</strong> ·
+                    Listed Price: <strong id="offer-product-original-price" class="font-mono-tech text-[#0095FF]">$0</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label for="offer-product-name-input" class="block text-xs font-bold text-[#0D1015] mb-1">
+                  Product Name (Auto-Filled)
+                </label>
+                <input
+                  id="offer-product-name-input"
+                  type="text"
+                  readonly
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-700 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label for="offer-proposed-price" class="block text-xs font-bold text-[#0D1015] mb-1">
+                  Your Proposed Price ($ USD) <span class="text-rose-600">*</span>
+                </label>
+                <input
+                  id="offer-proposed-price"
+                  type="number"
+                  min="25"
+                  step="1"
+                  required
+                  placeholder="Enter your proposed offer amount (e.g. 2400)"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 font-mono-tech text-sm font-bold text-[#0D1015] focus:outline-none focus:border-[#0095FF]"
+                />
+              </div>
+
+              <div>
+                <label for="offer-customizations" class="block text-xs font-bold text-[#0D1015] mb-1">
+                  Desired Customization or Modifications
+                </label>
+                <textarea
+                  id="offer-customizations"
+                  rows="2"
+                  placeholder="e.g., Custom length 220cm, smoked oak finish, or performance linen upholstery..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-[#0D1015] focus:outline-none focus:border-[#0095FF]"
+                ></textarea>
+              </div>
+
+              <div>
+                <label for="offer-notes" class="block text-xs font-bold text-[#0D1015] mb-1">
+                  Additional Instructions or Notes
+                </label>
+                <textarea
+                  id="offer-notes"
+                  rows="2"
+                  placeholder="e.g., Preferred delivery timeline, room access details, or matching pieces..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-[#0D1015] focus:outline-none focus:border-[#0095FF]"
+                ></textarea>
+              </div>
+
+              <div>
+                <label for="offer-reference-image" class="block text-xs font-bold text-[#0D1015] mb-1">
+                  Reference Image or Sketch (Optional)
+                </label>
+                <input
+                  id="offer-reference-image"
+                  type="file"
+                  accept="image/*"
+                  class="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#EBF6FF] file:text-[#0077CC] hover:file:bg-[#D8EEFF] cursor-pointer"
+                />
+                <div id="offer-ref-preview-wrap" class="hidden mt-2 flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200">
+                  <img id="offer-ref-preview-img" src="" alt="Uploaded reference preview" class="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                  <span id="offer-ref-preview-name" class="text-xs text-slate-600 truncate flex-1">Reference uploaded</span>
+                  <button type="button" id="offer-ref-clear-btn" class="text-xs font-semibold text-rose-600 hover:underline cursor-pointer">Remove</button>
+                </div>
+              </div>
+
+              <p id="make-offer-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700"></p>
+
+              <button
+                type="submit"
+                id="generate-offer-btn"
+                class="w-full py-3 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+              >
+                Generate Offer Proposal Image
+              </button>
+            </form>
+
+            <!-- Right Column: Generated Offer Image Preview + Copy / Download Actions -->
+            <div id="offer-generated-panel" class="lg:col-span-6 space-y-4">
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <p class="text-xs font-bold text-[#0D1015]">Generated Offer Proposal Card</p>
+                    <p class="text-[11px] text-slate-500">
+                      Copy or download this image, then send it directly to our workshop owner on Messenger.
+                    </p>
+                  </div>
+                  <span id="offer-status-badge" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#EBF6FF] text-[#0077CC]">
+                    Live Preview
+                  </span>
+                </div>
+
+                <canvas id="offer-proposal-canvas" width="960" height="640" class="hidden"></canvas>
+                <div class="offer-preview-card">
+                  <img
+                    id="offer-proposal-preview-img"
+                    src=""
+                    alt="Generated Furniture Offer Proposal"
+                    class="w-full h-auto block"
+                  />
+                </div>
+
+                <p
+                  id="offer-action-feedback"
+                  class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold"
+                ></p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    id="copy-offer-image-btn"
+                    class="py-2.5 px-4 rounded-xl bg-[#0D1015] hover:bg-slate-800 text-white text-xs font-semibold transition-colors inline-flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    <span>Copy Image</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="download-offer-image-btn"
+                    class="py-2.5 px-4 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold transition-colors inline-flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    <span>Download Image</span>
+                  </button>
+                </div>
+
+                <a
+                  id="offer-open-messenger-link"
+                  href="https://www.messenger.com/t/100000505712325"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-[#0D1015] border border-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg class="w-4 h-4 text-[#0095FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                  <span>Open Messenger to Send Offer Image ↗</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shopping Cart & Voucher Drawer -->
+    <div
+      id="cart-drawer"
+      class="fixed inset-0 z-50 bg-[#0D1015]/60 backdrop-blur-xs hidden justify-end overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Shopping Cart"
+    >
+      <div class="cart-drawer-panel">
+        <div class="cart-drawer-header flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-[#0095FF]">
+              Lillia and Rowena Furniture
+            </p>
+            <h2 class="font-serif-display text-2xl font-bold text-[#0D1015]">Your Shopping Cart</h2>
+          </div>
+          <button
+            type="button"
+            id="close-cart-btn"
+            aria-label="Close shopping cart"
+            class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-[#0D1015] cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div id="cart-items-list" class="cart-items-scroll-area space-y-3"></div>
+
+        <div class="cart-drawer-footer space-y-4">
+          <div id="cart-voucher-section" class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 hidden">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-[#0D1015]">
+                Have a Voucher Code?
+              </p>
+            </div>
+            <p id="cart-voucher-hint-line" class="text-[11px] text-slate-600">
+              Enter your personal voucher code (<span id="cart-user-email" class="font-semibold text-[#0D1015]">Sign in to verify your email</span>) to apply a discount to the eligible item in your cart.
+            </p>
+            <div class="flex gap-2">
+              <input
+                id="voucher-code-input"
+                type="text"
+                placeholder="Enter voucher code"
+                class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 font-mono-tech text-xs uppercase text-[#0D1015]"
+              />
+              <button
+                type="button"
+                id="apply-voucher-btn"
+                class="px-4 py-2 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs font-semibold cursor-pointer"
+              >
+                Apply
+              </button>
+            </div>
+            <p id="voucher-feedback" class="text-xs font-medium hidden"></p>
+          </div>
+
+          <div id="cart-footer-totals" class="space-y-3.5 hidden">
+            <div class="space-y-1.5 text-xs sm:text-sm">
+              <div class="flex justify-between text-slate-600">
+                <span>Items Subtotal</span>
+                <span id="cart-subtotal" class="font-mono-tech font-semibold text-[#0D1015]">$0</span>
+              </div>
+              <div id="cart-voucher-row" class="hidden justify-between text-emerald-700 font-semibold">
+                <span>Voucher Discount</span>
+                <span id="cart-voucher-discount" class="font-mono-tech">-$0</span>
+              </div>
+              <div class="flex justify-between text-slate-600">
+                <span>White-Glove Delivery &amp; Assembly</span>
+                <span id="cart-delivery" class="font-mono-tech font-semibold text-[#0D1015]">$0</span>
+              </div>
+              <div class="flex justify-between text-base font-bold text-[#0D1015] pt-2 border-t border-slate-200">
+                <span>Total</span>
+                <span id="cart-total" class="font-mono-tech text-[#0095FF]">$0</span>
+              </div>
+            </div>
+
+            <div>
+              <a
+                id="cart-checkout-link"
+                href="login.html"
+                class="block w-full px-4 py-3 rounded-xl bg-[#0095FF] hover:bg-[#0077CC] text-white text-xs sm:text-sm font-semibold text-center transition-colors shadow-xs"
+              >
+                Sign In to Checkout →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="assets/js/app.js"></script>
+  </body>
+</html>

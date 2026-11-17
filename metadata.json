@@ -1,0 +1,8 @@
+{
+  "name": "Remix Lillia and Rowena Furniture",
+  "description": "Lillia and Rowena Furniture — Architectural showroom, client order tracking portal, and record management system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

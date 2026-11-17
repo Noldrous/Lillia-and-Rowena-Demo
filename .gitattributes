@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+server.mjs linguist-vendored
+assets/js/store.test.js linguist-vendored

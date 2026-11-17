@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.playwright-cli/
+.aistudio/
+.DS_Store
+Thumbs.db
+*.log
+.env*
+!.env.example
+bun.lock
+bun.lockb
+package-lock.json

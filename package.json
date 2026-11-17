@@ -1,0 +1,15 @@
+{
+  "name": "lillia-and-rowena-furniture",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "build": "rm -rf dist && mkdir -p dist && cp -r index.html catalog.html login.html dashboard.html server.mjs assets config database src dist/",
+    "preview": "node server.mjs",
+    "clean": "rm -rf dist",
+    "lint": "test -f index.html && test -f catalog.html && test -f login.html && test -f dashboard.html && test -f src/api.php && test -f server.mjs && test -f assets/css/style.css && test -f assets/css/login.css && test -f assets/js/app.js && test -f assets/js/store.js && test -f assets/js/login.js && test -f assets/js/dashboard.js && test -f assets/js/analytics.js",
+    "test": "node --test assets/js/*.test.js"
+  }
+}
